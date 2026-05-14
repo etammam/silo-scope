@@ -3,7 +3,7 @@ updates:
 - package-ecosystem: "nuget"
   directory: "/src"
   commit-message:
-    prefix: "chore(deps)"
+    prefix: "chore"
     include: "scope"
   schedule:
     interval: "weekly"
@@ -23,7 +23,7 @@ updates:
     time: "04:00"
   open-pull-requests-limit: 5
   commit-message:
-    prefix: "chore(deps)"
+    prefix: "chore"
     include: "scope"
   target-branch: "main"
   labels:
@@ -38,7 +38,7 @@ updates:
     time: "04:00"
   open-pull-requests-limit: 5
   commit-message:
-    prefix: "ci(deps)"
+    prefix: "ci"
     include: "scope"
   target-branch: "main"
   labels:
