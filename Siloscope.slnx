@@ -1,1 +1,6 @@
-<Solution></Solution>
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Siloscope.Core/Siloscope.Core.csproj" />
+    <Project Path="src/Siloscope.Cli/Siloscope.Cli.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup>
+    <PackageVersion Include="Terminal.Gui" Version="2.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Client" Version="10.1.0" />
+  </ItemGroup>
+</Project>
