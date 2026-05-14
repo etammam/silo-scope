@@ -1,0 +1,98 @@
+name: Continues Integration
+on:
+  workflow_dispatch:
+  pull_request:
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      cache-key: ${{ steps.cache-keys.outputs.cache-key }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate cache keys
+        id: cache-keys
+        run: |
+          echo "cache-key=${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}" >> $GITHUB_OUTPUT
+          echo "tools-cache-key=${{ runner.os }}-dotnet-tools-${{ hashFiles('**/.config/dotnet-tools.json', '**/*.csproj') }}" >> $GITHUB_OUTPUT
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.local/share/NuGet/v3-cache
+          key: ${{ steps.cache-keys.outputs.cache-key }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Cache dotnet tools
+        uses: actions/cache@v5
+        with:
+          path: |
+            /home/runner/.dotnet/tools
+            ~/.dotnet/tools
+          key: ${{ steps.cache-keys.outputs.tools-cache-key }}
+          restore-keys: |
+            ${{ runner.os }}-dotnet-tools-
+
+      - name: Install global tools
+        run: |
+          dotnet tool restore --verbosity minimal
+          echo ".NET tools restored successfully"
+      - name: Restore dependencies
+        run: |
+          dotnet restore --locked-mode --verbosity minimal
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check formatting
+        run: |
+          dotnet csharpier check .
+        continue-on-error: false
+
+      - name: Build
+        run: |
+          dotnet build --configuration Release --no-restore --verbosity minimal
+
+      - name: Check for outdated dependencies
+        run: |
+          dotnet list package --outdated --format json > outdated-packages.json || echo '{"projects":[]}' > outdated-packages.json
+
+      - name: Upload outdated package list
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: outdated-packages
+          path: outdated-packages.json
+
+      - name: Unit Testing with Coverage
+        id: test
+        run: |
+          # Install dotnet-coverage tool for consistent coverage collection
+          dotnet tool install -g dotnet-coverage --verbosity minimal
+
+          # Collect coverage and output in Cobertura format for SonarQube
+
+          dotnet test --no-build --no-restore --verbosity normal --configuration Release  --settings coverage.runsettings \
+          --collect:"XPlat Code Coverage" --results-directory ./TestResults/coverage
+
+      - name: Upload test and coverage results
+        if: always()
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: test-coverage-results-${{ github.run_number }}
+          path: |
+            ./TestResults/coverage
+          retention-days: 30
