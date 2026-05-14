@@ -2,5 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/Siloscope.Core/Siloscope.Core.csproj" />
     <Project Path="src/Siloscope.Cli/Siloscope.Cli.csproj" />
+    <Project Path="src/Siloscope.Desktop/Siloscope.Desktop.csproj" />
   </Folder>
 </Solution>
