@@ -1,0 +1,8 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+set -e
+
+# Push should only proceed when formatting is clean.
+dotnet csharpier check .
+
