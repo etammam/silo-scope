@@ -2,10 +2,5 @@
   <ItemGroup>
     <PackageVersion Include="Terminal.Gui" Version="2.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.1.0" />
-    <PackageVersion Include="Avalonia" Version="12.0.3" />
-    <PackageVersion Include="Avalonia.Desktop" Version="12.0.3" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.0.3" />
-    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.0.3" />
-    <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.1" />
   </ItemGroup>
 </Project>
