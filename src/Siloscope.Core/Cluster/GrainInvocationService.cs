@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
+using FluentResults;
 using Siloscope.Core.Interfaces;
 
 namespace Siloscope.Core.Cluster;
@@ -18,7 +19,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         _diagnosticSink = sink;
     }
 
-    public async Task<OperationResult<string>> InvokeAsync(
+    public async Task<Result<string>> InvokeAsync(
         GrainInterfaceDescriptor grain,
         GrainMethodDescriptor method,
         string grainKey,
@@ -37,7 +38,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         if (string.IsNullOrWhiteSpace(grainKey))
         {
             LogSection("Invoke", "Rejected: empty grain key.");
-            return OperationResult<string>.Failure("Grain key is required.");
+            return Result.Fail("Grain key is required.");
         }
 
         if (
@@ -49,22 +50,20 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 "Invoke",
                 $"Rejected: no connector for gateway '{grain.Gateway ?? "null"}'."
             );
-            return OperationResult<string>.Failure(
-                $"No connector available for gateway '{grain.Gateway}'."
-            );
+            return Result.Fail($"No connector available for gateway '{grain.Gateway}'.");
         }
 
         if (!connector.TryGetClient(out var client))
         {
             LogSection("Invoke", "Rejected: Orleans client is not connected.");
-            return OperationResult<string>.Failure("Client is not connected. Click Connect first.");
+            return Result.Fail("Client is not connected. Click Connect first.");
         }
 
         var keyType = DetectGrainKeyType(grain.InterfaceType);
         if (keyType == GrainKeyType.Unknown)
         {
             LogSection("Invoke", $"Rejected: unsupported key type for '{grain.Name}'.");
-            return OperationResult<string>.Failure(
+            return Result.Fail(
                 $"Grain '{grain.Name}' does not implement a supported key interface (string, integer, guid, or compound)."
             );
         }
@@ -81,8 +80,12 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         var runtimeResolution = ResolveRuntimeTargets(grain.InterfaceType, method.MethodInfo);
         if (!runtimeResolution.IsSuccess)
         {
-            LogSection("TypeLoad", $"Failed: {runtimeResolution.ErrorMessage}");
-            return OperationResult<string>.Failure(runtimeResolution.ErrorMessage!);
+            foreach (var error in runtimeResolution.Errors)
+            {
+                LogSection("TypeLoad", $"Failed: {error.Message}");
+            }
+
+            return Result.Fail(errors: runtimeResolution.Errors);
         }
 
         var (runtimeInterfaceType, runtimeMethodInfo) = runtimeResolution.Value;
@@ -94,9 +97,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
             if (client is not IGrainFactory grainFactory)
             {
                 LogSection("Invoke", "Rejected: connected client is not an IGrainFactory.");
-                return OperationResult<string>.Failure(
-                    "Connected Orleans client does not expose IGrainFactory."
-                );
+                return Result.Fail("Connected Orleans client does not expose IGrainFactory.");
             }
 
             var grainRef = ResolveGrain(
@@ -108,8 +109,12 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
             );
             if (!grainRef.IsSuccess)
             {
-                LogSection("Invoke", $"Grain resolution failed: {grainRef.ErrorMessage}");
-                return OperationResult<string>.Failure(grainRef.ErrorMessage!);
+                foreach (var error in grainRef.Errors)
+                {
+                    LogSection("Invoke", $"Grain resolution failed: {error.Message}");
+                }
+
+                return Result.Fail(errors: grainRef.Errors);
             }
 
             var grainReference = grainRef.Value!;
@@ -142,7 +147,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
 
             var response = JsonSerializer.Serialize(normalized, SerializerOptions);
             LogSection("Result", $"Serialized response size={response.Length} chars.");
-            return OperationResult<string>.Success(response);
+            return Result.Ok(response);
         }
         catch (Exception ex)
         {
@@ -161,7 +166,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
             LogSection("Error", $"Exception chain: {BuildExceptionChain(ex)}");
             LogSection("Error", $"Stack trace: {ex}");
 
-            return OperationResult<string>.Failure($"Invocation failed: {flattened}");
+            return Result.Fail($"Invocation failed: {flattened}");
         }
     }
 
@@ -217,7 +222,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         return $"TypeDiagnostics Source='{source}', Interface='{type.FullName}', Assembly='{assembly.FullName}', Location='{location}', ALC='{alc}'";
     }
 
-    private OperationResult<(Type InterfaceType, MethodInfo MethodInfo)> ResolveRuntimeTargets(
+    private Result<(Type InterfaceType, MethodInfo MethodInfo)> ResolveRuntimeTargets(
         Type discoveredInterfaceType,
         MethodInfo discoveredMethod
     )
@@ -225,7 +230,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         var runtimeInterfaceType = ResolveInterfaceTypeInDefaultContext(discoveredInterfaceType);
         if (runtimeInterfaceType is null)
         {
-            return OperationResult<(Type InterfaceType, MethodInfo MethodInfo)>.Failure(
+            return Result.Fail(
                 $"Unable to resolve runtime grain type '{discoveredInterfaceType.FullName}'."
             );
         }
@@ -236,12 +241,12 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
 
         if (runtimeMethod is null)
         {
-            return OperationResult<(Type InterfaceType, MethodInfo MethodInfo)>.Failure(
+            return Result.Fail<(Type InterfaceType, MethodInfo MethodInfo)>(
                 $"Unable to resolve runtime method '{discoveredInterfaceType.FullName}.{discoveredMethod.Name}'."
             );
         }
 
-        return OperationResult<(Type InterfaceType, MethodInfo MethodInfo)>.Success(
+        return Result.Ok<(Type InterfaceType, MethodInfo MethodInfo)>(
             (runtimeInterfaceType, runtimeMethod)
         );
     }
@@ -403,7 +408,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         };
     }
 
-    private static OperationResult<object> ResolveGrain(
+    private static Result<object> ResolveGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
         GrainKeyType keyType,
@@ -443,13 +448,11 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 grainKey,
                 logSection
             ),
-            _ => OperationResult<object>.Failure(
-                $"Unsupported grain key type for '{grainInterfaceType.Name}'."
-            ),
+            _ => Result.Fail($"Unsupported grain key type for '{grainInterfaceType.Name}'."),
         };
     }
 
-    private static OperationResult<object> ResolveStringKeyGrain(
+    private static Result<object> ResolveStringKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
         string grainKey,
@@ -465,18 +468,18 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 grainKey
             );
             logSection?.Invoke("Invoke", "Grain reference path: GetGrain<T>(string).");
-            return OperationResult<object>.Success(genericRef);
+            return Result.Ok<object>(genericRef);
         }
         catch (Exception ex)
         {
             logSection?.Invoke("Invoke", $"GetGrain<T>(string) failed: {FlattenException(ex)}");
-            return OperationResult<object>.Failure(
+            return Result.Fail<object>(
                 $"Failed to resolve string-key grain: {FlattenException(ex)}"
             );
         }
     }
 
-    private static OperationResult<object> ResolveIntegerKeyGrain(
+    private static Result<object> ResolveIntegerKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
         string grainKey,
@@ -485,9 +488,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
     {
         if (!long.TryParse(grainKey, out var longKey))
         {
-            return OperationResult<object>.Failure(
-                $"Grain key '{grainKey}' is not a valid integer (long)."
-            );
+            return Result.Fail<object>($"Grain key '{grainKey}' is not a valid integer (long).");
         }
 
         try
@@ -499,18 +500,18 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 longKey
             );
             logSection?.Invoke("Invoke", "Grain reference path: GetGrain<T>(long).");
-            return OperationResult<object>.Success(genericRef);
+            return Result.Ok<object>(genericRef);
         }
         catch (Exception ex)
         {
             logSection?.Invoke("Invoke", $"GetGrain<T>(long) failed: {FlattenException(ex)}");
-            return OperationResult<object>.Failure(
+            return Result.Fail<object>(
                 $"Failed to resolve integer-key grain: {FlattenException(ex)}"
             );
         }
     }
 
-    private static OperationResult<object> ResolveGuidKeyGrain(
+    private static Result<object> ResolveGuidKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
         string grainKey,
@@ -519,7 +520,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
     {
         if (!Guid.TryParse(grainKey, out var guidKey))
         {
-            return OperationResult<object>.Failure($"Grain key '{grainKey}' is not a valid GUID.");
+            return Result.Fail<object>($"Grain key '{grainKey}' is not a valid GUID.");
         }
 
         try
@@ -531,18 +532,16 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 guidKey
             );
             logSection?.Invoke("Invoke", "Grain reference path: GetGrain<T>(Guid).");
-            return OperationResult<object>.Success(genericRef);
+            return Result.Ok<object>(genericRef);
         }
         catch (Exception ex)
         {
             logSection?.Invoke("Invoke", $"GetGrain<T>(Guid) failed: {FlattenException(ex)}");
-            return OperationResult<object>.Failure(
-                $"Failed to resolve GUID-key grain: {FlattenException(ex)}"
-            );
+            return Result.Fail<object>($"Failed to resolve GUID-key grain: {FlattenException(ex)}");
         }
     }
 
-    private static OperationResult<object> ResolveIntegerCompoundKeyGrain(
+    private static Result<object> ResolveIntegerCompoundKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
         string grainKey,
@@ -552,7 +551,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         var (primaryKey, keyExtension) = ParseCompoundKey(grainKey);
         if (!long.TryParse(primaryKey, out var longKey))
         {
-            return OperationResult<object>.Failure(
+            return Result.Fail<object>(
                 $"Compound key primary part '{primaryKey}' is not a valid integer. Use format: <integer>,<string>"
             );
         }
@@ -578,7 +577,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 "Invoke",
                 $"Grain reference path: GetGrain<T>(long, string) with extension='{keyExtension}'."
             );
-            return OperationResult<object>.Success(result);
+            return Result.Ok<object>(result);
         }
         catch (Exception ex)
         {
@@ -586,13 +585,13 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 "Invoke",
                 $"GetGrain<T>(long, string) failed: {FlattenException(ex)}"
             );
-            return OperationResult<object>.Failure(
+            return Result.Fail<object>(
                 $"Failed to resolve integer-compound-key grain: {FlattenException(ex)}"
             );
         }
     }
 
-    private static OperationResult<object> ResolveGuidCompoundKeyGrain(
+    private static Result<object> ResolveGuidCompoundKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
         string grainKey,
@@ -602,7 +601,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         var (primaryKey, keyExtension) = ParseCompoundKey(grainKey);
         if (!Guid.TryParse(primaryKey, out var guidKey))
         {
-            return OperationResult<object>.Failure(
+            return Result.Fail<object>(
                 $"Compound key primary part '{primaryKey}' is not a valid GUID. Use format: <guid>,<string>"
             );
         }
@@ -628,7 +627,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 "Invoke",
                 $"Grain reference path: GetGrain<T>(Guid, string) with extension='{keyExtension}'."
             );
-            return OperationResult<object>.Success(result);
+            return Result.Ok<object>(result);
         }
         catch (Exception ex)
         {
@@ -636,7 +635,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
                 "Invoke",
                 $"GetGrain<T>(Guid, string) failed: {FlattenException(ex)}"
             );
-            return OperationResult<object>.Failure(
+            return Result.Fail<object>(
                 $"Failed to resolve GUID-compound-key grain: {FlattenException(ex)}"
             );
         }

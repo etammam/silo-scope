@@ -1,6 +1,7 @@
 using System.Net;
 using System.Reflection;
 using System.Runtime.Loader;
+using FluentResults;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -38,12 +39,12 @@ public sealed class OrleansClientConnector(
         _diagnosticSink = sink;
     }
 
-    public async Task<OperationResult<string>> ConnectAsync(CancellationToken cancellationToken)
+    public async Task<Result<string>> ConnectAsync(CancellationToken cancellationToken)
     {
         if (_client is not null)
         {
             LogDiagnostic("Connect skipped: client already connected.");
-            return OperationResult<string>.Success("Already connected.");
+            return Result.Ok("Already connected.");
         }
 
         try
@@ -166,13 +167,13 @@ public sealed class OrleansClientConnector(
             await _host.StartAsync(timeoutCts.Token);
             _client = _host.Services.GetRequiredService<IClusterClient>();
             LogDiagnostic($"Connected. Client runtime type='{_client.GetType().FullName}'.");
-            return OperationResult<string>.Success("Connected to Orleans cluster.");
+            return Result.Ok("Connected to Orleans cluster.");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             LogDiagnostic("Connection timed out.");
             await CleanupHostAsync(CancellationToken.None);
-            return OperationResult<string>.Failure(
+            return Result.Ok(
                 $"Connection timed out after {ResolveConnectTimeoutSeconds()} seconds."
             );
         }
@@ -180,13 +181,13 @@ public sealed class OrleansClientConnector(
         {
             LogDiagnostic("Connection canceled by caller.");
             await CleanupHostAsync(CancellationToken.None);
-            return OperationResult<string>.Failure("Connection canceled.");
+            return Result.Fail("Connection canceled.");
         }
         catch (Exception ex)
         {
             LogDiagnostic($"Connection failed with {ex.GetType().FullName}: {ex.Message}");
             await CleanupHostAsync(CancellationToken.None);
-            return OperationResult<string>.Failure($"Connection failed: {ex.Message}");
+            return Result.Fail($"Connection failed: {ex.Message}");
         }
     }
 

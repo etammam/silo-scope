@@ -1,13 +1,22 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Loader;
+using FluentResults;
+using Microsoft.Extensions.Logging;
+using Siloscope.Core.Components.Nuget;
 using Siloscope.Core.Configuration;
 
 namespace Siloscope.Core.Interfaces;
 
-public sealed class InterfaceCatalogLoader
+public sealed class InterfaceCatalogLoader(
+    ILogger<InterfaceCatalogLoader>? logger = null,
+    INugetConnectionManager? nugetManager = null
+)
 {
-    public OperationResult<InterfaceCatalog> LoadAll(IReadOnlyList<InterfaceEntry> entries)
+    private readonly ILogger<InterfaceCatalogLoader>? _logger = logger;
+    private readonly INugetConnectionManager? _nugetManager = nugetManager;
+
+    public Result<InterfaceCatalog> LoadAll(IReadOnlyList<InterfaceEntry> entries)
     {
         var allGrains = new List<GrainInterfaceDescriptor>();
         var assemblyPaths = new List<string>();
@@ -24,12 +33,12 @@ public sealed class InterfaceCatalogLoader
             );
 
             var assemblyPathResult = ResolveAssemblyPath(legacySource);
-            if (!assemblyPathResult.IsSuccess)
+            if (assemblyPathResult.IsFailed)
             {
-                return OperationResult<InterfaceCatalog>.Failure(assemblyPathResult.ErrorMessage!);
+                return Result.Fail(assemblyPathResult.Errors.Select(e => new Error(e.Message)));
             }
 
-            var assemblyPath = assemblyPathResult.Value!;
+            var assemblyPath = assemblyPathResult.Value;
             assemblyPaths.Add(assemblyPath);
 
             try
@@ -38,38 +47,34 @@ public sealed class InterfaceCatalogLoader
                     assemblyPath,
                     legacySource.NugetConfigPath
                 );
-                if (!defaultLoadResult.IsSuccess)
+                if (defaultLoadResult.IsFailed)
                 {
-                    return OperationResult<InterfaceCatalog>.Failure(
-                        defaultLoadResult.ErrorMessage!
-                    );
+                    return Result.Fail(defaultLoadResult.Errors.Select(e => new Error(e.Message)));
                 }
 
-                var grains = DiscoverGrainInterfaces(defaultLoadResult.Value!, entry.Gateway);
+                var grains = DiscoverGrainInterfaces(defaultLoadResult.Value, entry.Gateway);
                 allGrains.AddRange(grains);
             }
             catch (Exception ex)
             {
-                return OperationResult<InterfaceCatalog>.Failure(
+                return Result.Fail(
                     $"Failed to load interface assembly '{assemblyPath}': {ex.Message}"
                 );
             }
         }
 
-        return OperationResult<InterfaceCatalog>.Success(
-            new InterfaceCatalog(allGrains, assemblyPaths)
-        );
+        return Result.Ok(new InterfaceCatalog(allGrains, assemblyPaths));
     }
 
-    public OperationResult<InterfaceCatalog> Load(InterfaceSourceOptions sourceOptions)
+    public Result<InterfaceCatalog> Load(InterfaceSourceOptions sourceOptions)
     {
         var assemblyPathResult = ResolveAssemblyPath(sourceOptions);
-        if (!assemblyPathResult.IsSuccess)
+        if (assemblyPathResult.IsFailed)
         {
-            return OperationResult<InterfaceCatalog>.Failure(assemblyPathResult.ErrorMessage!);
+            return Result.Fail(assemblyPathResult.Errors.Select(e => new Error(e.Message)));
         }
 
-        var assemblyPath = assemblyPathResult.Value!;
+        var assemblyPath = assemblyPathResult.Value;
 
         try
         {
@@ -77,41 +82,37 @@ public sealed class InterfaceCatalogLoader
                 assemblyPath,
                 sourceOptions.NugetConfigPath
             );
-            if (!defaultLoadResult.IsSuccess)
+            if (defaultLoadResult.IsFailed)
             {
-                return OperationResult<InterfaceCatalog>.Failure(defaultLoadResult.ErrorMessage!);
+                return Result.Fail(defaultLoadResult.Errors.Select(e => new Error(e.Message)));
             }
 
-            var grains = DiscoverGrainInterfaces(defaultLoadResult.Value!, gateway: null);
+            var grains = DiscoverGrainInterfaces(defaultLoadResult.Value, gateway: null);
 
-            return OperationResult<InterfaceCatalog>.Success(
-                new InterfaceCatalog(grains, [assemblyPath])
-            );
+            return Result.Ok(new InterfaceCatalog(grains, [assemblyPath]));
         }
         catch (Exception ex)
         {
-            return OperationResult<InterfaceCatalog>.Failure(
-                $"Failed to load interface assembly '{assemblyPath}': {ex.Message}"
-            );
+            return Result.Fail($"Failed to load interface assembly '{assemblyPath}': {ex.Message}");
         }
     }
 
-    private static OperationResult<string> ResolveAssemblyPath(InterfaceSourceOptions options)
+    private static Result<string> ResolveAssemblyPath(InterfaceSourceOptions options)
     {
         if (options.SourceType == InterfaceSourceType.Dll)
         {
             if (string.IsNullOrWhiteSpace(options.DllPath))
             {
-                return OperationResult<string>.Failure("DLL source requires a --dll path.");
+                return Result.Fail("DLL source requires a --dll path.");
             }
 
             var fullPath = Path.GetFullPath(options.DllPath);
             if (!File.Exists(fullPath))
             {
-                return OperationResult<string>.Failure($"Interface DLL not found: {fullPath}");
+                return Result.Fail($"Interface DLL not found: {fullPath}");
             }
 
-            return OperationResult<string>.Success(fullPath);
+            return Result.Ok(fullPath);
         }
 
         if (
@@ -119,9 +120,7 @@ public sealed class InterfaceCatalogLoader
             || string.IsNullOrWhiteSpace(options.PackageVersion)
         )
         {
-            return OperationResult<string>.Failure(
-                "NuGet source requires --package-id and --package-version."
-            );
+            return Result.Fail("NuGet source requires --package-id and --package-version.");
         }
 
         var packageRoot = ResolveNuGetRoot(options.PackageRoot);
@@ -133,7 +132,7 @@ public sealed class InterfaceCatalogLoader
 
         if (!Directory.Exists(packageFolder))
         {
-            return OperationResult<string>.Failure(
+            return Result.Fail(
                 $"Package not found in local NuGet cache: {packageFolder}. Restore it first."
             );
         }
@@ -141,12 +140,10 @@ public sealed class InterfaceCatalogLoader
         var dll = FindPackageDll(packageFolder, options.PackageId);
         if (dll is null)
         {
-            return OperationResult<string>.Failure(
-                $"Could not find a DLL in package folder: {packageFolder}"
-            );
+            return Result.Fail($"Could not find a DLL in package folder: {packageFolder}");
         }
 
-        return OperationResult<string>.Success(dll);
+        return Result.Ok(dll);
     }
 
     private static string ResolveNuGetRoot(string? packageRoot)
@@ -254,7 +251,7 @@ public sealed class InterfaceCatalogLoader
         return $"{baseName}<{args}>";
     }
 
-    private static OperationResult<Assembly> EnsureAssemblyLoadedInDefaultContext(
+    private static Result<Assembly> EnsureAssemblyLoadedInDefaultContext(
         string assemblyPath,
         string? nugetConfigPath
     )
@@ -268,43 +265,43 @@ public sealed class InterfaceCatalogLoader
 
         if (existing is not null)
         {
-            return OperationResult<Assembly>.Success(existing);
+            return Result.Ok(existing);
         }
 
         try
         {
             var loaded = AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
-            return OperationResult<Assembly>.Success(loaded);
+            return Result.Ok(loaded);
         }
         catch (FileNotFoundException)
         {
             var restoreResult = TryRestoreInferredProjectDependencies(fullPath, nugetConfigPath);
-            if (!restoreResult.IsSuccess)
+            if (restoreResult.IsFailed)
             {
-                return OperationResult<Assembly>.Failure(restoreResult.ErrorMessage!);
+                return Result.Fail(restoreResult.Errors.Select(e => new Error(e.Message)));
             }
 
             try
             {
                 var loaded = AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
-                return OperationResult<Assembly>.Success(loaded);
+                return Result.Ok(loaded);
             }
             catch (Exception retryEx)
             {
-                return OperationResult<Assembly>.Failure(
+                return Result.Fail(
                     $"Failed to load interface assembly into default runtime context '{fullPath}' after dependency restore: {retryEx.Message}"
                 );
             }
         }
         catch (Exception ex)
         {
-            return OperationResult<Assembly>.Failure(
+            return Result.Fail(
                 $"Failed to load interface assembly into default runtime context '{fullPath}': {ex.Message}"
             );
         }
     }
 
-    private static OperationResult<bool> TryRestoreInferredProjectDependencies(
+    private static Result<bool> TryRestoreInferredProjectDependencies(
         string assemblyPath,
         string? nugetConfigPath
     )
@@ -312,7 +309,7 @@ public sealed class InterfaceCatalogLoader
         var inferredProject = InferProjectPathFromBuildOutput(assemblyPath);
         if (inferredProject is null)
         {
-            return OperationResult<bool>.Failure(
+            return Result.Fail(
                 "Dependency restore failed: could not infer project file from interface DLL path."
             );
         }
@@ -334,7 +331,7 @@ public sealed class InterfaceCatalogLoader
         using var process = System.Diagnostics.Process.Start(startInfo);
         if (process is null)
         {
-            return OperationResult<bool>.Failure(
+            return Result.Fail(
                 "Dependency restore failed: unable to start dotnet restore process."
             );
         }
@@ -342,12 +339,12 @@ public sealed class InterfaceCatalogLoader
         process.WaitForExit();
         if (process.ExitCode == 0)
         {
-            return OperationResult<bool>.Success(true);
+            return Result.Ok(true);
         }
 
         var stdErr = process.StandardError.ReadToEnd();
         var stdOut = process.StandardOutput.ReadToEnd();
-        return OperationResult<bool>.Failure(
+        return Result.Fail(
             "Dependency restore failed."
                 + (string.IsNullOrWhiteSpace(stdErr) ? string.Empty : $" stderr: {stdErr.Trim()}")
                 + (string.IsNullOrWhiteSpace(stdOut) ? string.Empty : $" stdout: {stdOut.Trim()}")

@@ -1,3 +1,4 @@
+using FluentResults;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.Interfaces;
 
@@ -82,7 +83,7 @@ public sealed class OrleansClientConnectorPool : IDisposable
         }
     }
 
-    public async Task<OperationResult<string>> ConnectAllAsync(CancellationToken cancellationToken)
+    public async Task<Result<string>> ConnectAllAsync(CancellationToken cancellationToken)
     {
         var errors = new List<string>();
 
@@ -91,13 +92,13 @@ public sealed class OrleansClientConnectorPool : IDisposable
             var result = await connector.ConnectAsync(cancellationToken);
             if (!result.IsSuccess)
             {
-                errors.Add($"[{gateway}] {result.ErrorMessage}");
+                errors.AddRange(result.Errors.Select(e => $"[{gateway}] {e.Message}"));
             }
         }
 
         return errors.Count > 0
-            ? OperationResult<string>.Failure($"Connection errors:\n{string.Join("\n", errors)}")
-            : OperationResult<string>.Success($"Connected to {_connectors.Count} gateway(s).");
+            ? Result.Fail($"Connection errors:\n{string.Join("\n", errors)}")
+            : Result.Ok($"Connected to {_connectors.Count} gateway(s).");
     }
 
     public bool TryGetConnectorForGateway(string? gateway, out OrleansClientConnector? connector)

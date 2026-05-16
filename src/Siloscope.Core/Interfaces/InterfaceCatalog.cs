@@ -1,4 +1,5 @@
 using System.Reflection;
+using FluentResults;
 
 namespace Siloscope.Core.Interfaces;
 
@@ -16,20 +17,6 @@ public sealed record InterfaceCatalog(
     IReadOnlyList<string> AssemblyPaths
 )
 {
-    /// <summary>All unique gateway endpoints referenced by the loaded grains.</summary>
     public IReadOnlyList<string> Gateways =>
         Grains.Select(static g => g.Gateway).Where(static g => g is not null).Distinct().ToList()!;
-}
-
-public sealed record OperationResult<T>(bool IsSuccess, T? Value, string? ErrorMessage)
-{
-    public static OperationResult<T> Success(T value)
-    {
-        return new OperationResult<T>(true, value, null);
-    }
-
-    public static OperationResult<T> Failure(string errorMessage)
-    {
-        return new OperationResult<T>(false, default, errorMessage);
-    }
 }

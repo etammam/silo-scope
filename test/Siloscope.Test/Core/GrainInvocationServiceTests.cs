@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using FluentResults;
 using Siloscope.Core.Cluster;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.Interfaces;
@@ -32,7 +33,7 @@ public sealed class GrainInvocationServiceTests
         );
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().Be("Grain key is required.");
+        result.Errors.Should().Contain(e => e.Message == "Grain key is required.");
     }
 
     [Fact]
@@ -61,6 +62,8 @@ public sealed class GrainInvocationServiceTests
         );
 
         result.IsSuccess.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("No connector available for gateway");
+        result
+            .Errors.Should()
+            .Contain(e => e.Message.Contains("No connector available for gateway"));
     }
 }
