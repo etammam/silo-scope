@@ -3,6 +3,8 @@
         "Avalonia",
         "NOLOGO",
         "OPTOUT",
-        "siloscope"
+        "Serilog",
+        "siloscope",
+        "xunit"
     ]
 }

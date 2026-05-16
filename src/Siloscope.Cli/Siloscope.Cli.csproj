@@ -4,6 +4,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Terminal.Gui" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Siloscope.Core/Siloscope.Core.csproj" />
   </ItemGroup>
 </Project>

@@ -1,10 +1,14 @@
 <Project>
   <ItemGroup>
+    <PackageVersion Include="FluentResults" Version="4.0.0" />
+    <PackageVersion Include="NuGet.Protocol" Version="7.6.0" />
+    <PackageVersion Include="Serilog" Version="4.3.1" />
+    <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Terminal.Gui" Version="2.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Orleans.Serialization.MessagePack" Version="10.0.1" />
-
     <!-- Test dependencies -->
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
