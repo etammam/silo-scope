@@ -191,7 +191,7 @@ public sealed class SiloScopeCommandsTests
 
         _grainInvocationServiceMock
             .Setup(s =>
-                s.InvokeAsync(
+                s.InvokeWithTimingAsync(
                     It.IsAny<GrainInterfaceDescriptor>(),
                     It.IsAny<GrainMethodDescriptor>(),
                     It.IsAny<string>(),
@@ -199,13 +199,19 @@ public sealed class SiloScopeCommandsTests
                     It.IsAny<CancellationToken>()
                 )
             )
-            .ReturnsAsync(Result.Ok("{\"result\": \"success\"}"));
+            .ReturnsAsync(
+                Result.Ok(("{\"result\": \"success\"}", new InvocationTiming(1, 10, 15)))
+            );
 
         var result = await _commands.InvokeGrainAsync("TestGrain", "Echo", "key123", "{}");
 
         result.IsSuccess.Should().BeTrue();
         result.Value.IsSuccess.Should().BeTrue();
         result.Value.Result.Should().Be("{\"result\": \"success\"}");
+        result.Value.Timing.Should().NotBeNull();
+        result.Value.Timing.SerializationMs.Should().Be(1);
+        result.Value.Timing.ExecutionMs.Should().Be(10);
+        result.Value.Timing.TotalMs.Should().Be(15);
     }
 
     private void SetWorkspace(Workspace workspace)

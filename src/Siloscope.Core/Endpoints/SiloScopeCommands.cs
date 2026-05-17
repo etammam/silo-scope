@@ -316,7 +316,7 @@ public class SiloScopeCommands : ISiloScopeCommands
             );
         }
 
-        var result = await _grainInvocationService.InvokeAsync(
+        var result = await _grainInvocationService.InvokeWithTimingAsync(
             grain,
             method,
             grainKey,
@@ -331,7 +331,10 @@ public class SiloScopeCommands : ISiloScopeCommands
             );
         }
 
-        return Result.Ok(new InvocationResult(true, result.Value, null, null));
+        var (response, timing) = result.Value;
+        var timingInfo = new TimingInfo(timing.SerializationMs, timing.ExecutionMs, timing.TotalMs);
+
+        return Result.Ok(new InvocationResult(true, response, null, timingInfo));
     }
 
     public async Task<Result<RestoreResult>> RestorePackagesAsync(
