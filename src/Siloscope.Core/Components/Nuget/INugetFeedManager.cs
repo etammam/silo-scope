@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Packaging;
+using NuGet.Packaging.Core;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
 using NuGet.Versioning;
@@ -257,19 +258,7 @@ public class NugetConnectionManager : INugetConnectionManager
                 packageSourceUrl
             );
 
-            var source = new PackageSource(packageSourceUrl);
-
-            if (credentials != null)
-            {
-                source.Credentials = new PackageSourceCredential(
-                    source: packageSourceUrl,
-                    username: credentials.Username,
-                    passwordText: credentials.Password,
-                    isPasswordClearText: credentials.IsPasswordClearText,
-                    validAuthenticationTypesText: "basic"
-                );
-                source.DisableTLSCertificateValidation = true;
-            }
+            var source = CreatePackageSource(packageSourceUrl, credentials);
 
             var provider = Repository.Factory.GetCoreV3(source);
 
@@ -278,10 +267,19 @@ public class NugetConnectionManager : INugetConnectionManager
             );
             var packageVersion = NuGetVersion.Parse(version);
 
+            var normalizedVersion = packageVersion.ToNormalizedString().ToLowerInvariant();
             var nugetPackagesPath = GetNuGetPackagesPath();
-            var targetPath = Path.Combine(nugetPackagesPath, packageId.ToLowerInvariant(), version);
+            var targetPath = Path.Combine(
+                nugetPackagesPath,
+                packageId.ToLowerInvariant(),
+                normalizedVersion
+            );
+            var nupkgPath = Path.Combine(
+                targetPath,
+                $"{packageId.ToLowerInvariant()}.{normalizedVersion}.nupkg"
+            );
 
-            if (Directory.Exists(targetPath))
+            if (Directory.Exists(targetPath) && HasInstalledPackageContent(targetPath, nupkgPath))
             {
                 _logger.LogInformation("Package already exists at {Path}", targetPath);
                 return Result.Ok(targetPath);
@@ -289,7 +287,6 @@ public class NugetConnectionManager : INugetConnectionManager
 
             Directory.CreateDirectory(targetPath);
 
-            var nupkgPath = Path.Combine(targetPath, $"{packageId}.{version}.nupkg");
             var fileStream = new FileStream(
                 nupkgPath,
                 FileMode.Create,
@@ -313,10 +310,9 @@ public class NugetConnectionManager : INugetConnectionManager
                 await fileStream.DisposeAsync();
             }
 
-            var extractionFolder = Path.Combine(targetPath, "extracted");
-            ExtractNupkg(nupkgPath, extractionFolder);
+            ExtractNupkg(nupkgPath, targetPath);
 
-            _logger.LogInformation("Package extracted to {Path}", extractionFolder);
+            _logger.LogInformation("Package extracted to {Path}", targetPath);
             return Result.Ok(targetPath);
         }
         catch (Exception e)
@@ -340,26 +336,27 @@ public class NugetConnectionManager : INugetConnectionManager
     {
         var results = new List<string>();
         var errors = new List<string>();
+        var restored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var credentials = !string.IsNullOrEmpty(feedName) ? GetCredentials(feedName) : null;
 
         foreach (var (id, version) in packages)
         {
-            var result = await DownloadPackageAsync(
+            var result = await RestorePackageGraphAsync(
                 id,
                 version,
                 sourceUrl,
                 credentials,
+                restored,
+                results,
                 cancellationToken
             );
             if (result.IsSuccess)
             {
-                results.Add(result.Value);
+                continue;
             }
-            else
-            {
-                errors.Add($"{id} {version}: {result.Errors.FirstOrDefault()?.Message}");
-            }
+
+            errors.Add($"{id} {version}: {result.Errors.FirstOrDefault()?.Message}");
         }
 
         if (errors.Count > 0)
@@ -370,6 +367,175 @@ public class NugetConnectionManager : INugetConnectionManager
         }
 
         return Result.Ok($"Restored {results.Count} packages");
+    }
+
+    private async Task<Result> RestorePackageGraphAsync(
+        string packageId,
+        string version,
+        string? sourceUrl,
+        NugetFeedSourceAuthentication? credentials,
+        HashSet<string> restored,
+        List<string> restoredPaths,
+        CancellationToken cancellationToken
+    )
+    {
+        var packageKey = $"{packageId}/{NuGetVersion.Parse(version).ToNormalizedString()}";
+        if (!restored.Add(packageKey))
+        {
+            return Result.Ok();
+        }
+
+        var downloadResult = await DownloadPackageAsync(
+            packageId,
+            version,
+            sourceUrl,
+            credentials,
+            cancellationToken
+        );
+        if (downloadResult.IsFailed)
+        {
+            return Result.Fail(downloadResult.Errors.Select(e => e.Message));
+        }
+
+        restoredPaths.Add(downloadResult.Value);
+
+        var dependenciesResult = ReadDependencies(downloadResult.Value);
+        if (dependenciesResult.IsFailed)
+        {
+            return Result.Fail(dependenciesResult.Errors.Select(e => e.Message));
+        }
+
+        if (dependenciesResult.Value.Count == 0)
+        {
+            return Result.Ok();
+        }
+
+        var source = CreatePackageSource(sourceUrl, credentials);
+        var repository = Repository.Factory.GetCoreV3(source);
+        var findPackageResource = await repository.GetResourceAsync<FindPackageByIdResource>(
+            cancellationToken
+        );
+
+        foreach (var dependency in dependenciesResult.Value)
+        {
+            var versionResult = await ResolveDependencyVersionAsync(
+                findPackageResource,
+                dependency,
+                cancellationToken
+            );
+            if (versionResult.IsFailed)
+            {
+                return Result.Fail(versionResult.Errors.Select(e => e.Message));
+            }
+
+            var restoreResult = await RestorePackageGraphAsync(
+                dependency.Id,
+                versionResult.Value.ToNormalizedString(),
+                sourceUrl,
+                credentials,
+                restored,
+                restoredPaths,
+                cancellationToken
+            );
+            if (restoreResult.IsFailed)
+            {
+                return restoreResult;
+            }
+        }
+
+        return Result.Ok();
+    }
+
+    private static async Task<Result<NuGetVersion>> ResolveDependencyVersionAsync(
+        FindPackageByIdResource findPackageResource,
+        PackageDependency dependency,
+        CancellationToken cancellationToken
+    )
+    {
+        var availableVersions = await findPackageResource.GetAllVersionsAsync(
+            dependency.Id,
+            new SourceCacheContext(),
+            NullLogger.Instance,
+            cancellationToken
+        );
+
+        var selectedVersion = availableVersions
+            .Where(version => dependency.VersionRange.Satisfies(version))
+            .OrderByDescending(version => version)
+            .FirstOrDefault();
+
+        if (selectedVersion is not null)
+        {
+            return Result.Ok(selectedVersion);
+        }
+
+        if (dependency.VersionRange.MinVersion is not null)
+        {
+            return Result.Ok(dependency.VersionRange.MinVersion);
+        }
+
+        return Result.Fail<NuGetVersion>(
+            $"Unable to resolve dependency {dependency.Id} {dependency.VersionRange}."
+        );
+    }
+
+    private static Result<IReadOnlyList<PackageDependency>> ReadDependencies(string packagePath)
+    {
+        var nupkgPath = Directory
+            .EnumerateFiles(packagePath, "*.nupkg", SearchOption.TopDirectoryOnly)
+            .FirstOrDefault();
+        if (nupkgPath is null)
+        {
+            return Result.Ok<IReadOnlyList<PackageDependency>>([]);
+        }
+
+        try
+        {
+            using var packageStream = File.OpenRead(nupkgPath);
+            using var reader = new PackageArchiveReader(packageStream);
+
+            var dependencies = reader
+                .NuspecReader.GetDependencyGroups()
+                .SelectMany(group => group.Packages)
+                .GroupBy(dependency => dependency.Id, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+
+            return Result.Ok<IReadOnlyList<PackageDependency>>(dependencies);
+        }
+        catch (Exception ex)
+        {
+            return Result.Fail<IReadOnlyList<PackageDependency>>(
+                $"Failed to read NuGet dependencies from {nupkgPath}: {ex.Message}"
+            );
+        }
+    }
+
+    private static PackageSource CreatePackageSource(
+        string? sourceUrl,
+        NugetFeedSourceAuthentication? credentials
+    )
+    {
+        var packageSourceUrl = string.IsNullOrEmpty(sourceUrl)
+            ? "https://api.nuget.org/v3/index.json"
+            : sourceUrl;
+        var source = new PackageSource(packageSourceUrl);
+
+        if (credentials is null)
+        {
+            return source;
+        }
+
+        source.Credentials = new PackageSourceCredential(
+            source: packageSourceUrl,
+            username: credentials.Username,
+            passwordText: credentials.Password,
+            isPasswordClearText: credentials.IsPasswordClearText,
+            validAuthenticationTypesText: "basic"
+        );
+        source.DisableTLSCertificateValidation = true;
+
+        return source;
     }
 
     private static string GetNuGetPackagesPath()
@@ -388,5 +554,14 @@ public class NugetConnectionManager : INugetConnectionManager
     {
         Directory.CreateDirectory(targetFolder);
         ZipFile.ExtractToDirectory(nupkgPath, targetFolder, overwriteFiles: true);
+    }
+
+    private static bool HasInstalledPackageContent(string targetPath, string nupkgPath)
+    {
+        return File.Exists(nupkgPath)
+            || Directory.Exists(Path.Combine(targetPath, "lib"))
+            || Directory
+                .EnumerateFiles(targetPath, "*.nuspec", SearchOption.TopDirectoryOnly)
+                .Any();
     }
 }

@@ -1,6 +1,10 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
+using NuGet.Frameworks;
+using NuGet.Packaging;
+using NuGet.Packaging.Core;
+using NuGet.Versioning;
 using Siloscope.Core.Components.Nuget;
 using Siloscope.Core.Nuget.Models;
 using Xunit;
@@ -107,6 +111,66 @@ public sealed class NugetConnectionManagerTests
     }
 
     [Fact]
+    public async Task RestorePackagesAsync_LocalPackage_RestoresTransitiveDependencies()
+    {
+        var previousPackagesPath = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        var testRoot = Path.Combine(Path.GetTempPath(), $"siloscope-nuget-{Guid.NewGuid():N}");
+        var sourcePath = Path.Combine(testRoot, "source");
+        var packagesPath = Path.Combine(testRoot, "packages");
+        Directory.CreateDirectory(sourcePath);
+
+        try
+        {
+            Environment.SetEnvironmentVariable("NUGET_PACKAGES", packagesPath);
+            CreateLocalPackage(sourcePath, "SiloScope.Dependency", "2.0.0");
+            CreateLocalPackage(
+                sourcePath,
+                "SiloScope.Root",
+                "1.0.0",
+                new PackageDependency("SiloScope.Dependency", VersionRange.Parse("[2.0.0]"))
+            );
+
+            var result = await _manager.RestorePackagesAsync(
+                [("SiloScope.Root", "1.0.0")],
+                sourcePath,
+                null,
+                CancellationToken.None
+            );
+
+            result.IsSuccess.Should().BeTrue(result.Errors.FirstOrDefault()?.Message ?? "");
+            result.Value.Should().Be("Restored 2 packages");
+            File.Exists(
+                    Path.Combine(
+                        packagesPath,
+                        "siloscope.root",
+                        "1.0.0",
+                        "siloscope.root.1.0.0.nupkg"
+                    )
+                )
+                .Should()
+                .BeTrue();
+            File.Exists(
+                    Path.Combine(
+                        packagesPath,
+                        "siloscope.dependency",
+                        "2.0.0",
+                        "siloscope.dependency.2.0.0.nupkg"
+                    )
+                )
+                .Should()
+                .BeTrue();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("NUGET_PACKAGES", previousPackagesPath);
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task GetCredentials_WithCredentials_ReturnsCredentials()
     {
         var feedName = $"cred-feed-{Guid.NewGuid():N}";
@@ -146,5 +210,40 @@ public sealed class NugetConnectionManagerTests
 
         var result = _manager.Get(feedName);
         result.Value.Username.Should().Be("admin");
+    }
+
+    private static void CreateLocalPackage(
+        string sourcePath,
+        string packageId,
+        string version,
+        params PackageDependency[] dependencies
+    )
+    {
+        var packageBuilder = new PackageBuilder
+        {
+            Id = packageId,
+            Version = NuGetVersion.Parse(version),
+            Description = $"{packageId} test package",
+        };
+        packageBuilder.Authors.Add("SiloScope");
+        var contentPath = Path.Combine(sourcePath, $"{packageId}.{version}.txt");
+        File.WriteAllText(contentPath, packageId);
+        packageBuilder.Files.Add(
+            new PhysicalPackageFile
+            {
+                SourcePath = contentPath,
+                TargetPath = $"content/{packageId}.txt",
+            }
+        );
+        if (dependencies.Length > 0)
+        {
+            packageBuilder.DependencyGroups.Add(
+                new PackageDependencyGroup(NuGetFramework.AnyFramework, dependencies)
+            );
+        }
+
+        var packagePath = Path.Combine(sourcePath, $"{packageId}.{version}.nupkg");
+        using var packageStream = File.Create(packagePath);
+        packageBuilder.Save(packageStream);
     }
 }
