@@ -51,6 +51,41 @@ public sealed class WorkspaceServiceTests
         await action.Should().ThrowAsync<FileNotFoundException>();
     }
 
+    [Fact]
+    public async Task SaveAsync_MultipleWorkspaces_CanLoadEach()
+    {
+        var workspace1 = CreateTestWorkspace();
+        workspace1.Id = "workspace-1";
+        workspace1.WorkspaceInfo.Name = "Workspace One";
+
+        var workspace2 = CreateTestWorkspace();
+        workspace2.Id = "workspace-2";
+        workspace2.WorkspaceInfo.Name = "Workspace Two";
+
+        var filePath1 = Path.Combine(_testDirectory, "workspace1.json");
+        var filePath2 = Path.Combine(_testDirectory, "workspace2.json");
+
+        await _workspaceService.SaveAsync(filePath1, workspace1);
+        await _workspaceService.SaveAsync(filePath2, workspace2);
+
+        var loaded1 = await _workspaceService.LoadAsync(filePath1);
+        var loaded2 = await _workspaceService.LoadAsync(filePath2);
+
+        loaded1.Id.Should().Be("workspace-1");
+        loaded1.WorkspaceInfo.Name.Should().Be("Workspace One");
+        loaded2.Id.Should().Be("workspace-2");
+        loaded2.WorkspaceInfo.Name.Should().Be("Workspace Two");
+    }
+
+    [Fact]
+    public void GetDefaultWorkspacePath_ReturnsValidPath()
+    {
+        var path = _workspaceService.GetDefaultWorkspacePath();
+
+        path.Should().NotBeEmpty();
+        path.Should().Contain("SiloScope");
+    }
+
     private static Workspace CreateTestWorkspace()
     {
         return new Workspace
