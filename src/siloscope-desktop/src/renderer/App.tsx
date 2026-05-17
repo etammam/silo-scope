@@ -233,6 +233,7 @@ function App() {
               error: `Invocation pending: ${request.grainType}.${request.method}`,
             });
           }}
+          onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
           onSelectMethod={setSelectedMethod}
           selectedFunctionId={selectedFunctionId}

@@ -938,7 +938,7 @@ textarea,
 	border-bottom: 1px solid var(--ui-3);
 	display: grid;
 	gap: 8px;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 	min-width: 0;
 	padding: 10px 14px;
 }

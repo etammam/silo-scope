@@ -56,6 +56,18 @@ const sourceCatalog = {
           namespace: "Application",
           methods: [
             {
+              functionId: "function-get-state",
+              sourceId: "source-core",
+              interfaceId: "grain-1",
+              interfaceName: "IPlayerGrain",
+              namespace: "Application",
+              methodName: "GetState",
+              signature: "GetState()",
+              returnType: "System.Threading.Tasks.Task<System.String>",
+              keyType: "String" as const,
+              parameters: [],
+            },
+            {
               functionId: "function-set-name",
               sourceId: "source-core",
               interfaceId: "grain-1",
@@ -154,6 +166,8 @@ describe("RequestWorkbench", () => {
 
     expect(screen.getByText("Core.dll")).toBeInTheDocument();
     expect(screen.getAllByText("IPlayerGrain").length).toBeGreaterThan(0);
+    expect(screen.getByText("SetName")).toBeInTheDocument();
+    expect(screen.getByText("name: System.String")).toBeInTheDocument();
     expect(screen.getByText("System.Threading.Tasks.Task")).toBeInTheDocument();
     expect(screen.getByLabelText("Payload editor")).toHaveValue('{\n  "name": ""\n}');
 
@@ -171,6 +185,67 @@ describe("RequestWorkbench", () => {
       keyType: "String",
       method: "SetName",
       payload: '{"name":"Ada"}',
+      sourceId: "source-core",
+      functionId: "function-set-name",
+    });
+  });
+
+  it("scopes the method quick switch to the selected source interface", () => {
+    const onSelectFunction = vi.fn();
+    const onSelectMethod = vi.fn();
+
+    render(
+      <RequestWorkbench
+        grains={grains}
+        onInvoke={vi.fn()}
+        onSelectFunction={onSelectFunction}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={onSelectMethod}
+        selectedFunctionId="function-set-name"
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        sourceCatalog={sourceCatalog}
+        theme="dark"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Method"), {
+      target: { value: "GetState()" },
+    });
+
+    expect(onSelectFunction).toHaveBeenCalledWith("function-get-state");
+    expect(onSelectMethod).toHaveBeenCalledWith("GetState");
+  });
+
+  it("can invoke from a source-owned catalog without a flat grain list", () => {
+    const onInvoke = vi.fn();
+
+    render(
+      <RequestWorkbench
+        grains={[]}
+        onInvoke={onInvoke}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedFunctionId="function-set-name"
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        sourceCatalog={sourceCatalog}
+        theme="dark"
+      />,
+    );
+
+    expect(screen.getByLabelText("Grain")).toHaveValue("grain-1");
+    fireEvent.change(screen.getByLabelText("Grain ID"), {
+      target: { value: "player-1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+
+    expect(onInvoke).toHaveBeenCalledWith({
+      grainType: "IPlayerGrain",
+      grainKey: "player-1",
+      keyType: "String",
+      method: "SetName",
+      payload: '{\n  "name": ""\n}',
       sourceId: "source-core",
       functionId: "function-set-name",
     });

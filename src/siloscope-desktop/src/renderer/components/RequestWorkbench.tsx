@@ -17,6 +17,7 @@ type RequestWorkbenchProps = {
   selectedMethod: string | null;
   theme: "dark" | "light";
   onSelectGrain: (grainId: string | null) => void;
+  onSelectFunction?: (functionId: string | null) => void;
   onSelectMethod: (methodName: string | null) => void;
   onInvoke: (request: {
     grainType: string;
@@ -37,6 +38,7 @@ export function RequestWorkbench({
   selectedMethod,
   theme,
   onSelectGrain,
+  onSelectFunction,
   onSelectMethod,
   onInvoke,
 }: RequestWorkbenchProps) {
@@ -53,12 +55,35 @@ export function RequestWorkbench({
     () => findCatalogSource(sourceCatalog ?? { sources: [] }, activeFunction?.sourceId ?? null),
     [activeFunction, sourceCatalog],
   );
+  const activeInterface = useMemo(
+    () =>
+      activeSource?.interfaces.find((catalogInterface) => catalogInterface.interfaceId === activeFunction?.interfaceId) ??
+      null,
+    [activeFunction, activeSource],
+  );
 
   const activeGrain = useMemo(
     () => grains.find((grain) => grain.interfaceId === selectedGrain) ?? null,
     [grains, selectedGrain],
   );
-  const methods = activeGrain?.methods ?? [];
+  const grainOptions = useMemo(() => {
+    if (!activeFunction || grains.some((grain) => grain.interfaceId === activeFunction.interfaceId)) {
+      return grains;
+    }
+
+    return [
+      ...grains,
+      {
+        interfaceId: activeFunction.interfaceId,
+        interfaceName: activeFunction.interfaceName,
+        methods: activeInterface?.methods.map(toGrainMethod) ?? [toGrainMethod(activeFunction)],
+      },
+    ];
+  }, [activeFunction, activeInterface, grains]);
+  const methods = useMemo(
+    () => activeInterface?.methods.map(toGrainMethod) ?? activeGrain?.methods ?? [],
+    [activeGrain, activeInterface],
+  );
   const activeMethod = activeFunction
     ? toGrainMethod(activeFunction)
     : methods.find((method) => method.name === selectedMethod) ?? null;
@@ -70,7 +95,14 @@ export function RequestWorkbench({
     [methodQuery, methods],
   );
   const payloadError = useMemo(() => validateJson(payload), [payload]);
-  const canInvoke = Boolean(activeGrain && activeMethod && grainKey.trim() && !payloadError);
+  const expectsSourceOwnedSelection = Boolean(sourceCatalog?.sources.some((source) => source.interfaces.length > 0));
+  const canInvoke = Boolean(
+    (activeFunction || activeGrain) &&
+      activeMethod &&
+      (!expectsSourceOwnedSelection || activeFunction) &&
+      grainKey.trim() &&
+      !payloadError,
+  );
 
   useEffect(() => {
     const selected = activeFunction ? toGrainMethod(activeFunction) : methods.find((method) => method.name === selectedMethod) ?? null;
@@ -79,12 +111,16 @@ export function RequestWorkbench({
 
   useEffect(() => {
     if (!activeFunction) {
+      if (selectedFunctionId) {
+        setPayload("{\n}");
+        setKeyType("String");
+      }
       return;
     }
 
     setKeyType(activeFunction.keyType);
     setPayload(createPayloadTemplate(activeFunction));
-  }, [activeFunction]);
+  }, [activeFunction, selectedFunctionId]);
 
   const handleGrainChange = (grainId: string) => {
     const nextGrain = grainId.length > 0 ? grainId : null;
@@ -94,6 +130,15 @@ export function RequestWorkbench({
 
   const handleMethodQueryChange = (query: string) => {
     setMethodQuery(query);
+    const nextCatalogFunction = activeInterface?.methods.find(
+      (method) => method.methodName === query || method.signature === query,
+    );
+    if (activeInterface) {
+      onSelectFunction?.(nextCatalogFunction?.functionId ?? null);
+      onSelectMethod(nextCatalogFunction?.methodName ?? null);
+      return;
+    }
+
     const nextMethod = methods.find((method) => method.name === query || formatMethodLabel(method) === query);
     onSelectMethod(nextMethod?.name ?? null);
   };
@@ -110,12 +155,12 @@ export function RequestWorkbench({
   };
 
   const handleInvoke = () => {
-    if (!activeGrain || !activeMethod || !canInvoke) {
+    if ((!activeGrain && !activeFunction) || !activeMethod || !canInvoke) {
       return;
     }
 
     onInvoke({
-      grainType: activeFunction?.interfaceName ?? activeGrain.interfaceName,
+      grainType: activeFunction?.interfaceName ?? activeGrain!.interfaceName,
       grainKey: grainKey.trim(),
       keyType,
       method: activeFunction?.methodName ?? activeMethod.name,
@@ -142,8 +187,20 @@ export function RequestWorkbench({
           <strong>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</strong>
         </div>
         <div>
+          <span>Method</span>
+          <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
+        </div>
+        <div>
+          <span>Key</span>
+          <strong>{activeFunction?.keyType ?? keyType}</strong>
+        </div>
+        <div>
           <span>Return</span>
           <strong>{activeFunction?.returnType ?? activeMethod?.returnType ?? "unknown"}</strong>
+        </div>
+        <div>
+          <span>Parameters</span>
+          <strong>{formatParameterList(activeFunction?.parameters ?? activeMethod?.parameters ?? [])}</strong>
         </div>
       </div>
 
@@ -152,7 +209,7 @@ export function RequestWorkbench({
           <span>Grain</span>
           <select value={selectedGrain ?? ""} onChange={(event) => handleGrainChange(event.target.value)}>
             <option value="">Select grain</option>
-            {grains.map((grain) => (
+            {grainOptions.map((grain) => (
               <option key={grain.interfaceId} value={grain.interfaceId}>
                 {grain.interfaceName}
               </option>
@@ -255,6 +312,14 @@ function createPayloadTemplate(catalogFunction: SourceCatalogFunction): string {
   });
 
   return `{\n${lines.join(",\n")}\n}`;
+}
+
+function formatParameterList(parameters: GrainMethodDescriptor["parameters"]): string {
+  if (parameters.length === 0) {
+    return "none";
+  }
+
+  return parameters.map((parameter) => `${parameter.name}: ${parameter.typeName}`).join(", ");
 }
 
 function defaultJsonValue(typeName: string): string {
