@@ -85,6 +85,11 @@ new BrowserWindow({
   title: "SiloScope",
   url: "views://renderer/index.html",
   rpc,
+  titleBarStyle: "hiddenInset",
+  trafficLightOffset: {
+    x: 12,
+    y: 10,
+  },
   frame: {
     x: 100,
     y: 100,

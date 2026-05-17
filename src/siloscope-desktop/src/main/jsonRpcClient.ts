@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { dirname, join, normalize } from "node:path";
+import { fileURLToPath } from "node:url";
+
 type JsonRpcId = number;
 type JsonRpcParams = readonly unknown[] | Record<string, unknown> | undefined;
 
@@ -26,6 +30,7 @@ type PendingRequest<T> = {
 };
 
 export type SidecarProcessOptions = {
+  coreCommand?: string[];
   corePath?: string;
   cwd?: string;
   env?: Record<string, string>;
@@ -79,12 +84,12 @@ export class SidecarJsonRpcClient {
       this.restartTimer = null;
     }
 
-    const corePath = this.options.corePath ?? resolveDefaultCorePath();
-    this.process = Bun.spawn([corePath], {
+    const sidecar = this.resolveSidecar();
+    this.process = Bun.spawn(sidecar.command, {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
-      cwd: this.options.cwd,
+      cwd: this.options.cwd ?? sidecar.cwd,
       env: {
         ...process.env,
         ...this.options.env,
@@ -282,12 +287,113 @@ export class SidecarJsonRpcClient {
 
     this.pendingRequests.clear();
   }
+
+  private resolveSidecar(): SidecarCommand {
+    if (this.options.coreCommand) {
+      return {
+        command: this.options.coreCommand,
+        cwd: this.options.cwd ?? process.cwd(),
+      };
+    }
+
+    if (this.options.corePath) {
+      return {
+        command: [this.options.corePath],
+        cwd: this.options.cwd ?? dirname(this.options.corePath),
+      };
+    }
+
+    return resolveDefaultCoreCommand();
+  }
 }
 
 export function resolveDefaultCorePath(): string {
+  const command = resolveDefaultCoreCommand().command;
+  return command[0] === "dotnet" ? command[1] : command[0];
+}
+
+export type SidecarCommand = {
+  command: string[];
+  cwd: string;
+};
+
+export function resolveDefaultCoreCommand(): SidecarCommand {
+  const overridePath = process.env["SILOSCOPE_CORE_PATH"];
+  if (overridePath) {
+    return {
+      command: [overridePath],
+      cwd: dirname(overridePath),
+    };
+  }
+
+  const repoRoot = findRepoRoot();
+  if (!repoRoot) {
+    throw new Error(
+      "Could not locate Siloscope.slnx. Set SILOSCOPE_CORE_PATH to the SiloScope Core executable.",
+    );
+  }
+
   const executableName = process.platform === "win32" ? "Siloscope.Core.exe" : "Siloscope.Core";
-  const currentDirectory = new URL(".", import.meta.url).pathname;
-  return `${currentDirectory}../../../Siloscope.Core/bin/Debug/net10.0/${executableName}`;
+  const outputDirectory = join(repoRoot, "src", "Siloscope.Core", "bin", "Debug", "net10.0");
+  const executablePath = join(outputDirectory, executableName);
+  if (existsSync(executablePath)) {
+    return {
+      command: [executablePath],
+      cwd: outputDirectory,
+    };
+  }
+
+  const dllPath = join(outputDirectory, "Siloscope.Core.dll");
+  if (existsSync(dllPath)) {
+    return {
+      command: ["dotnet", dllPath],
+      cwd: outputDirectory,
+    };
+  }
+
+  const projectPath = join(repoRoot, "src", "Siloscope.Core", "Siloscope.Core.csproj");
+  if (existsSync(projectPath)) {
+    return {
+      command: ["dotnet", "run", "--project", projectPath, "--no-launch-profile"],
+      cwd: repoRoot,
+    };
+  }
+
+  throw new Error(`Could not locate SiloScope Core project under ${repoRoot}.`);
+}
+
+function findRepoRoot(): string | null {
+  const searchStarts = [
+    process.cwd(),
+    dirname(fileURLToPath(import.meta.url)),
+    process.env["INIT_CWD"],
+  ].filter((path): path is string => Boolean(path));
+
+  for (const searchStart of searchStarts) {
+    const repoRoot = findAncestorContaining(searchStart, "Siloscope.slnx");
+    if (repoRoot) {
+      return repoRoot;
+    }
+  }
+
+  return null;
+}
+
+function findAncestorContaining(startDirectory: string, fileName: string): string | null {
+  let currentDirectory = normalize(startDirectory);
+
+  while (true) {
+    if (existsSync(join(currentDirectory, fileName))) {
+      return currentDirectory;
+    }
+
+    const parentDirectory = dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      return null;
+    }
+
+    currentDirectory = parentDirectory;
+  }
 }
 
 function concatBytes(
