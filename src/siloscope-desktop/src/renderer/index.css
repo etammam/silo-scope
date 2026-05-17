@@ -348,6 +348,21 @@ textarea,
 
 .navigation-sidebar__select-label select {
 	appearance: none;
+	-webkit-appearance: none;
+	background: var(--ui-2);
+	border: 1px solid var(--ui-4);
+	border-radius: 4px;
+	color-scheme: dark;
+	color: var(--ui-6);
+	font: inherit;
+	font-size: 12px;
+	height: 28px;
+	padding: 0 8px;
+}
+
+.navigation-sidebar__select-label input {
+	appearance: none;
+	-webkit-appearance: none;
 	background: var(--ui-2);
 	border: 1px solid var(--ui-4);
 	border-radius: 4px;
@@ -355,7 +370,18 @@ textarea,
 	font: inherit;
 	font-size: 12px;
 	height: 28px;
+	min-width: 0;
 	padding: 0 8px;
+}
+
+.navigation-sidebar__select-label input::placeholder {
+	color: var(--ui-5);
+}
+
+.navigation-sidebar__select-label input:focus,
+.navigation-sidebar__select-label select:focus {
+	border-color: var(--focus-ring);
+	outline: none;
 }
 
 .navigation-sidebar__row {
@@ -412,6 +438,30 @@ textarea,
 	color: var(--ui-5);
 	font-size: 12px;
 	padding: 4px 6px 8px;
+}
+
+.navigation-sidebar__command {
+	appearance: none;
+	-webkit-appearance: none;
+	background: var(--ui-2);
+	border: 1px solid var(--ui-4);
+	border-radius: 4px;
+	color: var(--ui-6);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	height: 28px;
+	margin: 10px 6px 0;
+	padding: 0 10px;
+	text-align: left;
+	width: calc(100% - 12px);
+}
+
+.navigation-sidebar__command:hover,
+.navigation-sidebar__command:focus-visible {
+	background: var(--ui-3);
+	color: var(--ui-7);
+	outline: none;
 }
 
 .navigation-sidebar__tree {

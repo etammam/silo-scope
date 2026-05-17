@@ -66,4 +66,40 @@ describe("NavigationSidebar", () => {
 
     expect(onSelectGrain).toHaveBeenCalledWith("grain-1");
   });
+
+  it("renders NuGet registry manager when NuGet view is active", () => {
+    render(
+      <NavigationSidebar
+        activeView="nuget"
+        grains={[]}
+        isConnected={false}
+        onSelectGrain={vi.fn()}
+        selectedGrain={null}
+        workspace={null}
+      />,
+    );
+
+    expect(screen.getByText("NuGet")).toBeInTheDocument();
+    expect(screen.getByLabelText("Active source")).toHaveValue("nuget");
+    expect(screen.getByLabelText("Package ID")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Search Packages" })).toBeInTheDocument();
+  });
+
+  it("renders system settings when settings view is active", () => {
+    render(
+      <NavigationSidebar
+        activeView="settings"
+        grains={[]}
+        isConnected={false}
+        onSelectGrain={vi.fn()}
+        selectedGrain={null}
+        workspace={null}
+      />,
+    );
+
+    expect(screen.getByText("Application")).toBeInTheDocument();
+    expect(screen.getByLabelText("Use native titlebar")).toBeChecked();
+    expect(screen.getByLabelText("Disable text selection")).toBeChecked();
+    expect(screen.getByLabelText("Workbench theme")).toHaveValue("dark");
+  });
 });
