@@ -1,7 +1,8 @@
-import { BrowserWindow, BrowserView } from "electrobun/bun";
+import { ApplicationMenu, BrowserWindow, BrowserView } from "electrobun/bun";
 import Electrobun from "electrobun/bun";
 import type { SiloScopeRPC } from "../shared/rpc";
 import type { SourceOwnedCatalog } from "../shared/types";
+import { installApplicationMenu } from "./applicationMenu";
 import { SidecarJsonRpcClient } from "./jsonRpcClient";
 
 const sidecar = new SidecarJsonRpcClient();
@@ -168,7 +169,7 @@ function isGrainKeyType(value: string): value is "Guid" | "String" | "Integer" {
   return value === "Guid" || value === "String" || value === "Integer";
 }
 
-new BrowserWindow({
+const mainWindow = new BrowserWindow({
   title: "SiloScope",
   url: "views://renderer/index.html",
   rpc,
@@ -182,6 +183,14 @@ new BrowserWindow({
     y: 100,
     width: 1200,
     height: 800,
+  },
+});
+
+installApplicationMenu({
+  ApplicationMenu,
+  events: Electrobun.events,
+  onFileAction: (action) => {
+    mainWindow.webview.rpc?.send.fileMenuAction({ action });
   },
 });
 

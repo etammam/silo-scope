@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { Electroview } from "electrobun/view";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/renderer/App";
+import { useAppStore } from "@/renderer/store";
 
 vi.mock("electrobun/view", () => ({
   Electroview: {
@@ -25,6 +27,17 @@ vi.mock("@/renderer/components/MonacoEditor", () => ({
 describe("App shell", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    useAppStore.setState({
+      workspace: null,
+      grains: [],
+      sourceCatalog: { sources: [] },
+      selectedGrain: null,
+      selectedMethod: null,
+      selectedFunctionId: null,
+      invocationResult: null,
+      logs: [],
+      isConnected: false,
+    });
   });
 
   it("collapses the response pane from the titlebar", () => {
@@ -133,5 +146,43 @@ describe("App shell", () => {
 
     expect(container.firstElementChild).toHaveAttribute("data-theme", "light");
     expect(screen.getAllByTestId("mock-editor")[0]).toHaveAttribute("data-theme", "light");
+  });
+
+  it("clears workspace state when the File menu requests a new workspace", () => {
+    useAppStore.setState({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+      },
+      grains: [{ interfaceId: "grain-1", interfaceName: "IPlayerGrain", methods: [] }],
+      sourceCatalog: {
+        sources: [
+          {
+            sourceId: "source-1",
+            sourceType: "DLL",
+            reference: "Core.dll",
+            label: "Core.dll",
+            enabled: true,
+            discoveryStatus: "ready",
+            interfaces: [],
+          },
+        ],
+      },
+      selectedFunctionId: "function-1",
+      invocationResult: { isSuccess: false, error: "pending" },
+    });
+
+    const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
+
+    rpcConfig.handlers.messages.fileMenuAction({ action: "newWorkspace" });
+
+    expect(useAppStore.getState().workspace).toBeNull();
+    expect(useAppStore.getState().grains).toEqual([]);
+    expect(useAppStore.getState().sourceCatalog).toEqual({ sources: [] });
+    expect(useAppStore.getState().selectedFunctionId).toBeNull();
+    expect(useAppStore.getState().invocationResult).toBeNull();
   });
 });

@@ -7,6 +7,8 @@ import type {
   SourceOwnedCatalog,
 } from "./types";
 
+export type FileMenuAction = "newWorkspace" | "openWorkspace" | "saveWorkspace";
+
 export type SiloScopeRPC = {
   bun: RPCSchema<{
     requests: {
@@ -36,6 +38,7 @@ export type SiloScopeRPC = {
     };
     messages: {
       requestGrains: { workspaceId: string };
+      fileMenuAction: { action: FileMenuAction };
     };
   }>;
 };

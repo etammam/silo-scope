@@ -25,6 +25,19 @@ Electroview.defineRPC<SiloScopeRPC>({
       requestGrains: ({ workspaceId }) => {
         console.log("requestGrains for", workspaceId);
       },
+      fileMenuAction: ({ action }) => {
+        const store = useAppStore.getState();
+        if (action === "newWorkspace") {
+          store.setWorkspace(null);
+          store.setGrains([]);
+          store.setSourceCatalog({ sources: [] });
+          store.setSelectedFunction(null);
+          store.setInvocationResult(null);
+          return;
+        }
+
+        console.log("fileMenuAction", action);
+      },
     },
   },
 });
