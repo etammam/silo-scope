@@ -22,6 +22,7 @@ type WorkspaceNavigatorProps = {
   selectedFunctionId?: string | null;
   selectedGrain: string | null;
   workspace: Workspace | null;
+  onNewWorkspace?: () => void;
   onSelectFunction?: (functionId: string | null) => void;
   onSelectGrain: (grainId: string | null) => void;
 };
@@ -30,6 +31,7 @@ export function NavigationSidebar({
   activeView,
   grains,
   isConnected,
+  onNewWorkspace,
   onSelectFunction,
   selectedGrain,
   selectedFunctionId,
@@ -51,6 +53,7 @@ export function NavigationSidebar({
         <WorkspaceNavigator
           grains={grains}
           isConnected={isConnected}
+          onNewWorkspace={onNewWorkspace}
           onSelectFunction={onSelectFunction}
           onSelectGrain={onSelectGrain}
           selectedFunctionId={selectedFunctionId}
@@ -70,6 +73,7 @@ export function NavigationSidebar({
 function WorkspaceNavigator({
   grains,
   isConnected,
+  onNewWorkspace,
   onSelectFunction,
   selectedGrain,
   selectedFunctionId,
@@ -138,8 +142,20 @@ function WorkspaceNavigator({
   return (
     <>
       <section className="navigation-sidebar__section" aria-labelledby="workspace-select-title">
-        <div className="navigation-sidebar__section-title" id="workspace-select-title">
-          Workspace
+        <div className="navigation-sidebar__section-heading">
+          <div className="navigation-sidebar__section-title" id="workspace-select-title">
+            Workspace
+          </div>
+          <button
+            aria-label="New workspace"
+            className="navigation-sidebar__icon-command"
+            disabled={!onNewWorkspace}
+            onClick={onNewWorkspace}
+            title="New workspace"
+            type="button"
+          >
+            <span className="navigation-sidebar__new-workspace-icon" aria-hidden="true" />
+          </button>
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Active workspace</span>

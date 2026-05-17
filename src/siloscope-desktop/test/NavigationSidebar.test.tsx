@@ -44,6 +44,28 @@ describe("NavigationSidebar", () => {
     expect(screen.getByText("Disconnected")).toBeInTheDocument();
   });
 
+  it("starts a new workspace from the workspace header action", () => {
+    const onNewWorkspace = vi.fn();
+
+    render(
+      <NavigationSidebar
+        activeView="workspace"
+        grains={[]}
+        isConnected={false}
+        onNewWorkspace={onNewWorkspace}
+        onSelectGrain={vi.fn()}
+        onThemeChange={vi.fn()}
+        selectedGrain={null}
+        theme="dark"
+        workspace={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
+
+    expect(onNewWorkspace).toHaveBeenCalledOnce();
+  });
+
   it("renders source-owned function catalog and selectable method leaves", () => {
     const onSelectGrain = vi.fn();
     const onSelectFunction = vi.fn();

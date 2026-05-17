@@ -186,6 +186,44 @@ describe("App shell", () => {
     expect(useAppStore.getState().invocationResult).toBeNull();
   });
 
+  it("clears workspace state from the navigation new workspace action", () => {
+    useAppStore.setState({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+      },
+      grains: [{ interfaceId: "grain-1", interfaceName: "IPlayerGrain", methods: [] }],
+      sourceCatalog: {
+        sources: [
+          {
+            sourceId: "source-1",
+            sourceType: "DLL",
+            reference: "Core.dll",
+            label: "Core.dll",
+            enabled: true,
+            discoveryStatus: "ready",
+            interfaces: [],
+          },
+        ],
+      },
+      selectedFunctionId: "function-1",
+      invocationResult: { isSuccess: false, error: "pending" },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
+
+    expect(useAppStore.getState().workspace).toBeNull();
+    expect(useAppStore.getState().grains).toEqual([]);
+    expect(useAppStore.getState().sourceCatalog).toEqual({ sources: [] });
+    expect(useAppStore.getState().selectedFunctionId).toBeNull();
+    expect(useAppStore.getState().invocationResult).toBeNull();
+  });
+
   it("toggles shell panels from the View menu actions", () => {
     const { container } = render(<App />);
     const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;

@@ -28,13 +28,8 @@ Electroview.defineRPC<SiloScopeRPC>({
       },
       applicationMenuAction: ({ action }) => {
         window.dispatchEvent(new CustomEvent(applicationMenuEventName, { detail: action }));
-        const store = useAppStore.getState();
         if (action === "newWorkspace") {
-          store.setWorkspace(null);
-          store.setGrains([]);
-          store.setSourceCatalog({ sources: [] });
-          store.setSelectedFunction(null);
-          store.setInvocationResult(null);
+          resetWorkspaceState();
           return;
         }
 
@@ -68,6 +63,7 @@ function App() {
   const [paneLayout, setPaneLayout] = useState<PaneLayout>("horizontal");
   const [horizontalResponseSize, setHorizontalResponseSize] = useState(320);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
+  const handleNewWorkspace = useCallback(() => resetWorkspaceState(), []);
 
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, theme);
@@ -218,6 +214,7 @@ function App() {
           isConnected={isConnected}
           onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
+          onNewWorkspace={handleNewWorkspace}
           onThemeChange={setTheme}
           selectedFunctionId={selectedFunctionId}
           selectedGrain={selectedGrain}
@@ -274,6 +271,15 @@ function readStoredTheme(): WorkbenchTheme {
 
   const storedTheme = window.localStorage.getItem(themeStorageKey);
   return storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
+}
+
+function resetWorkspaceState() {
+  const store = useAppStore.getState();
+  store.setWorkspace(null);
+  store.setGrains([]);
+  store.setSourceCatalog({ sources: [] });
+  store.setSelectedFunction(null);
+  store.setInvocationResult(null);
 }
 
 function clamp(value: number, min: number, max: number): number {
