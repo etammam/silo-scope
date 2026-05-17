@@ -7,6 +7,7 @@ import { SidecarJsonRpcClient } from "./jsonRpcClient";
 
 const sidecar = new SidecarJsonRpcClient();
 sidecar.start();
+let pageZoom = 1;
 
 type FluentResult<T> = {
   IsSuccess: boolean;
@@ -169,6 +170,10 @@ function isGrainKeyType(value: string): value is "Guid" | "String" | "Integer" {
   return value === "Guid" || value === "String" || value === "Integer";
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
 const mainWindow = new BrowserWindow({
   title: "SiloScope",
   url: "views://renderer/index.html",
@@ -189,8 +194,14 @@ const mainWindow = new BrowserWindow({
 installApplicationMenu({
   ApplicationMenu,
   events: Electrobun.events,
-  onFileAction: (action) => {
-    mainWindow.webview.rpc?.send.fileMenuAction({ action });
+  onMenuAction: (action) => {
+    if (action === "zoomIn" || action === "zoomOut") {
+      pageZoom = clamp(action === "zoomIn" ? pageZoom + 0.1 : pageZoom - 0.1, 0.7, 1.6);
+      mainWindow.setPageZoom(pageZoom);
+      return;
+    }
+
+    mainWindow.webview.rpc?.send.applicationMenuAction({ action });
   },
 });
 

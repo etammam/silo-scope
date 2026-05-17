@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Electroview } from "electrobun/view";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/renderer/App";
@@ -177,12 +177,34 @@ describe("App shell", () => {
 
     const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
 
-    rpcConfig.handlers.messages.fileMenuAction({ action: "newWorkspace" });
+    rpcConfig.handlers.messages.applicationMenuAction({ action: "newWorkspace" });
 
     expect(useAppStore.getState().workspace).toBeNull();
     expect(useAppStore.getState().grains).toEqual([]);
     expect(useAppStore.getState().sourceCatalog).toEqual({ sources: [] });
     expect(useAppStore.getState().selectedFunctionId).toBeNull();
     expect(useAppStore.getState().invocationResult).toBeNull();
+  });
+
+  it("toggles shell panels from the View menu actions", () => {
+    const { container } = render(<App />);
+    const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
+
+    expect(screen.getByRole("navigation", { name: "Primary views" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "workspace navigation" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Response" })).toBeInTheDocument();
+
+    act(() => {
+      rpcConfig.handlers.messages.applicationMenuAction({ action: "toggleActivityBar" });
+      rpcConfig.handlers.messages.applicationMenuAction({ action: "toggleNavigationSidebar" });
+      rpcConfig.handlers.messages.applicationMenuAction({ action: "toggleTelemetryPane" });
+    });
+
+    expect(container.firstElementChild).toHaveAttribute("data-activity-visible", "false");
+    expect(container.firstElementChild).toHaveAttribute("data-navigation-visible", "false");
+    expect(container.firstElementChild).toHaveAttribute("data-response-visible", "false");
+    expect(screen.queryByRole("navigation", { name: "Primary views" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "workspace navigation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Response" })).not.toBeInTheDocument();
   });
 });

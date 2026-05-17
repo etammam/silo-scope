@@ -12,6 +12,7 @@ type PaneLayout = "horizontal" | "vertical";
 type WorkbenchTheme = "dark" | "light";
 
 const themeStorageKey = "siloscope.theme";
+const applicationMenuEventName = "siloscope:application-menu-action";
 
 Electroview.defineRPC<SiloScopeRPC>({
   handlers: {
@@ -25,7 +26,8 @@ Electroview.defineRPC<SiloScopeRPC>({
       requestGrains: ({ workspaceId }) => {
         console.log("requestGrains for", workspaceId);
       },
-      fileMenuAction: ({ action }) => {
+      applicationMenuAction: ({ action }) => {
+        window.dispatchEvent(new CustomEvent(applicationMenuEventName, { detail: action }));
         const store = useAppStore.getState();
         if (action === "newWorkspace") {
           store.setWorkspace(null);
@@ -36,7 +38,7 @@ Electroview.defineRPC<SiloScopeRPC>({
           return;
         }
 
-        console.log("fileMenuAction", action);
+        console.log("applicationMenuAction", action);
       },
     },
   },
@@ -59,6 +61,7 @@ function App() {
   } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
   const [theme, setTheme] = useState<WorkbenchTheme>(() => readStoredTheme());
+  const [isActivityBarVisible, setIsActivityBarVisible] = useState(true);
   const [isNavigationVisible, setIsNavigationVisible] = useState(true);
   const [isResponseVisible, setIsResponseVisible] = useState(true);
   const [responseTab, setResponseTab] = useState<ResponsePaneTab>("response");
@@ -69,6 +72,26 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
+
+  useEffect(() => {
+    const handleApplicationMenuAction = (event: Event) => {
+      const action = (event as CustomEvent<string>).detail;
+      if (action === "toggleActivityBar") {
+        setIsActivityBarVisible((visible) => !visible);
+      }
+
+      if (action === "toggleNavigationSidebar") {
+        setIsNavigationVisible((visible) => !visible);
+      }
+
+      if (action === "toggleTelemetryPane") {
+        setIsResponseVisible((visible) => !visible);
+      }
+    };
+
+    window.addEventListener(applicationMenuEventName, handleApplicationMenuAction);
+    return () => window.removeEventListener(applicationMenuEventName, handleApplicationMenuAction);
+  }, []);
 
   const responseSize = paneLayout === "horizontal" ? horizontalResponseSize : verticalResponseSize;
   const effectiveSourceCatalog = useMemo(() => {
@@ -132,13 +155,14 @@ function App() {
   return (
     <div
       className="app-shell"
+      data-activity-visible={isActivityBarVisible}
       data-navigation-visible={isNavigationVisible}
       data-pane-layout={paneLayout}
       data-response-visible={isResponseVisible}
       data-theme={theme}
       style={shellStyle}
     >
-      <ActivityBar activeView={activeView} onViewChange={setActiveView} />
+      {isActivityBarVisible && <ActivityBar activeView={activeView} onViewChange={setActiveView} />}
 
       <header className="app-titlebar electrobun-webkit-app-region-drag">
         <div className="app-titlebar__spacer" />

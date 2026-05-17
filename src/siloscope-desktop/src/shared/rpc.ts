@@ -7,7 +7,13 @@ import type {
   SourceOwnedCatalog,
 } from "./types";
 
-export type FileMenuAction = "newWorkspace" | "openWorkspace" | "saveWorkspace";
+export type ApplicationMenuAction =
+  | "newWorkspace"
+  | "openWorkspace"
+  | "saveWorkspace"
+  | "toggleActivityBar"
+  | "toggleNavigationSidebar"
+  | "toggleTelemetryPane";
 
 export type SiloScopeRPC = {
   bun: RPCSchema<{
@@ -38,7 +44,7 @@ export type SiloScopeRPC = {
     };
     messages: {
       requestGrains: { workspaceId: string };
-      fileMenuAction: { action: FileMenuAction };
+      applicationMenuAction: { action: ApplicationMenuAction };
     };
   }>;
 };

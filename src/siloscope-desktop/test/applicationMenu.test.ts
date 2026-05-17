@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createApplicationMenuTemplate,
   fileMenuActions,
-  getFileMenuAction,
+  getApplicationMenuAction,
   installApplicationMenu,
+  viewMenuActions,
 } from "@/main/applicationMenu";
 
 describe("application menu", () => {
@@ -32,14 +33,29 @@ describe("application menu", () => {
           { role: "paste" },
         ],
       },
+      {
+        label: "View",
+        submenu: [
+          { label: "Toggle Activity Bar", action: viewMenuActions.toggleActivityBar },
+          { label: "Toggle Navigation Sidebar", action: viewMenuActions.toggleNavigationSidebar },
+          { label: "Toggle Telemetry Pane", action: viewMenuActions.toggleTelemetryPane },
+          { type: "separator" },
+          { label: "Zoom In", action: viewMenuActions.zoomIn },
+          { label: "Zoom Out", action: viewMenuActions.zoomOut },
+        ],
+      },
     ]);
   });
 
   it("maps native menu events to file actions", () => {
-    expect(getFileMenuAction({ data: { action: fileMenuActions.newWorkspace } })).toBe("newWorkspace");
-    expect(getFileMenuAction({ data: { action: fileMenuActions.openWorkspace } })).toBe("openWorkspace");
-    expect(getFileMenuAction({ data: { action: fileMenuActions.saveWorkspace } })).toBe("saveWorkspace");
-    expect(getFileMenuAction({ data: { action: "unknown" } })).toBeNull();
+    expect(getApplicationMenuAction({ data: { action: fileMenuActions.newWorkspace } })).toBe("newWorkspace");
+    expect(getApplicationMenuAction({ data: { action: fileMenuActions.openWorkspace } })).toBe("openWorkspace");
+    expect(getApplicationMenuAction({ data: { action: fileMenuActions.saveWorkspace } })).toBe("saveWorkspace");
+    expect(getApplicationMenuAction({ data: { action: viewMenuActions.toggleTelemetryPane } })).toBe(
+      "toggleTelemetryPane",
+    );
+    expect(getApplicationMenuAction({ data: { action: viewMenuActions.zoomIn } })).toBe("zoomIn");
+    expect(getApplicationMenuAction({ data: { action: "unknown" } })).toBeNull();
   });
 
   it("installs the native menu and forwards file actions", () => {
@@ -50,7 +66,7 @@ describe("application menu", () => {
     installApplicationMenu({
       ApplicationMenu: { setApplicationMenu },
       events: { on },
-      onFileAction,
+      onMenuAction: onFileAction,
     });
 
     expect(setApplicationMenu).toHaveBeenCalledWith(createApplicationMenuTemplate());

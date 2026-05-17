@@ -82,6 +82,14 @@ textarea,
 	grid-template-columns: 48px minmax(0, 1fr);
 }
 
+.app-shell[data-activity-visible="false"] {
+	grid-template-columns: 256px minmax(0, 1fr);
+}
+
+.app-shell[data-activity-visible="false"][data-navigation-visible="false"] {
+	grid-template-columns: minmax(0, 1fr);
+}
+
 .app-titlebar {
 	align-items: center;
 	background: var(--ui-0);
@@ -421,6 +429,10 @@ textarea,
 	min-width: 0;
 	overflow: hidden;
 	padding: 0;
+}
+
+.app-shell[data-activity-visible="false"] .navigation-sidebar {
+	grid-column: 1;
 }
 
 .navigation-sidebar__header {
@@ -811,6 +823,14 @@ textarea,
 
 .app-shell[data-navigation-visible="false"] .app-shell__content {
 	grid-column: 2 / -1;
+}
+
+.app-shell[data-activity-visible="false"] .app-shell__content {
+	grid-column: 2 / -1;
+}
+
+.app-shell[data-activity-visible="false"][data-navigation-visible="false"] .app-shell__content {
+	grid-column: 1 / -1;
 }
 
 .app-shell[data-response-visible="false"] .app-shell__content {
