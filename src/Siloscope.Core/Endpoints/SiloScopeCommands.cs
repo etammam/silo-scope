@@ -96,15 +96,67 @@ public class SiloScopeCommands : ISiloScopeCommands
         }
     }
 
-    public Task<Result> SaveWorkspaceAsync(
+    public async Task<Result> SaveWorkspaceAsync(
         WorkspaceInfo workspace,
         string? path = null,
         CancellationToken cancellationToken = default
     )
     {
-        // TODO: Implement - save workspace to app data
-        _logger.LogInformation("SaveWorkspace called for {WorkspaceName}", workspace.Name);
-        return Task.FromResult(Result.Ok());
+        path ??= _workspaceService.GetDefaultWorkspacePath();
+        _logger.LogInformation("Saving workspace to {Path}", path);
+
+        try
+        {
+            var workspaceModel = new Workspace
+            {
+                Id = workspace.Id,
+                WorkspaceInfo = new Components.Workspace.WorkspaceInfo
+                {
+                    Name = workspace.Name,
+                    Description = workspace.Description ?? string.Empty,
+                    Creation = DateTime.UtcNow.ToString("O"),
+                },
+                Cluster = new ClusterConfig
+                {
+                    Type = "homogenous",
+                    ClusterId = workspace.Cluster.ClusterId,
+                    ServiceId = workspace.Cluster.ServiceId,
+                    DefaultGateway =
+                        workspace.Cluster.GatewayEndpoints.FirstOrDefault() ?? string.Empty,
+                },
+                Silos = workspace
+                    .Silos.Select(s => new Components.Workspace.SiloSource
+                    {
+                        Reference = s.Reference,
+                        Source = s.Source,
+                        Version = s.Version,
+                        Gateway = s.Gateway,
+                        Enabled = s.Enabled,
+                    })
+                    .ToList(),
+                Security = new SecurityConfig(),
+                Environments = new List<EnvironmentConfig>
+                {
+                    new EnvironmentConfig
+                    {
+                        Name = "default",
+                        Variables = workspace.EnvironmentVariables,
+                    },
+                },
+                Session = new SessionConfig { ActiveEnvironment = "default" },
+            };
+
+            await _workspaceService.SaveAsync(path, workspaceModel);
+            _currentWorkspace = workspaceModel;
+
+            _logger.LogInformation("Workspace saved: {WorkspaceName}", workspace.Name);
+            return Result.Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save workspace");
+            return Result.Fail(ex.Message);
+        }
     }
 
     public async Task<Result<string>> ConnectClusterAsync(
