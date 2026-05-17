@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
@@ -34,6 +35,31 @@ public sealed class GrainInvocationService : IGrainInvocationService
         CancellationToken cancellationToken
     )
     {
+        var result = await InvokeWithTimingAsync(
+            grain,
+            method,
+            grainKey,
+            payloadJson,
+            cancellationToken
+        );
+
+        if (result.IsFailed)
+            return Result.Fail<string>(result.Errors.FirstOrDefault()?.Message ?? "Unknown error");
+
+        return Result.Ok(result.Value.Result);
+    }
+
+    public async Task<Result<(string Result, InvocationTiming Timing)>> InvokeWithTimingAsync(
+        GrainInterfaceDescriptor grain,
+        GrainMethodDescriptor method,
+        string grainKey,
+        string? payloadJson,
+        CancellationToken cancellationToken
+    )
+    {
+        var totalStopwatch = Stopwatch.StartNew();
+        var serializationStopwatch = new Stopwatch();
+
         payloadJson ??= string.Empty;
 
         LogSection(
@@ -130,13 +156,19 @@ public sealed class GrainInvocationService : IGrainInvocationService
                 $"Grain reference resolved as '{grainReference.GetType().FullName}'."
             );
 
+            serializationStopwatch.Start();
             var arguments = BindArguments(runtimeMethodInfo, payloadJson);
+            serializationStopwatch.Stop();
+
             LogSection(
                 "Bind",
                 $"Bound {arguments.Length} argument(s). [{DescribeArguments(runtimeMethodInfo, arguments)}]"
             );
 
+            var executionStopwatch = Stopwatch.StartNew();
             var rawResult = runtimeMethodInfo.Invoke(grainReference, arguments);
+            executionStopwatch.Stop();
+
             LogSection(
                 "Invoke",
                 $"Method invocation returned '{rawResult?.GetType().FullName ?? "null"}'."
@@ -152,9 +184,21 @@ public sealed class GrainInvocationService : IGrainInvocationService
                 $"Normalized result type '{normalized?.GetType().FullName ?? "null"}'."
             );
 
+            serializationStopwatch.Start();
             var response = JsonSerializer.Serialize(normalized, SerializerOptions);
+            serializationStopwatch.Stop();
+
             LogSection("Result", $"Serialized response size={response.Length} chars.");
-            return Result.Ok(response);
+
+            totalStopwatch.Stop();
+
+            var timing = new InvocationTiming(
+                serializationStopwatch.ElapsedMilliseconds,
+                executionStopwatch.ElapsedMilliseconds,
+                totalStopwatch.ElapsedMilliseconds
+            );
+
+            return Result.Ok((response, timing));
         }
         catch (Exception ex)
         {

@@ -13,4 +13,13 @@ public interface IGrainInvocationService
         string? payloadJson,
         CancellationToken cancellationToken
     );
+    Task<Result<(string Result, InvocationTiming Timing)>> InvokeWithTimingAsync(
+        GrainInterfaceDescriptor grain,
+        GrainMethodDescriptor method,
+        string grainKey,
+        string? payloadJson,
+        CancellationToken cancellationToken
+    );
 }
+
+public record InvocationTiming(long SerializationMs, long ExecutionMs, long TotalMs);
