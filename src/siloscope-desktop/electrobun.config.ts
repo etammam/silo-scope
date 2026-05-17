@@ -2,19 +2,22 @@ import type { ElectrobunConfig } from "electrobun";
 
 export default {
 	app: {
-		name: "hello-world",
-		identifier: "helloworld.electrobun.dev",
+		name: "siloscope",
+		identifier: "siloscope.app",
 		version: "0.0.1",
 	},
 	build: {
+		bun: {
+			entrypoint: "src/main/index.ts",
+		},
 		views: {
-			mainview: {
-				entrypoint: "src/mainview/index.ts",
+			renderer: {
+				entrypoint: "src/renderer/index.tsx",
 			},
 		},
 		copy: {
-			"src/mainview/index.html": "views/mainview/index.html",
-			"src/mainview/index.css": "views/mainview/index.css",
+			"src/renderer/index.html": "views/renderer/index.html",
+			"src/renderer/index.css": "views/renderer/index.css",
 		},
 		mac: {
 			bundleCEF: false,

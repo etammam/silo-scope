@@ -3,8 +3,13 @@
 	"version": "1.0.0",
 	"description": "A simple Electrobun app showcasing core features",
 	"scripts": {
-		"start": "electrobun dev",
-		"dev": "electrobun dev --watch"
+		"start": "electrobun run",
+		"dev": "electrobun dev",
+		"dev:watch": "electrobun dev --watch",
+		"typecheck": "tsc --noEmit",
+		"build:dev": "electrobun build",
+		"build:canary": "electrobun build --env=canary",
+		"build:stable": "electrobun build --env=stable"
 	},
 	"dependencies": {
 		"@monaco-editor/react": "^4.7.0",
@@ -13,11 +18,14 @@
 		"postcss": "^8.5.14",
 		"react": "^19.2.6",
 		"react-dom": "^19.2.6",
-		"tailwindcss": "^4.3.0"
+		"tailwindcss": "^4.3.0",
+		"zustand": "^5.0.13"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
 		"@types/react": "^19.2.14",
-		"@types/react-dom": "^19.2.3"
+		"@types/react-dom": "^19.2.3",
+		"@types/three": "^0.184.1",
+		"typescript": "^6.0.3"
 	}
 }
