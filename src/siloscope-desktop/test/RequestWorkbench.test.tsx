@@ -50,6 +50,7 @@ describe("RequestWorkbench", () => {
         onSelectMethod={vi.fn()}
         selectedGrain={null}
         selectedMethod={null}
+        theme="dark"
       />,
     );
 
@@ -69,6 +70,7 @@ describe("RequestWorkbench", () => {
         onSelectMethod={onSelectMethod}
         selectedGrain="grain-1"
         selectedMethod="SetName"
+        theme="dark"
       />,
     );
 
@@ -106,6 +108,7 @@ describe("RequestWorkbench", () => {
         onSelectMethod={onSelectMethod}
         selectedGrain={null}
         selectedMethod={null}
+        theme="dark"
       />,
     );
 

@@ -3,6 +3,8 @@ import type { GrainInterfaceDescriptor, Workspace } from "../../shared/types";
 
 type NavigationSidebarProps = {
   activeView: ActivityView;
+  theme: "dark" | "light";
+  onThemeChange: (theme: "dark" | "light") => void;
 } & WorkspaceNavigatorProps;
 
 type WorkspaceNavigatorProps = {
@@ -18,8 +20,10 @@ export function NavigationSidebar({
   grains,
   isConnected,
   selectedGrain,
+  theme,
   workspace,
   onSelectGrain,
+  onThemeChange,
 }: NavigationSidebarProps) {
   const title = formatViewTitle(activeView);
 
@@ -41,7 +45,7 @@ export function NavigationSidebar({
 
       {activeView === "nuget" && <NuGetRegistryManager />}
 
-      {activeView === "settings" && <SystemSettings />}
+      {activeView === "settings" && <SystemSettings onThemeChange={onThemeChange} theme={theme} />}
     </aside>
   );
 }
@@ -157,7 +161,13 @@ function NuGetRegistryManager() {
   );
 }
 
-function SystemSettings() {
+function SystemSettings({
+  onThemeChange,
+  theme,
+}: {
+  onThemeChange: (theme: "dark" | "light") => void;
+  theme: "dark" | "light";
+}) {
   return (
     <>
       <section className="navigation-sidebar__section" aria-labelledby="settings-app-title">
@@ -193,8 +203,12 @@ function SystemSettings() {
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Workbench theme</span>
-          <select defaultValue="dark">
+          <select
+            value={theme}
+            onChange={(event) => onThemeChange(event.target.value as "dark" | "light")}
+          >
             <option value="dark">Dark Mono</option>
+            <option value="light">Light Mono</option>
           </select>
         </label>
       </section>

@@ -36,9 +36,11 @@ function App() {
     workspace,
   } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [isResponseVisible, setIsResponseVisible] = useState(true);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-response-visible={isResponseVisible} data-theme={theme}>
       <ActivityBar activeView={activeView} onViewChange={setActiveView} />
 
       <header className="app-titlebar electrobun-webkit-app-region-drag">
@@ -46,9 +48,19 @@ function App() {
         <div className="app-titlebar__command">SiloScope</div>
         <div className="app-titlebar__actions">
           <button
+            aria-label={isResponseVisible ? "Collapse response panel" : "Expand response panel"}
+            aria-pressed={!isResponseVisible}
+            className="titlebar-action titlebar-action--response electrobun-webkit-app-region-no-drag"
+            onClick={() => setIsResponseVisible((visible) => !visible)}
+            title={isResponseVisible ? "Collapse response panel" : "Expand response panel"}
+            type="button"
+          >
+            <span aria-hidden="true" className="titlebar-response__icon" />
+          </button>
+          <button
             aria-label="Settings"
             aria-pressed={activeView === "settings"}
-            className="titlebar-settings electrobun-webkit-app-region-no-drag"
+            className="titlebar-action titlebar-settings electrobun-webkit-app-region-no-drag"
             onClick={() => setActiveView("settings")}
             title="Settings"
             type="button"
@@ -63,7 +75,9 @@ function App() {
         grains={grains}
         isConnected={isConnected}
         onSelectGrain={setSelectedGrain}
+        onThemeChange={setTheme}
         selectedGrain={selectedGrain}
+        theme={theme}
         workspace={workspace}
       />
 
@@ -80,8 +94,9 @@ function App() {
           onSelectMethod={setSelectedMethod}
           selectedGrain={selectedGrain}
           selectedMethod={selectedMethod}
+          theme={theme}
         />
-        <ResponseTelemetryPane result={invocationResult} />
+        {isResponseVisible && <ResponseTelemetryPane result={invocationResult} theme={theme} />}
       </main>
     </div>
   );

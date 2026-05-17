@@ -7,6 +7,7 @@ interface MonacoEditorProps {
   onChange: (value: string) => void;
   readOnly?: boolean;
   language?: string;
+  theme?: "dark" | "light";
 }
 
 export function MonacoEditor({
@@ -14,6 +15,7 @@ export function MonacoEditor({
   onChange,
   readOnly = false,
   language = "json",
+  theme = "dark",
 }: MonacoEditorProps) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
 
@@ -40,6 +42,28 @@ export function MonacoEditor({
         "scrollbarSlider.activeBackground": "#85858599",
       },
     });
+    monaco.editor.defineTheme("siloscope-light", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#ffffff",
+        "editor.foreground": "#242424",
+        "editorLineNumber.foreground": "#858585",
+        "editorLineNumber.activeForeground": "#3c3c3c",
+        "editorCursor.foreground": "#242424",
+        "editor.selectionBackground": "#c8c8c8",
+        "editor.inactiveSelectionBackground": "#e5e5e5",
+        "editor.lineHighlightBackground": "#f3f3f3",
+        "editor.lineHighlightBorder": "#00000000",
+        "editorGutter.background": "#ffffff",
+        "editorIndentGuide.background1": "#d4d4d4",
+        "editorIndentGuide.activeBackground1": "#858585",
+        "scrollbarSlider.background": "#c8c8c899",
+        "scrollbarSlider.hoverBackground": "#85858566",
+        "scrollbarSlider.activeBackground": "#85858599",
+      },
+    });
   };
 
   const handleMount: OnMount = (editor) => {
@@ -54,7 +78,7 @@ export function MonacoEditor({
     <Editor
       height="100%"
       language={language}
-      theme="siloscope-dark"
+      theme={theme === "light" ? "siloscope-light" : "siloscope-dark"}
       value={value}
       onChange={handleChange}
       beforeMount={handleBeforeMount}

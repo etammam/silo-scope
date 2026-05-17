@@ -31,7 +31,9 @@ describe("NavigationSidebar", () => {
         grains={[]}
         isConnected={false}
         onSelectGrain={vi.fn()}
+        onThemeChange={vi.fn()}
         selectedGrain={null}
+        theme="dark"
         workspace={null}
       />,
     );
@@ -50,7 +52,9 @@ describe("NavigationSidebar", () => {
         grains={grains}
         isConnected
         onSelectGrain={onSelectGrain}
+        onThemeChange={vi.fn()}
         selectedGrain="grain-2"
+        theme="dark"
         workspace={workspace}
       />,
     );
@@ -74,7 +78,9 @@ describe("NavigationSidebar", () => {
         grains={[]}
         isConnected={false}
         onSelectGrain={vi.fn()}
+        onThemeChange={vi.fn()}
         selectedGrain={null}
+        theme="dark"
         workspace={null}
       />,
     );
@@ -86,13 +92,17 @@ describe("NavigationSidebar", () => {
   });
 
   it("renders system settings when settings view is active", () => {
+    const onThemeChange = vi.fn();
+
     render(
       <NavigationSidebar
         activeView="settings"
         grains={[]}
         isConnected={false}
         onSelectGrain={vi.fn()}
+        onThemeChange={onThemeChange}
         selectedGrain={null}
+        theme="dark"
         workspace={null}
       />,
     );
@@ -101,5 +111,11 @@ describe("NavigationSidebar", () => {
     expect(screen.getByLabelText("Use native titlebar")).toBeChecked();
     expect(screen.getByLabelText("Disable text selection")).toBeChecked();
     expect(screen.getByLabelText("Workbench theme")).toHaveValue("dark");
+
+    fireEvent.change(screen.getByLabelText("Workbench theme"), {
+      target: { value: "light" },
+    });
+
+    expect(onThemeChange).toHaveBeenCalledWith("light");
   });
 });

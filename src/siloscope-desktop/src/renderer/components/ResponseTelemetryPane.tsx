@@ -4,9 +4,10 @@ import { MonacoEditor } from "./MonacoEditor";
 
 type ResponseTelemetryPaneProps = {
   result: InvocationResult | null;
+  theme: "dark" | "light";
 };
 
-export function ResponseTelemetryPane({ result }: ResponseTelemetryPaneProps) {
+export function ResponseTelemetryPane({ result, theme }: ResponseTelemetryPaneProps) {
   const output = useMemo(() => formatResult(result), [result]);
 
   return (
@@ -21,7 +22,7 @@ export function ResponseTelemetryPane({ result }: ResponseTelemetryPaneProps) {
           <span>Output</span>
           <span>Read-only</span>
         </div>
-        <MonacoEditor value={output} onChange={() => undefined} readOnly />
+        <MonacoEditor value={output} onChange={() => undefined} readOnly theme={theme} />
       </div>
 
       <div className="response-pane__section response-pane__section--timing">

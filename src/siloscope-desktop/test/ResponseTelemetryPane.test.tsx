@@ -18,7 +18,7 @@ vi.mock("@/renderer/components/MonacoEditor", () => ({
 
 describe("ResponseTelemetryPane", () => {
   it("renders an idle read-only output viewer before invocation", () => {
-    render(<ResponseTelemetryPane result={null} />);
+    render(<ResponseTelemetryPane result={null} theme="dark" />);
 
     expect(screen.getByText("Idle")).toBeInTheDocument();
     expect(screen.getByTestId("output-viewer")).toHaveAttribute("data-readonly", "true");
@@ -38,6 +38,7 @@ describe("ResponseTelemetryPane", () => {
             totalMs: 20,
           },
         }}
+        theme="dark"
       />,
     );
 

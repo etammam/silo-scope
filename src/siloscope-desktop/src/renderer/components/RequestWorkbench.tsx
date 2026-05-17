@@ -8,6 +8,7 @@ type RequestWorkbenchProps = {
   grains: GrainInterfaceDescriptor[];
   selectedGrain: string | null;
   selectedMethod: string | null;
+  theme: "dark" | "light";
   onSelectGrain: (grainId: string | null) => void;
   onSelectMethod: (methodName: string | null) => void;
   onInvoke: (request: {
@@ -23,6 +24,7 @@ export function RequestWorkbench({
   grains,
   selectedGrain,
   selectedMethod,
+  theme,
   onSelectGrain,
   onSelectMethod,
   onInvoke,
@@ -125,7 +127,7 @@ export function RequestWorkbench({
           <span>Payload</span>
           <span>JSON</span>
         </div>
-        <MonacoEditor value={payload} onChange={setPayload} />
+        <MonacoEditor value={payload} onChange={setPayload} theme={theme} />
       </div>
     </section>
   );

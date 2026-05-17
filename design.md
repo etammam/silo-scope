@@ -8,7 +8,7 @@ SiloScope should feel like a modern developer workbench, close to the current VS
 
 - Use one monochrome gray scale per theme.
 - Avoid accent colors for core chrome, navigation, active states, and empty states.
-- Dark theme is the primary design target.
+- Dark and light themes are both baseline requirements from day zero.
 - Keep contrast strong enough for labels, active navigation, and buttons, but avoid bright white blocks.
 - Borders should be subtle and structural, not decorative.
 - Shadows should be avoided in the main workbench. Use borders and surface changes instead.
@@ -25,6 +25,8 @@ Current dark theme intent:
 --ui-6: #c8c8c8; /* normal text */
 --ui-7: #f2f2f2; /* high-emphasis text */
 ```
+
+Light theme mirrors the same roles with a monochrome gray scale. It should preserve the workbench grammar rather than become a separate visual product.
 
 ## Layout
 
@@ -56,6 +58,7 @@ remaining Workbench
 - The SiloScope command/title field must remain centered relative to the full window, not shifted by right-side controls.
 - Right-side controls should be actual app actions, not decorative placeholders.
 - Settings currently belongs in the titlebar, not the Activity Bar.
+- Response pane visibility is a titlebar-level workbench action beside Settings.
 - Titlebar controls must use `electrobun-webkit-app-region-no-drag`.
 
 ## Activity Bar
