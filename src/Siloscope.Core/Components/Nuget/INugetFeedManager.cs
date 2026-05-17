@@ -112,14 +112,15 @@ internal class NugetConnectionManager : INugetConnectionManager
             if (!Directory.Exists(location))
                 Directory.CreateDirectory(location);
 
-            if (!File.Exists(Path.Combine(location, fileName)))
-                File.Create(Path.Combine(location, fileName));
+            var filePath = Path.Combine(location, fileName);
+            if (!File.Exists(filePath))
+            {
+                using var _ = File.Create(filePath);
+            }
 
-            var fileContent =
-                File.ReadAllText(Path.Combine(AppContext.BaseDirectory, folder, fileName))
-                ?? JsonSerializer.Serialize<Feed[]>([], _jsonSerializerOptions);
+            var fileContent = File.ReadAllText(filePath);
 
-            if (fileContent.Length == 0)
+            if (string.IsNullOrEmpty(fileContent))
                 fileContent = JsonSerializer.Serialize<Feed[]>([], _jsonSerializerOptions);
 
             var content = JsonSerializer.Deserialize<List<Feed>>(

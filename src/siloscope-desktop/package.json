@@ -1,0 +1,23 @@
+{
+	"name": "electrobun-hello-world",
+	"version": "1.0.0",
+	"description": "A simple Electrobun app showcasing core features",
+	"scripts": {
+		"start": "electrobun dev",
+		"dev": "electrobun dev --watch"
+	},
+	"dependencies": {
+		"@monaco-editor/react": "^4.7.0",
+		"autoprefixer": "^10.5.0",
+		"electrobun": "1.18.1",
+		"postcss": "^8.5.14",
+		"react": "^19.2.6",
+		"react-dom": "^19.2.6",
+		"tailwindcss": "^4.3.0"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"@types/react": "^19.2.14",
+		"@types/react-dom": "^19.2.3"
+	}
+}

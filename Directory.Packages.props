@@ -5,6 +5,7 @@
     <PackageVersion Include="Serilog" Version="4.3.1" />
     <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="StreamJsonRpc" Version="2.20.17" />
     <PackageVersion Include="Terminal.Gui" Version="2.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.0.1" />

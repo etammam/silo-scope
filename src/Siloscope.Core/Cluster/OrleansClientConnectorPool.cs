@@ -4,51 +4,60 @@ using Siloscope.Core.Interfaces;
 
 namespace Siloscope.Core.Cluster;
 
-/// <summary>
-/// Manages one <see cref="OrleansClientConnector"/> per unique gateway endpoint.
-/// In a heterogeneous cluster each silo gateway can only deserialize its own grain types,
-/// so invocations must be routed through the correct gateway.
-/// </summary>
 public sealed class OrleansClientConnectorPool : IDisposable
 {
     private readonly Dictionary<string, OrleansClientConnector> _connectors = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private ToolClusterOptions? _clusterOptions;
+    private List<string>? _assemblyPaths;
+
+    public OrleansClientConnectorPool() { }
 
     public OrleansClientConnectorPool(
         ToolClusterOptions clusterOptions,
         InterfaceCatalog catalog,
         IReadOnlyList<InterfaceEntry> entries
     )
+        : this()
     {
-        // Build mapping: gateway → interface assembly paths (for serializer registration).
+        Configure(clusterOptions, catalog, entries);
+    }
+
+    public void Configure(
+        ToolClusterOptions clusterOptions,
+        InterfaceCatalog catalog,
+        IReadOnlyList<InterfaceEntry>? entries = null
+    )
+    {
+        _clusterOptions = clusterOptions;
+        _assemblyPaths = catalog.AssemblyPaths.Count > 0 ? catalog.AssemblyPaths.ToList() : null;
+
         var gatewayToAssemblyPaths = new Dictionary<string, List<string>>(
             StringComparer.OrdinalIgnoreCase
         );
-        foreach (var entry in entries)
+
+        if (entries != null)
         {
-            var gw = entry.Gateway;
-            if (string.IsNullOrWhiteSpace(gw) || string.IsNullOrWhiteSpace(entry.DllPath))
+            foreach (var entry in entries)
             {
-                continue;
-            }
+                var gw = entry.Gateway;
+                if (string.IsNullOrWhiteSpace(gw) || string.IsNullOrWhiteSpace(entry.DllPath))
+                    continue;
 
-            if (!gatewayToAssemblyPaths.TryGetValue(gw, out var paths))
-            {
-                paths = [];
-                gatewayToAssemblyPaths[gw] = paths;
+                if (!gatewayToAssemblyPaths.TryGetValue(gw, out var paths))
+                {
+                    paths = [];
+                    gatewayToAssemblyPaths[gw] = paths;
+                }
+                paths.Add(entry.DllPath);
             }
-
-            paths.Add(entry.DllPath);
         }
 
-        // Create one connector per unique gateway referenced by the loaded grains.
         foreach (var gateway in catalog.Gateways)
         {
             if (_connectors.ContainsKey(gateway))
-            {
                 continue;
-            }
 
             var perGatewayCluster = new ToolClusterOptions(
                 clusterOptions.ClusterId,
@@ -60,14 +69,17 @@ public sealed class OrleansClientConnectorPool : IDisposable
             _connectors[gateway] = new OrleansClientConnector(perGatewayCluster, assemblyPaths);
         }
 
-        // Fallback: if no gateways are specified, create a single connector with all interface assemblies.
-        // This is the common case for Redis clustering where gateways are discovered dynamically.
         if (_connectors.Count == 0)
         {
-            _connectors["localhost"] = new OrleansClientConnector(
-                clusterOptions,
-                catalog.AssemblyPaths.Count > 0 ? catalog.AssemblyPaths.ToList() : null
-            );
+            _connectors["localhost"] = new OrleansClientConnector(clusterOptions, _assemblyPaths);
+        }
+    }
+
+    public async Task DisconnectAllAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (var connector in _connectors.Values)
+        {
+            await connector.DisconnectAsync();
         }
     }
 
@@ -90,7 +102,7 @@ public sealed class OrleansClientConnectorPool : IDisposable
         foreach (var (gateway, connector) in _connectors)
         {
             var result = await connector.ConnectAsync(cancellationToken);
-            if (!result.IsSuccess)
+            if (result.IsFailed)
             {
                 errors.AddRange(result.Errors.Select(e => $"[{gateway}] {e.Message}"));
             }
@@ -110,7 +122,6 @@ public sealed class OrleansClientConnectorPool : IDisposable
             return true;
         }
 
-        // Fallback: return the first (or only) connector.
         if (_connectors.Count > 0)
         {
             connector = _connectors.Values.First();
