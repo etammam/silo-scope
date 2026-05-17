@@ -236,7 +236,8 @@ public class SiloScopeCommands : ISiloScopeCommands
                 s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Reference : null,
                 s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Version : null,
                 null,
-                null
+                null,
+                BuildSourceId(s)
             ))
             .ToList();
 
@@ -266,6 +267,43 @@ public class SiloScopeCommands : ISiloScopeCommands
         _logger.LogInformation("Discovered {Count} grain interfaces", grainInfos.Count);
 
         return Result.Ok(new GrainCatalog(grainInfos, catalog.AssemblyPaths));
+    }
+
+    public Task<Result<SourceOwnedGrainCatalog>> DiscoverSourceCatalogAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        return DiscoverSourceCatalogAsync(null, cancellationToken);
+    }
+
+    public async Task<Result<SourceOwnedGrainCatalog>> DiscoverSourceCatalogAsync(
+        string? path,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (_currentWorkspace is null)
+        {
+            var loadResult = await LoadWorkspaceAsync(path, cancellationToken);
+            if (loadResult.IsFailed)
+            {
+                return Result.Fail<SourceOwnedGrainCatalog>(
+                    "No workspace loaded and none specified"
+                );
+            }
+        }
+
+        if (_catalog is null)
+        {
+            var discoverResult = await DiscoverGrainsAsync(path, cancellationToken);
+            if (discoverResult.IsFailed)
+            {
+                return Result.Fail<SourceOwnedGrainCatalog>(
+                    discoverResult.Errors.Select(e => e.Message)
+                );
+            }
+        }
+
+        return Result.Ok(BuildSourceOwnedCatalog(_currentWorkspace!, _catalog!));
     }
 
     public async Task<Result<InvocationResult>> InvokeGrainAsync(
@@ -380,5 +418,160 @@ public class SiloScopeCommands : ISiloScopeCommands
                 []
             )
         );
+    }
+
+    private static SourceOwnedGrainCatalog BuildSourceOwnedCatalog(
+        Components.Workspace.Workspace workspace,
+        InterfaceCatalog catalog
+    )
+    {
+        var catalogSources = catalog.SourceDescriptors.ToDictionary(
+            static source => source.SourceId,
+            StringComparer.Ordinal
+        );
+
+        var sources = workspace
+            .Silos.Select(silo =>
+            {
+                var sourceId = BuildSourceId(silo);
+                catalogSources.TryGetValue(sourceId, out var sourceDescriptor);
+
+                var interfaces = catalog
+                    .Grains.Where(grain =>
+                        string.Equals(grain.SourceId, sourceId, StringComparison.Ordinal)
+                    )
+                    .Select(grain => new SourceCatalogInterface(
+                        grain.Name,
+                        grain.InterfaceType.Name,
+                        grain.InterfaceType.Namespace ?? "",
+                        grain
+                            .Methods.Select(method => new SourceCatalogFunction(
+                                BuildFunctionId(sourceId, grain, method),
+                                sourceId,
+                                grain.Name,
+                                grain.InterfaceType.Name,
+                                grain.InterfaceType.Namespace ?? "",
+                                method.MethodInfo.Name,
+                                method.Signature,
+                                FormatTypeName(method.MethodInfo.ReturnType),
+                                GetGrainKeyType(grain.InterfaceType),
+                                method
+                                    .MethodInfo.GetParameters()
+                                    .Select(parameter => new FunctionParameterInfo(
+                                        parameter.Name ?? "value",
+                                        FormatTypeName(parameter.ParameterType)
+                                    ))
+                                    .ToList()
+                            ))
+                            .ToList()
+                    ))
+                    .OrderBy(
+                        static catalogInterface => catalogInterface.Namespace,
+                        StringComparer.Ordinal
+                    )
+                    .ThenBy(
+                        static catalogInterface => catalogInterface.InterfaceName,
+                        StringComparer.Ordinal
+                    )
+                    .ToList();
+
+                return new SourceCatalogInfo(
+                    sourceId,
+                    NormalizeSourceType(silo.Source),
+                    silo.Reference,
+                    GetSourceLabel(silo),
+                    silo.Version,
+                    silo.Gateway,
+                    silo.Enabled,
+                    GetDiscoveryStatus(silo, sourceDescriptor, interfaces),
+                    interfaces
+                );
+            })
+            .ToList();
+
+        return new SourceOwnedGrainCatalog(sources);
+    }
+
+    private static string BuildSourceId(Components.Workspace.SiloSource silo)
+    {
+        return $"{NormalizeSourceType(silo.Source)}:{silo.Reference}:{silo.Version ?? ""}:{silo.Gateway ?? ""}";
+    }
+
+    private static string BuildFunctionId(
+        string sourceId,
+        GrainInterfaceDescriptor grain,
+        GrainMethodDescriptor method
+    )
+    {
+        return $"{sourceId}:{grain.Name}:{method.Signature}";
+    }
+
+    private static string NormalizeSourceType(string source)
+    {
+        return source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? "NuGet" : "DLL";
+    }
+
+    private static string GetSourceLabel(Components.Workspace.SiloSource source)
+    {
+        if (source.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(source.Version)
+                ? source.Reference
+                : $"{source.Reference} {source.Version}";
+        }
+
+        return Path.GetFileName(source.Reference);
+    }
+
+    private static string GetDiscoveryStatus(
+        Components.Workspace.SiloSource source,
+        Interfaces.InterfaceSourceDescriptor? sourceDescriptor,
+        IReadOnlyList<SourceCatalogInterface> interfaces
+    )
+    {
+        if (!source.Enabled)
+        {
+            return "idle";
+        }
+
+        if (sourceDescriptor is null)
+        {
+            return "idle";
+        }
+
+        return interfaces.Count > 0 ? "ready" : "idle";
+    }
+
+    private static string GetGrainKeyType(Type interfaceType)
+    {
+        if (typeof(IGrainWithGuidKey).IsAssignableFrom(interfaceType))
+        {
+            return "Guid";
+        }
+
+        if (typeof(IGrainWithIntegerKey).IsAssignableFrom(interfaceType))
+        {
+            return "Integer";
+        }
+
+        return "String";
+    }
+
+    private static string FormatTypeName(Type type)
+    {
+        if (!type.IsGenericType)
+        {
+            return type.Name;
+        }
+
+        var baseName = type.Name;
+        var tick = baseName.IndexOf('`');
+        if (tick >= 0)
+        {
+            baseName = baseName[..tick];
+        }
+
+        var args = string.Join(", ", type.GetGenericArguments().Select(FormatTypeName));
+        return $"{baseName}<{args}>";
     }
 }

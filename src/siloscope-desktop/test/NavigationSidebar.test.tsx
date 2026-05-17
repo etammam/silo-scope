@@ -14,17 +14,17 @@ const grains = [
   {
     interfaceId: "grain-1",
     interfaceName: "IPlayerGrain",
-    methods: [],
+    methods: [{ name: "GetProfile", parameters: [] }],
   },
   {
     interfaceId: "grain-2",
     interfaceName: "IGameGrain",
-    methods: [],
+    methods: [{ name: "StartMatch", parameters: [] }],
   },
 ];
 
 describe("NavigationSidebar", () => {
-  it("renders empty workspace, silo, and grain states", () => {
+  it("renders empty workspace and catalog states", () => {
     render(
       <NavigationSidebar
         activeView="workspace"
@@ -39,21 +39,24 @@ describe("NavigationSidebar", () => {
     );
 
     expect(screen.getByLabelText("Active workspace")).toHaveValue("none");
-    expect(screen.getByText("No silo sources")).toBeInTheDocument();
-    expect(screen.getByText("No grains discovered")).toBeInTheDocument();
+    expect(screen.getByText("Function Catalog")).toBeInTheDocument();
+    expect(screen.getAllByText("No workspace loaded")).toHaveLength(2);
     expect(screen.getByText("Disconnected")).toBeInTheDocument();
   });
 
-  it("renders workspace source and selectable grain tree", () => {
+  it("renders source-owned function catalog and selectable method leaves", () => {
     const onSelectGrain = vi.fn();
+    const onSelectFunction = vi.fn();
     render(
       <NavigationSidebar
         activeView="workspace"
         grains={grains}
         isConnected
+        onSelectFunction={onSelectFunction}
         onSelectGrain={onSelectGrain}
         onThemeChange={vi.fn()}
-        selectedGrain="grain-2"
+        selectedFunctionId="source:active-workspace:workspace-1:grain-2:StartMatch()"
+        selectedGrain={null}
         theme="dark"
         workspace={workspace}
       />,
@@ -63,33 +66,78 @@ describe("NavigationSidebar", () => {
     expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
     expect(screen.getByText("DLL")).toBeInTheDocument();
-    expect(screen.getByText("NuGet")).toBeInTheDocument();
     expect(screen.getByText("127.0.0.1:30000")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Application 2" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "127.0.0.1:30000 2" })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
-    expect(screen.getByRole("button", { name: "IGameGrain" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "StartMatch()" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "IPlayerGrain" }));
+    fireEvent.click(screen.getByRole("button", { name: "GetProfile()" }));
 
-    expect(onSelectGrain).toHaveBeenCalledWith("grain-1");
+    expect(onSelectFunction).toHaveBeenCalledWith("source:active-workspace:workspace-1:grain-1:GetProfile()");
   });
 
-  it("groups discovered grains by namespace and supports collapsing groups", () => {
+  it("filters methods while preserving their source parent", () => {
+    render(
+      <NavigationSidebar
+        activeView="workspace"
+        grains={grains}
+        isConnected
+        onSelectGrain={vi.fn()}
+        onThemeChange={vi.fn()}
+        selectedGrain={null}
+        theme="dark"
+        workspace={workspace}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Search catalog"), {
+      target: { value: "profile" },
+    });
+
+    expect(screen.getByRole("button", { name: "127.0.0.1:30000 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "GetProfile()" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "StartMatch()" })).not.toBeInTheDocument();
+  });
+
+  it("toggles source enabled state without losing the catalog", () => {
+    render(
+      <NavigationSidebar
+        activeView="workspace"
+        grains={grains}
+        isConnected
+        onSelectGrain={vi.fn()}
+        onThemeChange={vi.fn()}
+        selectedGrain={null}
+        theme="dark"
+        workspace={workspace}
+      />,
+    );
+
+    const sourceToggle = screen.getByRole("checkbox", { name: "127.0.0.1:30000 enabled" });
+
+    expect(sourceToggle).toBeChecked();
+    fireEvent.click(sourceToggle);
+
+    expect(sourceToggle).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "GetProfile()" })).toBeInTheDocument();
+  });
+
+  it("groups discovered functions under interfaces and supports collapsing", () => {
     const namespacedGrains = [
       {
         interfaceId: "inventory-1",
         interfaceName: "SiloScope.Inventory.IItemGrain",
-        methods: [],
+        methods: [{ name: "GetItem", parameters: [] }],
       },
       {
         interfaceId: "matchmaking-1",
         interfaceName: "SiloScope.Matchmaking.IGameGrain",
-        methods: [],
+        methods: [{ name: "CreateGame", parameters: [] }],
       },
     ];
 
@@ -106,15 +154,15 @@ describe("NavigationSidebar", () => {
       />,
     );
 
-    const inventoryGroup = screen.getByRole("button", { name: "SiloScope.Inventory 1" });
+    const inventoryGroup = screen.getByRole("button", { name: "SiloScope.Inventory.IItemGrain 1" });
 
     expect(inventoryGroup).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "SiloScope.Inventory.IItemGrain" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "GetItem()" })).toBeInTheDocument();
 
     fireEvent.click(inventoryGroup);
 
     expect(inventoryGroup).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: "SiloScope.Inventory.IItemGrain" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "GetItem()" })).not.toBeInTheDocument();
   });
 
   it("renders NuGet registry manager when NuGet view is active", () => {

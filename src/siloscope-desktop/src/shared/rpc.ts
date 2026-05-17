@@ -1,11 +1,28 @@
 import type { RPCSchema } from "electrobun/bun";
-import type { Workspace, GrainInterfaceDescriptor, InvocationResult, LogEntry } from "./types";
+import type {
+  Workspace,
+  GrainInterfaceDescriptor,
+  InvocationResult,
+  LogEntry,
+  SourceOwnedCatalog,
+} from "./types";
 
 export type SiloScopeRPC = {
   bun: RPCSchema<{
     requests: {
-      getGrains: { params: { workspaceId: string }; response: { grains: GrainInterfaceDescriptor[] } };
-      invokeGrain: { params: { grainType: string; method: string; grainKey: string; payload: string }; response: InvocationResult };
+      getGrains: { params: { workspaceId: string }; response: { grains: GrainInterfaceDescriptor[]; sourceCatalog?: SourceOwnedCatalog } };
+      getSourceCatalog: { params: { workspaceId: string }; response: { sourceCatalog: SourceOwnedCatalog } };
+      invokeGrain: {
+        params: {
+          grainType: string;
+          method: string;
+          grainKey: string;
+          payload: string;
+          sourceId?: string;
+          functionId?: string;
+        };
+        response: InvocationResult;
+      };
       getWorkspaces: { params: void; response: { workspaces: Workspace[] } };
     };
     messages: {

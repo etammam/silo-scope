@@ -20,8 +20,9 @@ public sealed class InterfaceCatalogLoader(
     {
         var allGrains = new List<GrainInterfaceDescriptor>();
         var assemblyPaths = new List<string>();
+        var sources = new List<InterfaceSourceDescriptor>();
 
-        foreach (var entry in entries)
+        foreach (var (entry, index) in entries.Select((entry, index) => (entry, index)))
         {
             var legacySource = new InterfaceSourceOptions(
                 entry.SourceType,
@@ -40,6 +41,7 @@ public sealed class InterfaceCatalogLoader(
 
             var assemblyPath = assemblyPathResult.Value;
             assemblyPaths.Add(assemblyPath);
+            var sourceId = entry.SourceId ?? BuildSourceId(entry, index);
 
             try
             {
@@ -52,7 +54,24 @@ public sealed class InterfaceCatalogLoader(
                     return Result.Fail(defaultLoadResult.Errors.Select(e => new Error(e.Message)));
                 }
 
-                var grains = DiscoverGrainInterfaces(defaultLoadResult.Value, entry.Gateway);
+                sources.Add(
+                    new InterfaceSourceDescriptor(
+                        sourceId,
+                        entry.SourceType.ToString(),
+                        GetSourceReference(entry),
+                        GetSourceLabel(entry),
+                        entry.PackageVersion,
+                        entry.Gateway,
+                        true,
+                        assemblyPath
+                    )
+                );
+
+                var grains = DiscoverGrainInterfaces(
+                    defaultLoadResult.Value,
+                    entry.Gateway,
+                    sourceId
+                );
                 allGrains.AddRange(grains);
             }
             catch (Exception ex)
@@ -63,7 +82,7 @@ public sealed class InterfaceCatalogLoader(
             }
         }
 
-        return Result.Ok(new InterfaceCatalog(allGrains, assemblyPaths));
+        return Result.Ok(new InterfaceCatalog(allGrains, assemblyPaths, sources));
     }
 
     public Result<InterfaceCatalog> Load(InterfaceSourceOptions sourceOptions)
@@ -87,9 +106,42 @@ public sealed class InterfaceCatalogLoader(
                 return Result.Fail(defaultLoadResult.Errors.Select(e => new Error(e.Message)));
             }
 
-            var grains = DiscoverGrainInterfaces(defaultLoadResult.Value, gateway: null);
+            var sourceId = BuildSourceId(
+                new InterfaceEntry(
+                    null,
+                    sourceOptions.SourceType,
+                    sourceOptions.DllPath,
+                    sourceOptions.PackageId,
+                    sourceOptions.PackageVersion,
+                    sourceOptions.PackageRoot,
+                    sourceOptions.NugetConfigPath
+                ),
+                0
+            );
+            var grains = DiscoverGrainInterfaces(defaultLoadResult.Value, gateway: null, sourceId);
 
-            return Result.Ok(new InterfaceCatalog(grains, [assemblyPath]));
+            return Result.Ok(
+                new InterfaceCatalog(
+                    grains,
+                    [assemblyPath],
+                    [
+                        new InterfaceSourceDescriptor(
+                            sourceId,
+                            sourceOptions.SourceType.ToString(),
+                            sourceOptions.SourceType == InterfaceSourceType.Dll
+                                ? sourceOptions.DllPath ?? assemblyPath
+                                : sourceOptions.PackageId ?? assemblyPath,
+                            sourceOptions.SourceType == InterfaceSourceType.Dll
+                                ? Path.GetFileName(sourceOptions.DllPath ?? assemblyPath)
+                                : sourceOptions.PackageId ?? Path.GetFileName(assemblyPath),
+                            sourceOptions.PackageVersion,
+                            null,
+                            true,
+                            assemblyPath
+                        ),
+                    ]
+                )
+            );
         }
         catch (Exception ex)
         {
@@ -200,7 +252,8 @@ public sealed class InterfaceCatalogLoader(
 
     private static IReadOnlyList<GrainInterfaceDescriptor> DiscoverGrainInterfaces(
         Assembly assembly,
-        string? gateway
+        string? gateway,
+        string? sourceId
     )
     {
         return assembly
@@ -218,9 +271,34 @@ public sealed class InterfaceCatalogLoader(
                         method
                     ))
                     .ToList(),
-                gateway
+                gateway,
+                sourceId
             ))
             .ToList();
+    }
+
+    private static string BuildSourceId(InterfaceEntry entry, int index)
+    {
+        return $"{entry.SourceType}:{GetSourceReference(entry)}:{entry.PackageVersion ?? ""}:{entry.Gateway ?? ""}:{index}";
+    }
+
+    private static string GetSourceReference(InterfaceEntry entry)
+    {
+        return entry.SourceType == InterfaceSourceType.Dll
+            ? entry.DllPath ?? string.Empty
+            : entry.PackageId ?? string.Empty;
+    }
+
+    private static string GetSourceLabel(InterfaceEntry entry)
+    {
+        if (entry.SourceType == InterfaceSourceType.Dll)
+        {
+            return Path.GetFileName(entry.DllPath ?? string.Empty);
+        }
+
+        return entry.PackageVersion is null
+            ? entry.PackageId ?? "NuGet package"
+            : $"{entry.PackageId} {entry.PackageVersion}";
     }
 
     private static string FormatMethodSignature(MethodInfo method)

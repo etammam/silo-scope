@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
 import type { ActivityView } from "./ActivityBar";
-import type { GrainInterfaceDescriptor, Workspace } from "../../shared/types";
+import type {
+  GrainInterfaceDescriptor,
+  SourceCatalogInterface,
+  SourceCatalogSource,
+  SourceOwnedCatalog,
+  Workspace,
+} from "../../shared/types";
+import { buildSourceCatalogFromGrains } from "../catalog";
 
 type NavigationSidebarProps = {
   activeView: ActivityView;
@@ -11,8 +18,11 @@ type NavigationSidebarProps = {
 type WorkspaceNavigatorProps = {
   grains: GrainInterfaceDescriptor[];
   isConnected: boolean;
+  sourceCatalog?: SourceOwnedCatalog;
+  selectedFunctionId?: string | null;
   selectedGrain: string | null;
   workspace: Workspace | null;
+  onSelectFunction?: (functionId: string | null) => void;
   onSelectGrain: (grainId: string | null) => void;
 };
 
@@ -20,7 +30,10 @@ export function NavigationSidebar({
   activeView,
   grains,
   isConnected,
+  onSelectFunction,
   selectedGrain,
+  selectedFunctionId,
+  sourceCatalog,
   theme,
   workspace,
   onSelectGrain,
@@ -38,8 +51,11 @@ export function NavigationSidebar({
         <WorkspaceNavigator
           grains={grains}
           isConnected={isConnected}
+          onSelectFunction={onSelectFunction}
           onSelectGrain={onSelectGrain}
+          selectedFunctionId={selectedFunctionId}
           selectedGrain={selectedGrain}
+          sourceCatalog={sourceCatalog}
           workspace={workspace}
         />
       )}
@@ -54,20 +70,66 @@ export function NavigationSidebar({
 function WorkspaceNavigator({
   grains,
   isConnected,
+  onSelectFunction,
   selectedGrain,
+  selectedFunctionId,
+  sourceCatalog,
   workspace,
   onSelectGrain,
 }: WorkspaceNavigatorProps) {
-  const grainGroups = useMemo(() => groupGrainsByNamespace(grains), [grains]);
-  const [collapsedNamespaces, setCollapsedNamespaces] = useState<Set<string>>(() => new Set());
+  const catalog = useMemo(
+    () => sourceCatalog ?? buildSourceCatalogFromGrains(grains, workspace),
+    [grains, sourceCatalog, workspace],
+  );
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [collapsedSources, setCollapsedSources] = useState<Set<string>>(() => new Set());
+  const [collapsedInterfaces, setCollapsedInterfaces] = useState<Set<string>>(() => new Set());
+  const [disabledSourceIds, setDisabledSourceIds] = useState<Set<string>>(() => new Set());
 
-  const toggleNamespace = (namespaceName: string) => {
-    setCollapsedNamespaces((current) => {
+  const filteredSources = useMemo(
+    () =>
+      filterCatalogSources(
+        catalog.sources.map((source) => ({
+          ...source,
+          enabled: source.enabled && !disabledSourceIds.has(source.sourceId),
+        })),
+        catalogQuery,
+      ),
+    [catalog.sources, catalogQuery, disabledSourceIds],
+  );
+
+  const toggleSource = (sourceId: string) => {
+    setCollapsedSources((current) => {
       const next = new Set(current);
-      if (next.has(namespaceName)) {
-        next.delete(namespaceName);
+      if (next.has(sourceId)) {
+        next.delete(sourceId);
       } else {
-        next.add(namespaceName);
+        next.add(sourceId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSourceEnabled = (sourceId: string) => {
+    setDisabledSourceIds((current) => {
+      const next = new Set(current);
+      if (next.has(sourceId)) {
+        next.delete(sourceId);
+      } else {
+        next.add(sourceId);
+      }
+      return next;
+    });
+  };
+
+  const toggleInterface = (sourceId: string, interfaceId: string) => {
+    const key = `${sourceId}:${interfaceId}`;
+    setCollapsedInterfaces((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
       }
       return next;
     });
@@ -96,68 +158,66 @@ function WorkspaceNavigator({
         </div>
       </section>
 
-      <section className="navigation-sidebar__section" aria-labelledby="silo-registry-title">
-        <div className="navigation-sidebar__section-title" id="silo-registry-title">
-          Silo Registry
+      <section className="navigation-sidebar__section" aria-labelledby="source-catalog-title">
+        <div className="navigation-sidebar__section-title" id="source-catalog-title">
+          Function Catalog
         </div>
-        {workspace ? (
-          <div className="navigation-sidebar__sources">
-            <label className="navigation-sidebar__check-row">
-              <input type="checkbox" defaultChecked />
-              <span className="navigation-sidebar__source-type">DLL</span>
-              <span>{workspace.siloAddress}:{workspace.gatewayPort}</span>
-            </label>
-            <label className="navigation-sidebar__check-row">
-              <input type="checkbox" defaultChecked />
-              <span className="navigation-sidebar__source-type">NuGet</span>
-              <span>nuget.org</span>
-            </label>
-          </div>
-        ) : (
-          <div className="navigation-sidebar__empty">No silo sources</div>
-        )}
-      </section>
-
-      <section className="navigation-sidebar__section" aria-labelledby="grains-tree-title">
-        <div className="navigation-sidebar__section-title" id="grains-tree-title">
-          Discovered Grains
-        </div>
-        {grains.length > 0 ? (
-          <ul className="navigation-sidebar__tree">
-            {grainGroups.map((group) => (
-              <li key={group.namespaceName}>
-                <button
-                  aria-label={`${group.namespaceName} ${group.grains.length}`}
-                  aria-expanded={!collapsedNamespaces.has(group.namespaceName)}
-                  className="navigation-sidebar__namespace"
-                  onClick={() => toggleNamespace(group.namespaceName)}
-                  type="button"
-                >
-                  <span className="navigation-sidebar__disclosure" aria-hidden="true" />
-                  <span>{group.namespaceName}</span>
-                  <small>{group.grains.length}</small>
-                </button>
-                {!collapsedNamespaces.has(group.namespaceName) && (
-                  <ul className="navigation-sidebar__tree navigation-sidebar__tree--nested">
-                    {group.grains.map((grain) => (
-                      <li key={grain.interfaceId}>
-                        <button
-                          aria-pressed={selectedGrain === grain.interfaceId}
-                          onClick={() => onSelectGrain(grain.interfaceId)}
-                          type="button"
-                        >
-                          <span className="navigation-sidebar__grain-icon" aria-hidden="true" />
-                          <span>{grain.interfaceName}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+        <label className="navigation-sidebar__select-label">
+          <span>Search catalog</span>
+          <input
+            aria-label="Search catalog"
+            placeholder="Source, interface, method"
+            value={catalogQuery}
+            onChange={(event) => setCatalogQuery(event.target.value)}
+          />
+        </label>
+        {filteredSources.length > 0 ? (
+          <ul className="navigation-sidebar__tree navigation-sidebar__catalog">
+            {filteredSources.map((source) => (
+              <li key={source.sourceId}>
+                <div className="navigation-sidebar__source-row">
+                  <input
+                    aria-label={`${source.label} enabled`}
+                    checked={source.enabled}
+                    onChange={() => toggleSourceEnabled(source.sourceId)}
+                    type="checkbox"
+                  />
+                  <button
+                    aria-label={`${source.label} ${source.interfaces.length}`}
+                    aria-expanded={!collapsedSources.has(source.sourceId)}
+                    className="navigation-sidebar__source"
+                    onClick={() => toggleSource(source.sourceId)}
+                    type="button"
+                  >
+                    <span className="navigation-sidebar__disclosure" aria-hidden="true" />
+                    <span className="navigation-sidebar__source-main">
+                      <span className="navigation-sidebar__source-name">{source.label}</span>
+                      <span className="navigation-sidebar__source-meta">
+                        <span className="navigation-sidebar__source-type">{source.sourceType}</span>
+                        <span>{formatSourceDetail(source)}</span>
+                      </span>
+                    </span>
+                    <small>{source.discoveryStatus}</small>
+                  </button>
+                </div>
+                {!collapsedSources.has(source.sourceId) && (
+                  <SourceInterfaceTree
+                    collapsedInterfaces={collapsedInterfaces}
+                    onSelectFunction={onSelectFunction}
+                    onSelectGrain={onSelectGrain}
+                    onToggleInterface={toggleInterface}
+                    selectedFunctionId={selectedFunctionId}
+                    selectedGrain={selectedGrain}
+                    source={source}
+                  />
                 )}
               </li>
             ))}
           </ul>
         ) : (
-          <div className="navigation-sidebar__empty">No grains discovered</div>
+          <div className="navigation-sidebar__empty">
+            {workspace ? "No functions discovered" : "No workspace loaded"}
+          </div>
         )}
       </section>
 
@@ -171,6 +231,79 @@ function WorkspaceNavigator({
         </div>
       </section>
     </>
+  );
+}
+
+function SourceInterfaceTree({
+  collapsedInterfaces,
+  onSelectFunction,
+  onSelectGrain,
+  onToggleInterface,
+  selectedFunctionId,
+  selectedGrain,
+  source,
+}: {
+  collapsedInterfaces: Set<string>;
+  onSelectFunction?: (functionId: string | null) => void;
+  onSelectGrain: (grainId: string | null) => void;
+  onToggleInterface: (sourceId: string, interfaceId: string) => void;
+  selectedFunctionId?: string | null;
+  selectedGrain: string | null;
+  source: SourceCatalogSource;
+}) {
+  if (source.interfaces.length === 0) {
+    return <div className="navigation-sidebar__empty navigation-sidebar__empty--nested">No functions discovered</div>;
+  }
+
+  return (
+    <ul className="navigation-sidebar__tree navigation-sidebar__tree--nested">
+      {source.interfaces.map((catalogInterface) => {
+        const key = `${source.sourceId}:${catalogInterface.interfaceId}`;
+        const isCollapsed = collapsedInterfaces.has(key);
+
+        return (
+          <li key={catalogInterface.interfaceId}>
+            <button
+              aria-label={`${catalogInterface.interfaceName} ${catalogInterface.methods.length}`}
+              aria-expanded={!isCollapsed}
+              className="navigation-sidebar__interface"
+              onClick={() => onToggleInterface(source.sourceId, catalogInterface.interfaceId)}
+              type="button"
+            >
+              <span className="navigation-sidebar__disclosure" aria-hidden="true" />
+              <span>
+                <span>{catalogInterface.interfaceName}</span>
+                <small>{catalogInterface.namespace}</small>
+              </span>
+              <small>{catalogInterface.methods.length}</small>
+            </button>
+            {!isCollapsed && (
+              <ul className="navigation-sidebar__tree navigation-sidebar__tree--nested navigation-sidebar__tree--methods">
+                {catalogInterface.methods.map((method) => (
+                  <li key={method.functionId}>
+                    <button
+                      aria-pressed={
+                        selectedFunctionId ? selectedFunctionId === method.functionId : selectedGrain === method.interfaceId
+                      }
+                      onClick={() => {
+                        onSelectFunction?.(method.functionId);
+                        if (!onSelectFunction) {
+                          onSelectGrain(method.interfaceId);
+                        }
+                      }}
+                      type="button"
+                    >
+                      <span className="navigation-sidebar__grain-icon" aria-hidden="true" />
+                      <span>{method.signature}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -275,23 +408,62 @@ function formatViewTitle(view: ActivityView): string {
   return view;
 }
 
-function groupGrainsByNamespace(grains: GrainInterfaceDescriptor[]) {
-  const groups = new Map<string, GrainInterfaceDescriptor[]>();
-
-  for (const grain of grains) {
-    const namespaceName = getNamespaceName(grain.interfaceName);
-    groups.set(namespaceName, [...(groups.get(namespaceName) ?? []), grain]);
+function filterCatalogSources(sources: SourceCatalogSource[], query: string): SourceCatalogSource[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return sources;
   }
 
-  return [...groups.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([namespaceName, groupedGrains]) => ({
-      namespaceName,
-      grains: groupedGrains.sort((left, right) => left.interfaceName.localeCompare(right.interfaceName)),
-    }));
+  return sources.flatMap((source) => {
+    const sourceMatches = matchesSource(source, normalizedQuery);
+    const interfaces = source.interfaces.flatMap((catalogInterface) => {
+      const interfaceMatches = matchesInterface(catalogInterface, normalizedQuery);
+      const methods = catalogInterface.methods.filter((method) => {
+        return (
+          sourceMatches ||
+          interfaceMatches ||
+          method.methodName.toLowerCase().includes(normalizedQuery) ||
+          method.signature.toLowerCase().includes(normalizedQuery) ||
+          method.returnType.toLowerCase().includes(normalizedQuery) ||
+          method.parameters.some((parameter) =>
+            `${parameter.name} ${parameter.typeName}`.toLowerCase().includes(normalizedQuery),
+          )
+        );
+      });
+
+      return methods.length > 0 || interfaceMatches
+        ? [
+            {
+              ...catalogInterface,
+              methods: methods.length > 0 ? methods : catalogInterface.methods,
+            },
+          ]
+        : [];
+    });
+
+    if (sourceMatches || interfaces.length > 0) {
+      return [
+        {
+          ...source,
+          interfaces: interfaces.length > 0 ? interfaces : source.interfaces,
+        },
+      ];
+    }
+
+    return [];
+  });
 }
 
-function getNamespaceName(interfaceName: string): string {
-  const lastDot = interfaceName.lastIndexOf(".");
-  return lastDot > 0 ? interfaceName.slice(0, lastDot) : "Application";
+function matchesSource(source: SourceCatalogSource, query: string): boolean {
+  return `${source.label} ${source.reference} ${source.version ?? ""} ${source.sourceType}`
+    .toLowerCase()
+    .includes(query);
+}
+
+function matchesInterface(catalogInterface: SourceCatalogInterface, query: string): boolean {
+  return `${catalogInterface.namespace} ${catalogInterface.interfaceName}`.toLowerCase().includes(query);
+}
+
+function formatSourceDetail(source: SourceCatalogSource): string {
+  return source.version ? `${source.reference} @ ${source.version}` : source.reference;
 }

@@ -7,11 +7,28 @@ export interface GrainInterfaceDescriptor {
 export interface GrainMethodDescriptor {
   name: string;
   parameters: ParameterInfo[];
+  signature?: string;
+  returnType?: string;
+  keyType?: GrainKeyType;
 }
 
 export interface ParameterInfo {
   name: string;
   typeName: string;
+}
+
+export type GrainKeyType = "Guid" | "String" | "Integer";
+export type SourceType = "DLL" | "NuGet";
+export type SourceDiscoveryStatus = "idle" | "discovering" | "ready" | "error";
+
+export interface WorkspaceSource {
+  sourceId: string;
+  sourceType: SourceType;
+  reference: string;
+  label: string;
+  version?: string | null;
+  gateway?: string | null;
+  enabled: boolean;
 }
 
 export interface Workspace {
@@ -20,6 +37,7 @@ export interface Workspace {
   siloAddress: string;
   gatewayPort: number;
   orleansVersion: string;
+  sources?: WorkspaceSource[];
 }
 
 export interface InvocationResult {
@@ -43,4 +61,33 @@ export interface LogEntry {
 
 export interface InterfaceCatalog {
   interfaces: GrainInterfaceDescriptor[];
+}
+
+export interface SourceOwnedCatalog {
+  sources: SourceCatalogSource[];
+}
+
+export interface SourceCatalogSource extends WorkspaceSource {
+  discoveryStatus: SourceDiscoveryStatus;
+  interfaces: SourceCatalogInterface[];
+}
+
+export interface SourceCatalogInterface {
+  interfaceId: string;
+  interfaceName: string;
+  namespace: string;
+  methods: SourceCatalogFunction[];
+}
+
+export interface SourceCatalogFunction {
+  functionId: string;
+  sourceId: string;
+  interfaceId: string;
+  interfaceName: string;
+  namespace: string;
+  methodName: string;
+  signature: string;
+  returnType: string;
+  keyType: GrainKeyType;
+  parameters: ParameterInfo[];
 }

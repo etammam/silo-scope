@@ -1,11 +1,18 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import type { GrainInterfaceDescriptor, GrainMethodDescriptor } from "../../shared/types";
+import type {
+  GrainInterfaceDescriptor,
+  GrainKeyType,
+  GrainMethodDescriptor,
+  SourceCatalogFunction,
+  SourceOwnedCatalog,
+} from "../../shared/types";
+import { findCatalogFunction, findCatalogSource } from "../catalog";
 import { MonacoEditor } from "./MonacoEditor";
-
-type GrainKeyType = "Guid" | "String" | "Integer";
 
 type RequestWorkbenchProps = {
   grains: GrainInterfaceDescriptor[];
+  sourceCatalog?: SourceOwnedCatalog;
+  selectedFunctionId?: string | null;
   selectedGrain: string | null;
   selectedMethod: string | null;
   theme: "dark" | "light";
@@ -17,11 +24,15 @@ type RequestWorkbenchProps = {
     keyType: GrainKeyType;
     method: string;
     payload: string;
+    sourceId?: string;
+    functionId?: string;
   }) => void;
 };
 
 export function RequestWorkbench({
   grains,
+  sourceCatalog,
+  selectedFunctionId,
   selectedGrain,
   selectedMethod,
   theme,
@@ -34,13 +45,23 @@ export function RequestWorkbench({
   const [methodQuery, setMethodQuery] = useState("");
   const [payload, setPayload] = useState("{\n}");
   const methodListId = useId();
+  const activeFunction = useMemo(
+    () => findCatalogFunction(sourceCatalog ?? { sources: [] }, selectedFunctionId ?? null),
+    [selectedFunctionId, sourceCatalog],
+  );
+  const activeSource = useMemo(
+    () => findCatalogSource(sourceCatalog ?? { sources: [] }, activeFunction?.sourceId ?? null),
+    [activeFunction, sourceCatalog],
+  );
 
   const activeGrain = useMemo(
     () => grains.find((grain) => grain.interfaceId === selectedGrain) ?? null,
     [grains, selectedGrain],
   );
   const methods = activeGrain?.methods ?? [];
-  const activeMethod = methods.find((method) => method.name === selectedMethod) ?? null;
+  const activeMethod = activeFunction
+    ? toGrainMethod(activeFunction)
+    : methods.find((method) => method.name === selectedMethod) ?? null;
   const filteredMethods = useMemo(
     () =>
       methods.filter((method) =>
@@ -52,9 +73,18 @@ export function RequestWorkbench({
   const canInvoke = Boolean(activeGrain && activeMethod && grainKey.trim() && !payloadError);
 
   useEffect(() => {
-    const selected = methods.find((method) => method.name === selectedMethod) ?? null;
+    const selected = activeFunction ? toGrainMethod(activeFunction) : methods.find((method) => method.name === selectedMethod) ?? null;
     setMethodQuery(selected ? formatMethodLabel(selected) : "");
-  }, [methods, selectedMethod]);
+  }, [activeFunction, methods, selectedMethod]);
+
+  useEffect(() => {
+    if (!activeFunction) {
+      return;
+    }
+
+    setKeyType(activeFunction.keyType);
+    setPayload(createPayloadTemplate(activeFunction));
+  }, [activeFunction]);
 
   const handleGrainChange = (grainId: string) => {
     const nextGrain = grainId.length > 0 ? grainId : null;
@@ -85,11 +115,13 @@ export function RequestWorkbench({
     }
 
     onInvoke({
-      grainType: activeGrain.interfaceName,
+      grainType: activeFunction?.interfaceName ?? activeGrain.interfaceName,
       grainKey: grainKey.trim(),
       keyType,
-      method: activeMethod.name,
+      method: activeFunction?.methodName ?? activeMethod.name,
       payload,
+      sourceId: activeFunction?.sourceId,
+      functionId: activeFunction?.functionId,
     });
   };
 
@@ -97,7 +129,22 @@ export function RequestWorkbench({
     <section className="request-workbench" aria-labelledby="request-workbench-title">
       <div className="request-workbench__toolbar">
         <span id="request-workbench-title">Request</span>
-        <span>{activeMethod ? formatMethodLabel(activeMethod) : "No method selected"}</span>
+        <span>{activeFunction ? activeFunction.signature : activeMethod ? formatMethodLabel(activeMethod) : "No method selected"}</span>
+      </div>
+
+      <div className="request-workbench__selection" aria-label="Selected function">
+        <div>
+          <span>Source</span>
+          <strong>{activeSource?.label ?? "No source selected"}</strong>
+        </div>
+        <div>
+          <span>Interface</span>
+          <strong>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</strong>
+        </div>
+        <div>
+          <span>Return</span>
+          <strong>{activeFunction?.returnType ?? activeMethod?.returnType ?? "unknown"}</strong>
+        </div>
       </div>
 
       <div className="request-workbench__controls">
@@ -177,11 +224,54 @@ export function RequestWorkbench({
 }
 
 function formatMethodLabel(method: GrainMethodDescriptor): string {
+  if (method.signature) {
+    return method.signature;
+  }
+
   if (method.parameters.length === 0) {
     return `${method.name}()`;
   }
 
   return `${method.name}(${method.parameters.map((parameter) => parameter.name).join(", ")})`;
+}
+
+function toGrainMethod(catalogFunction: SourceCatalogFunction): GrainMethodDescriptor {
+  return {
+    name: catalogFunction.methodName,
+    parameters: catalogFunction.parameters,
+    signature: catalogFunction.signature,
+    returnType: catalogFunction.returnType,
+    keyType: catalogFunction.keyType,
+  };
+}
+
+function createPayloadTemplate(catalogFunction: SourceCatalogFunction): string {
+  if (catalogFunction.parameters.length === 0) {
+    return "{\n}";
+  }
+
+  const lines = catalogFunction.parameters.map((parameter) => {
+    return `  "${parameter.name}": ${defaultJsonValue(parameter.typeName)}`;
+  });
+
+  return `{\n${lines.join(",\n")}\n}`;
+}
+
+function defaultJsonValue(typeName: string): string {
+  const normalizedType = typeName.toLowerCase();
+  if (normalizedType.includes("int") || normalizedType.includes("double") || normalizedType.includes("float") || normalizedType.includes("decimal")) {
+    return "0";
+  }
+
+  if (normalizedType.includes("bool")) {
+    return "false";
+  }
+
+  if (normalizedType.endsWith("[]") || normalizedType.includes("list") || normalizedType.includes("array")) {
+    return "[]";
+  }
+
+  return "\"\"";
 }
 
 function validateJson(value: string): string | null {

@@ -1,10 +1,11 @@
 import { Electroview } from "electrobun/view";
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useState } from "react";
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { SiloScopeRPC } from "../shared/rpc";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { RequestWorkbench } from "./components/RequestWorkbench";
 import { ResponseTelemetryPane, type ResponsePaneTab } from "./components/ResponseTelemetryPane";
+import { buildSourceCatalogFromGrains, findCatalogFunction } from "./catalog";
 import { useAppStore } from "./store";
 
 type PaneLayout = "horizontal" | "vertical";
@@ -34,10 +35,13 @@ function App() {
     invocationResult,
     isConnected,
     selectedGrain,
+    selectedFunctionId,
     selectedMethod,
     setInvocationResult,
     setSelectedGrain,
+    setSelectedFunction,
     setSelectedMethod,
+    sourceCatalog,
     workspace,
   } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
@@ -54,6 +58,28 @@ function App() {
   }, [theme]);
 
   const responseSize = paneLayout === "horizontal" ? horizontalResponseSize : verticalResponseSize;
+  const effectiveSourceCatalog = useMemo(() => {
+    return sourceCatalog.sources.length > 0 ? sourceCatalog : buildSourceCatalogFromGrains(grains, workspace);
+  }, [grains, sourceCatalog, workspace]);
+
+  const handleSelectFunction = useCallback(
+    (functionId: string | null) => {
+      const selectedFunction = findCatalogFunction(effectiveSourceCatalog, functionId);
+
+      if (!selectedFunction) {
+        setSelectedFunction(null);
+        setSelectedGrain(null);
+        setSelectedMethod(null);
+        return;
+      }
+
+      setSelectedGrain(selectedFunction.interfaceId);
+      setSelectedMethod(selectedFunction.methodName);
+      setSelectedFunction(selectedFunction.functionId);
+    },
+    [effectiveSourceCatalog, setSelectedFunction, setSelectedGrain, setSelectedMethod],
+  );
+
   const shellStyle = {
     "--response-size": `${responseSize}px`,
   } as CSSProperties;
@@ -153,9 +179,12 @@ function App() {
           activeView={activeView}
           grains={grains}
           isConnected={isConnected}
+          onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
           onThemeChange={setTheme}
+          selectedFunctionId={selectedFunctionId}
           selectedGrain={selectedGrain}
+          sourceCatalog={effectiveSourceCatalog}
           theme={theme}
           workspace={workspace}
         />
@@ -172,8 +201,10 @@ function App() {
           }}
           onSelectGrain={setSelectedGrain}
           onSelectMethod={setSelectedMethod}
+          selectedFunctionId={selectedFunctionId}
           selectedGrain={selectedGrain}
           selectedMethod={selectedMethod}
+          sourceCatalog={effectiveSourceCatalog}
           theme={theme}
         />
         {isResponseVisible && (

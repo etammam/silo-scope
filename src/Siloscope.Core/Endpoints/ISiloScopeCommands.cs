@@ -24,6 +24,9 @@ public interface ISiloScopeCommands
 
     // Grains
     Task<Result<GrainCatalog>> DiscoverGrainsAsync(CancellationToken cancellationToken = default);
+    Task<Result<SourceOwnedGrainCatalog>> DiscoverSourceCatalogAsync(
+        CancellationToken cancellationToken = default
+    );
     Task<Result<InvocationResult>> InvokeGrainAsync(
         string grainType,
         string methodName,
@@ -70,6 +73,42 @@ public record GrainInfo(
 );
 
 public record MethodInfo(string Name, string Signature, string ReturnType);
+
+public record SourceOwnedGrainCatalog(IReadOnlyList<SourceCatalogInfo> Sources);
+
+public record SourceCatalogInfo(
+    string SourceId,
+    string SourceType,
+    string Reference,
+    string Label,
+    string? Version,
+    string? Gateway,
+    bool Enabled,
+    string DiscoveryStatus,
+    IReadOnlyList<SourceCatalogInterface> Interfaces
+);
+
+public record SourceCatalogInterface(
+    string InterfaceId,
+    string InterfaceName,
+    string Namespace,
+    IReadOnlyList<SourceCatalogFunction> Methods
+);
+
+public record SourceCatalogFunction(
+    string FunctionId,
+    string SourceId,
+    string InterfaceId,
+    string InterfaceName,
+    string Namespace,
+    string MethodName,
+    string Signature,
+    string ReturnType,
+    string KeyType,
+    IReadOnlyList<FunctionParameterInfo> Parameters
+);
+
+public record FunctionParameterInfo(string Name, string TypeName);
 
 public record InvocationResult(
     bool IsSuccess,

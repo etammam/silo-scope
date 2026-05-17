@@ -34,7 +34,8 @@ public sealed record InterfaceEntry(
     string? PackageId,
     string? PackageVersion,
     string? PackageRoot,
-    string? NugetConfigPath
+    string? NugetConfigPath,
+    string? SourceId = null
 );
 
 /// <summary>Kept for backward compatibility with old single-source config.</summary>

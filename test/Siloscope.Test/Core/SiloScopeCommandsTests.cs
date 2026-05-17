@@ -153,6 +153,169 @@ public sealed class SiloScopeCommandsTests
     }
 
     [Fact]
+    public async Task DiscoverSourceCatalogAsync_ReturnsFunctionsUnderParentSources()
+    {
+        var methodInfo = typeof(ITestStringGrain).GetMethod("Echo")!;
+        var sourceId = "DLL:/tmp/Core.dll::127.0.0.1:30000";
+        SetWorkspace(
+            new Workspace
+            {
+                Id = "test",
+                Silos =
+                [
+                    new Siloscope.Core.Components.Workspace.SiloSource
+                    {
+                        Reference = "/tmp/Core.dll",
+                        Source = "DLL",
+                        Gateway = "127.0.0.1:30000",
+                        Enabled = true,
+                    },
+                    new Siloscope.Core.Components.Workspace.SiloSource
+                    {
+                        Reference = "Contracts",
+                        Source = "nuget",
+                        Version = "1.2.3",
+                        Enabled = false,
+                    },
+                ],
+            }
+        );
+        SetCatalog(
+            new InterfaceCatalog(
+                [
+                    new GrainInterfaceDescriptor(
+                        typeof(ITestStringGrain).FullName!,
+                        typeof(ITestStringGrain),
+                        [new GrainMethodDescriptor("Task<String> Echo()", methodInfo)],
+                        "127.0.0.1:30000",
+                        sourceId
+                    ),
+                ],
+                ["/tmp/Core.dll"],
+                [
+                    new InterfaceSourceDescriptor(
+                        sourceId,
+                        "DLL",
+                        "/tmp/Core.dll",
+                        "Core.dll",
+                        null,
+                        "127.0.0.1:30000",
+                        true,
+                        "/tmp/Core.dll"
+                    ),
+                ]
+            )
+        );
+
+        var result = await _commands.DiscoverSourceCatalogAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Sources.Should().HaveCount(2);
+        var dllSource = result.Value.Sources[0];
+        dllSource.SourceId.Should().Be(sourceId);
+        dllSource.Label.Should().Be("Core.dll");
+        dllSource.DiscoveryStatus.Should().Be("ready");
+        dllSource.Interfaces.Should().ContainSingle();
+        dllSource.Interfaces[0].Methods.Should().ContainSingle();
+        dllSource.Interfaces[0].Methods[0].SourceId.Should().Be(sourceId);
+        dllSource.Interfaces[0].Methods[0].MethodName.Should().Be("Echo");
+        dllSource.Interfaces[0].Methods[0].KeyType.Should().Be("String");
+
+        var disabledNugetSource = result.Value.Sources[1];
+        disabledNugetSource.Enabled.Should().BeFalse();
+        disabledNugetSource.DiscoveryStatus.Should().Be("idle");
+        disabledNugetSource.Interfaces.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DiscoverSourceCatalogAsync_PreservesDuplicateMethodsBySource()
+    {
+        var methodInfo = typeof(ITestStringGrain).GetMethod("Echo")!;
+        var coreSourceId = "DLL:/tmp/Core.dll::127.0.0.1:30000";
+        var tenantSourceId = "NuGet:Contracts:1.2.3:";
+        SetWorkspace(
+            new Workspace
+            {
+                Id = "test",
+                Silos =
+                [
+                    new Siloscope.Core.Components.Workspace.SiloSource
+                    {
+                        Reference = "/tmp/Core.dll",
+                        Source = "DLL",
+                        Gateway = "127.0.0.1:30000",
+                        Enabled = true,
+                    },
+                    new Siloscope.Core.Components.Workspace.SiloSource
+                    {
+                        Reference = "Contracts",
+                        Source = "nuget",
+                        Version = "1.2.3",
+                        Enabled = true,
+                    },
+                ],
+            }
+        );
+        SetCatalog(
+            new InterfaceCatalog(
+                [
+                    new GrainInterfaceDescriptor(
+                        "Duplicate",
+                        typeof(ITestStringGrain),
+                        [new GrainMethodDescriptor("Task<String> Echo()", methodInfo)],
+                        "127.0.0.1:30000",
+                        coreSourceId
+                    ),
+                    new GrainInterfaceDescriptor(
+                        "Duplicate",
+                        typeof(ITestStringGrain),
+                        [new GrainMethodDescriptor("Task<String> Echo()", methodInfo)],
+                        null,
+                        tenantSourceId
+                    ),
+                ],
+                ["/tmp/Core.dll", "/tmp/Contracts.dll"],
+                [
+                    new InterfaceSourceDescriptor(
+                        coreSourceId,
+                        "DLL",
+                        "/tmp/Core.dll",
+                        "Core.dll",
+                        null,
+                        "127.0.0.1:30000",
+                        true,
+                        "/tmp/Core.dll"
+                    ),
+                    new InterfaceSourceDescriptor(
+                        tenantSourceId,
+                        "NuGet",
+                        "Contracts",
+                        "Contracts 1.2.3",
+                        "1.2.3",
+                        null,
+                        true,
+                        "/tmp/Contracts.dll"
+                    ),
+                ]
+            )
+        );
+
+        var result = await _commands.DiscoverSourceCatalogAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        var functionIds = result
+            .Value.Sources.SelectMany(source => source.Interfaces)
+            .SelectMany(catalogInterface => catalogInterface.Methods)
+            .Select(method => method.FunctionId)
+            .ToList();
+
+        functionIds.Should().HaveCount(2);
+        functionIds.Should().OnlyHaveUniqueItems();
+        functionIds.Should().Contain(id => id.StartsWith(coreSourceId, StringComparison.Ordinal));
+        functionIds.Should().Contain(id => id.StartsWith(tenantSourceId, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task InvokeGrainAsync_NoCatalog_ReturnsFailure()
     {
         var result = await _commands.InvokeGrainAsync("TestGrain", "DoSomething", "key123", "{}");

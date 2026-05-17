@@ -40,6 +40,45 @@ const grains = [
   },
 ];
 
+const sourceCatalog = {
+  sources: [
+    {
+      sourceId: "source-core",
+      sourceType: "DLL" as const,
+      reference: "/app/Core.dll",
+      label: "Core.dll",
+      enabled: true,
+      discoveryStatus: "ready" as const,
+      interfaces: [
+        {
+          interfaceId: "grain-1",
+          interfaceName: "IPlayerGrain",
+          namespace: "Application",
+          methods: [
+            {
+              functionId: "function-set-name",
+              sourceId: "source-core",
+              interfaceId: "grain-1",
+              interfaceName: "IPlayerGrain",
+              namespace: "Application",
+              methodName: "SetName",
+              signature: "SetName(name: System.String)",
+              returnType: "System.Threading.Tasks.Task",
+              keyType: "String" as const,
+              parameters: [
+                {
+                  name: "name",
+                  typeName: "System.String",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 describe("RequestWorkbench", () => {
   it("requires a selected grain, method, and grain id before invocation", () => {
     render(
@@ -93,6 +132,47 @@ describe("RequestWorkbench", () => {
       keyType: "Guid",
       method: "SetName",
       payload: '{"name":"Ada"}',
+    });
+  });
+
+  it("hydrates the request panel from a source-owned function selection", () => {
+    const onInvoke = vi.fn();
+
+    render(
+      <RequestWorkbench
+        grains={grains}
+        onInvoke={onInvoke}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedFunctionId="function-set-name"
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        sourceCatalog={sourceCatalog}
+        theme="dark"
+      />,
+    );
+
+    expect(screen.getByText("Core.dll")).toBeInTheDocument();
+    expect(screen.getAllByText("IPlayerGrain").length).toBeGreaterThan(0);
+    expect(screen.getByText("System.Threading.Tasks.Task")).toBeInTheDocument();
+    expect(screen.getByLabelText("Payload editor")).toHaveValue('{\n  "name": ""\n}');
+
+    fireEvent.change(screen.getByLabelText("Grain ID"), {
+      target: { value: "player-1" },
+    });
+    fireEvent.change(screen.getByLabelText("Payload editor"), {
+      target: { value: '{"name":"Ada"}' },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+
+    expect(onInvoke).toHaveBeenCalledWith({
+      grainType: "IPlayerGrain",
+      grainKey: "player-1",
+      keyType: "String",
+      method: "SetName",
+      payload: '{"name":"Ada"}',
+      sourceId: "source-core",
+      functionId: "function-set-name",
     });
   });
 
