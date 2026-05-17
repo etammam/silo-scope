@@ -4,6 +4,7 @@ import type { SiloScopeRPC } from "../shared/rpc";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { RequestWorkbench } from "./components/RequestWorkbench";
+import { ResponseTelemetryPane } from "./components/ResponseTelemetryPane";
 import { useAppStore } from "./store";
 
 Electroview.defineRPC<SiloScopeRPC>({
@@ -25,6 +26,7 @@ Electroview.defineRPC<SiloScopeRPC>({
 function App() {
   const {
     grains,
+    invocationResult,
     isConnected,
     selectedGrain,
     selectedMethod,
@@ -79,6 +81,7 @@ function App() {
           selectedGrain={selectedGrain}
           selectedMethod={selectedMethod}
         />
+        <ResponseTelemetryPane result={invocationResult} />
       </main>
     </div>
   );

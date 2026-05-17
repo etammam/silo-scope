@@ -460,8 +460,9 @@ textarea,
 
 .app-shell__content {
 	display: grid;
-	grid-column: 3;
+	grid-column: 3 / -1;
 	grid-row: 2;
+	grid-template-columns: minmax(0, 1fr) 320px;
 	min-width: 0;
 	place-items: stretch;
 }
@@ -573,6 +574,108 @@ textarea,
 	text-transform: uppercase;
 }
 
+.response-pane {
+	background: var(--ui-1);
+	border-left: 1px solid var(--ui-3);
+	display: grid;
+	grid-template-rows: 34px minmax(0, 1fr) auto;
+	min-height: 0;
+	min-width: 0;
+}
+
+.response-pane__toolbar {
+	align-items: center;
+	background: var(--ui-1);
+	border-bottom: 1px solid var(--ui-3);
+	color: var(--ui-6);
+	display: flex;
+	font-size: 12px;
+	font-weight: 600;
+	height: 34px;
+	justify-content: space-between;
+	padding: 0 12px;
+}
+
+.response-pane__toolbar span:last-child {
+	color: var(--ui-5);
+	font-size: 11px;
+	text-transform: uppercase;
+}
+
+.response-pane__section {
+	display: grid;
+	min-height: 0;
+}
+
+.response-pane__section--editor {
+	grid-template-rows: 30px minmax(0, 1fr);
+}
+
+.response-pane__section--timing {
+	border-top: 1px solid var(--ui-3);
+	grid-template-rows: 30px auto;
+}
+
+.response-pane__section-header {
+	align-items: center;
+	background: var(--ui-1);
+	border-bottom: 1px solid var(--ui-3);
+	color: var(--ui-5);
+	display: flex;
+	font-size: 11px;
+	font-weight: 700;
+	justify-content: space-between;
+	padding: 0 12px;
+	text-transform: uppercase;
+}
+
+.response-pane__timing {
+	display: grid;
+	gap: 10px;
+	margin: 0;
+	padding: 12px;
+}
+
+.response-pane__timing-row {
+	display: grid;
+	gap: 5px;
+}
+
+.response-pane__timing-row dt {
+	color: var(--ui-5);
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.response-pane__timing-row dd {
+	align-items: center;
+	display: grid;
+	gap: 8px;
+	grid-template-columns: minmax(0, 1fr) 48px;
+	margin: 0;
+}
+
+.response-pane__timing-row dd > span:last-child {
+	color: var(--ui-6);
+	font-size: 12px;
+	text-align: right;
+}
+
+.response-pane__bar-track {
+	background: var(--ui-2);
+	border: 1px solid var(--ui-3);
+	border-radius: 999px;
+	height: 6px;
+	overflow: hidden;
+}
+
+.response-pane__bar-fill {
+	background: var(--ui-6);
+	display: block;
+	height: 100%;
+}
+
 @media (max-width: 640px) {
 	.app-shell {
 		grid-template-columns: 48px minmax(0, 1fr);
@@ -584,9 +687,16 @@ textarea,
 
 	.app-shell__content {
 		grid-column: 2;
+		grid-template-columns: 1fr;
 	}
 
 	.request-workbench__controls {
 		grid-template-columns: 1fr;
+	}
+
+	.response-pane {
+		border-left: 0;
+		border-top: 1px solid var(--ui-3);
+		min-height: 320px;
 	}
 }
