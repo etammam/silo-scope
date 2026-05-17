@@ -353,33 +353,29 @@ public class SiloScopeCommands : ISiloScopeCommands
 
         _logger.LogInformation("Restoring {Count} NuGet packages", nugetPackages.Count);
 
-        var restored = new List<string>();
-        var failed = new List<string>();
-
-        foreach (var (id, version) in nugetPackages)
-        {
-            var result = await _nugetManager.DownloadPackageAsync(
-                id,
-                version,
-                sourceUrl,
-                cancellationToken
-            );
-            if (result.IsSuccess)
-            {
-                restored.Add($"{id} {version}");
-            }
-            else
-            {
-                failed.Add($"{id} {version}: {result.Errors.FirstOrDefault()?.Message}");
-            }
-        }
-
-        _logger.LogInformation(
-            "Restore complete: {Restored} restored, {Failed} failed",
-            restored.Count,
-            failed.Count
+        var result = await _nugetManager.RestorePackagesAsync(
+            nugetPackages,
+            sourceUrl,
+            null,
+            cancellationToken
         );
 
-        return Result.Ok(new RestoreResult(restored.Count, failed.Count, restored, failed));
+        if (result.IsFailed)
+        {
+            return Result.Fail<RestoreResult>(
+                result.Errors.FirstOrDefault()?.Message ?? "Restore failed"
+            );
+        }
+
+        _logger.LogInformation("Restore complete: {Message}", result.Value);
+
+        return Result.Ok(
+            new RestoreResult(
+                nugetPackages.Count,
+                0,
+                nugetPackages.Select(p => $"{p.Reference} {p.Item2}").ToList(),
+                []
+            )
+        );
     }
 }

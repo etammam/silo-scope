@@ -24,16 +24,20 @@ public interface INugetConnectionManager
     ValueTask<Result<Feed>> UpdateAsync(Feed feed, CancellationToken cancellationToken = default);
     ValueTask<Result> DeleteAsync(Feed feed, CancellationToken cancellationToken = default);
 
+    NugetFeedSourceAuthentication? GetCredentials(string feedName);
+
     Task<Result<string>> DownloadPackageAsync(
         string packageId,
         string version,
         string? sourceUrl = null,
+        NugetFeedSourceAuthentication? credentials = null,
         CancellationToken cancellationToken = default
     );
 
     Task<Result<string>> RestorePackagesAsync(
         IEnumerable<(string Id, string Version)> packages,
         string? sourceUrl = null,
+        string? feedName = null,
         CancellationToken cancellationToken = default
     );
 }
@@ -178,6 +182,19 @@ public class NugetConnectionManager : INugetConnectionManager
         }
     }
 
+    public NugetFeedSourceAuthentication? GetCredentials(string feedName)
+    {
+        var feed = _feeds.FirstOrDefault(f => f.Name == feedName);
+        if (feed == null || string.IsNullOrEmpty(feed.Username))
+            return null;
+
+        return new NugetFeedSourceAuthentication(
+            feed.Username,
+            feed.Password ?? string.Empty,
+            feed.IsPasswordClearText ?? true
+        );
+    }
+
     public async ValueTask<Result<Feed>> UpdateAsync(
         Feed feed,
         CancellationToken cancellationToken = default
@@ -223,6 +240,7 @@ public class NugetConnectionManager : INugetConnectionManager
         string packageId,
         string version,
         string? sourceUrl = null,
+        NugetFeedSourceAuthentication? credentials = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -240,6 +258,19 @@ public class NugetConnectionManager : INugetConnectionManager
             );
 
             var source = new PackageSource(packageSourceUrl);
+
+            if (credentials != null)
+            {
+                source.Credentials = new PackageSourceCredential(
+                    source: packageSourceUrl,
+                    username: credentials.Username,
+                    passwordText: credentials.Password,
+                    isPasswordClearText: credentials.IsPasswordClearText,
+                    validAuthenticationTypesText: "basic"
+                );
+                source.DisableTLSCertificateValidation = true;
+            }
+
             var provider = Repository.Factory.GetCoreV3(source);
 
             var findPackageResource = await provider.GetResourceAsync<FindPackageByIdResource>(
@@ -303,15 +334,24 @@ public class NugetConnectionManager : INugetConnectionManager
     public async Task<Result<string>> RestorePackagesAsync(
         IEnumerable<(string Id, string Version)> packages,
         string? sourceUrl = null,
+        string? feedName = null,
         CancellationToken cancellationToken = default
     )
     {
         var results = new List<string>();
         var errors = new List<string>();
 
+        var credentials = !string.IsNullOrEmpty(feedName) ? GetCredentials(feedName) : null;
+
         foreach (var (id, version) in packages)
         {
-            var result = await DownloadPackageAsync(id, version, sourceUrl, cancellationToken);
+            var result = await DownloadPackageAsync(
+                id,
+                version,
+                sourceUrl,
+                credentials,
+                cancellationToken
+            );
             if (result.IsSuccess)
             {
                 results.Add(result.Value);

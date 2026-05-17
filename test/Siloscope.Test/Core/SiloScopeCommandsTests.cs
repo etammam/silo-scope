@@ -272,14 +272,14 @@ public sealed class SiloScopeCommandsTests
 
         _nugetManagerMock
             .Setup(m =>
-                m.DownloadPackageAsync(
-                    "Newtonsoft.Json",
-                    "13.0.3",
+                m.RestorePackagesAsync(
+                    It.IsAny<IEnumerable<(string Id, string Version)>>(),
+                    null,
                     null,
                     It.IsAny<CancellationToken>()
                 )
             )
-            .ReturnsAsync(Result.Ok("/path/to/package"));
+            .ReturnsAsync(Result.Ok("Restored 1 packages"));
 
         var result = await _commands.RestorePackagesAsync(silos, null, CancellationToken.None);
 
@@ -297,13 +297,17 @@ public sealed class SiloScopeCommandsTests
 
         _nugetManagerMock
             .Setup(m =>
-                m.DownloadPackageAsync("NonExistent", "1.0.0", null, It.IsAny<CancellationToken>())
+                m.RestorePackagesAsync(
+                    It.IsAny<IEnumerable<(string Id, string Version)>>(),
+                    null,
+                    null,
+                    It.IsAny<CancellationToken>()
+                )
             )
             .ReturnsAsync(Result.Fail<string>("Package not found"));
 
         var result = await _commands.RestorePackagesAsync(silos, null, CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.FailedCount.Should().Be(1);
+        result.IsFailed.Should().BeTrue();
     }
 }

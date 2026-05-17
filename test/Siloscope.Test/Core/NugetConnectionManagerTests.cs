@@ -66,7 +66,12 @@ public sealed class NugetConnectionManagerTests
     {
         var packages = Array.Empty<(string Id, string Version)>();
 
-        var result = await _manager.RestorePackagesAsync(packages, null, CancellationToken.None);
+        var result = await _manager.RestorePackagesAsync(
+            packages,
+            null,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
     }
@@ -77,6 +82,7 @@ public sealed class NugetConnectionManagerTests
         var result = await _manager.DownloadPackageAsync(
             "Newtonsoft.Json",
             "13.0.3",
+            null,
             null,
             CancellationToken.None
         );
@@ -90,7 +96,12 @@ public sealed class NugetConnectionManagerTests
     {
         var packages = new[] { ("Newtonsoft.Json", "13.0.3") };
 
-        var result = await _manager.RestorePackagesAsync(packages, null, CancellationToken.None);
+        var result = await _manager.RestorePackagesAsync(
+            packages,
+            null,
+            null,
+            CancellationToken.None
+        );
 
         result.IsSuccess.Should().BeTrue();
     }
