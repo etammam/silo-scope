@@ -149,6 +149,62 @@ public sealed class SiloScopeCommandsTests
         result.Value.AssemblyPaths.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task InvokeGrainAsync_NoCatalog_ReturnsFailure()
+    {
+        var result = await _commands.InvokeGrainAsync("TestGrain", "DoSomething", "key123", "{}");
+
+        result.IsFailed.Should().BeTrue();
+        result.Errors.Should().Contain(e => e.Message.Contains("No grain catalog available"));
+    }
+
+    [Fact]
+    public async Task InvokeGrainAsync_GrainNotFound_ReturnsFailure()
+    {
+        SetCatalog(new InterfaceCatalog([], []));
+
+        var result = await _commands.InvokeGrainAsync("TestGrain", "DoSomething", "key123", "{}");
+
+        result.IsFailed.Should().BeTrue();
+        result.Errors.Should().Contain(e => e.Message.Contains("not found in catalog"));
+    }
+
+    [Fact]
+    public async Task InvokeGrainAsync_Success_ReturnsResult()
+    {
+        var methodInfo = typeof(ITestStringGrain).GetMethod("Echo")!;
+        var catalog = new InterfaceCatalog(
+            [
+                new GrainInterfaceDescriptor(
+                    "TestGrain",
+                    typeof(ITestStringGrain),
+                    [new GrainMethodDescriptor("string Echo()", methodInfo)],
+                    "localhost:30000"
+                ),
+            ],
+            ["/test/path.dll"]
+        );
+        SetCatalog(catalog);
+
+        _grainInvocationServiceMock
+            .Setup(s =>
+                s.InvokeAsync(
+                    It.IsAny<GrainInterfaceDescriptor>(),
+                    It.IsAny<GrainMethodDescriptor>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .ReturnsAsync(Result.Ok("{\"result\": \"success\"}"));
+
+        var result = await _commands.InvokeGrainAsync("TestGrain", "Echo", "key123", "{}");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.IsSuccess.Should().BeTrue();
+        result.Value.Result.Should().Be("{\"result\": \"success\"}");
+    }
+
     private void SetWorkspace(Workspace workspace)
     {
         var field = typeof(SiloScopeCommands).GetField(
@@ -156,6 +212,15 @@ public sealed class SiloScopeCommandsTests
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
         );
         field?.SetValue(_commands, workspace);
+    }
+
+    private void SetCatalog(InterfaceCatalog catalog)
+    {
+        var field = typeof(SiloScopeCommands).GetField(
+            "_catalog",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
+        );
+        field?.SetValue(_commands, catalog);
     }
 
     private static Workspace CreateTestWorkspace()

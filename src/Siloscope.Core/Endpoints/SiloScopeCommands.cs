@@ -264,7 +264,7 @@ public class SiloScopeCommands : ISiloScopeCommands
         return Result.Ok(new GrainCatalog(grainInfos, catalog.AssemblyPaths));
     }
 
-    public Task<Result<InvocationResult>> InvokeGrainAsync(
+    public async Task<Result<InvocationResult>> InvokeGrainAsync(
         string grainType,
         string methodName,
         string grainKey,
@@ -272,12 +272,61 @@ public class SiloScopeCommands : ISiloScopeCommands
         CancellationToken cancellationToken = default
     )
     {
-        // TODO: Implement - use GrainInvocationService
         _logger.LogInformation(
             "InvokeGrain called for {GrainType}.{Method}",
             grainType,
             methodName
         );
-        return Task.FromResult(Result.Ok(new InvocationResult(true, "{}", null, null)));
+
+        if (_catalog is null)
+        {
+            return Result.Fail<InvocationResult>(
+                "No grain catalog available. Call grains.discover first."
+            );
+        }
+
+        var grain = _catalog.Grains.FirstOrDefault(g =>
+            string.Equals(g.Name, grainType, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                g.InterfaceType.FullName,
+                grainType,
+                StringComparison.OrdinalIgnoreCase
+            )
+        );
+
+        if (grain is null)
+        {
+            return Result.Fail<InvocationResult>(
+                $"Grain interface '{grainType}' not found in catalog. Call grains.discover first."
+            );
+        }
+
+        var method = grain.Methods.FirstOrDefault(m =>
+            string.Equals(m.MethodInfo.Name, methodName, StringComparison.OrdinalIgnoreCase)
+        );
+
+        if (method is null)
+        {
+            return Result.Fail<InvocationResult>(
+                $"Method '{methodName}' not found on grain '{grainType}'."
+            );
+        }
+
+        var result = await _grainInvocationService.InvokeAsync(
+            grain,
+            method,
+            grainKey,
+            payload,
+            cancellationToken
+        );
+
+        if (result.IsFailed)
+        {
+            return Result.Fail<InvocationResult>(
+                result.Errors.Select(e => e.Message).FirstOrDefault() ?? "Unknown error"
+            );
+        }
+
+        return Result.Ok(new InvocationResult(true, result.Value, null, null));
     }
 }
