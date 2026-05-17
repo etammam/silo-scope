@@ -70,7 +70,12 @@ textarea,
 	grid-template-rows: 34px minmax(0, 1fr);
 	height: 100vh;
 	overflow: hidden;
+	--response-size: 320px;
 	width: 100%;
+}
+
+.app-shell[data-navigation-visible="false"] {
+	grid-template-columns: 48px minmax(0, 1fr);
 }
 
 .app-titlebar {
@@ -99,7 +104,7 @@ textarea,
 	justify-content: center;
 	min-width: 0;
 	padding: 0 16px;
-	width: min(360px, calc(100vw - 260px));
+	width: min(360px, calc(100vw - 340px));
 }
 
 .app-titlebar__actions {
@@ -158,6 +163,64 @@ textarea,
 	right: 4px;
 	top: 0;
 	width: 1.5px;
+}
+
+.titlebar-navigation__icon {
+	border: 1.5px solid currentcolor;
+	border-radius: 2px;
+	display: block;
+	height: 15px;
+	position: relative;
+	width: 17px;
+}
+
+.titlebar-navigation__icon::after {
+	background: currentcolor;
+	content: "";
+	height: 100%;
+	left: 4px;
+	position: absolute;
+	top: 0;
+	width: 1.5px;
+}
+
+.titlebar-layout__icon {
+	border: 1.5px solid currentcolor;
+	border-radius: 2px;
+	display: block;
+	height: 15px;
+	position: relative;
+	width: 17px;
+}
+
+.titlebar-layout__icon::before,
+.titlebar-layout__icon::after {
+	background: currentcolor;
+	content: "";
+	position: absolute;
+}
+
+.titlebar-layout__icon::before {
+	height: 100%;
+	left: 50%;
+	top: 0;
+	width: 1.5px;
+}
+
+.titlebar-layout__icon::after {
+	display: none;
+	height: 1.5px;
+	left: 0;
+	top: 50%;
+	width: 100%;
+}
+
+.app-shell[data-pane-layout="vertical"] .titlebar-layout__icon::before {
+	display: none;
+}
+
+.app-shell[data-pane-layout="vertical"] .titlebar-layout__icon::after {
+	display: block;
 }
 
 .titlebar-settings__icon {
@@ -558,15 +621,29 @@ textarea,
 	display: grid;
 	grid-column: 3 / -1;
 	grid-row: 2;
-	grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 360px);
+	grid-template-columns: minmax(0, 1fr) 4px minmax(240px, min(var(--response-size), 65%));
+	grid-template-rows: minmax(0, 1fr);
 	min-height: 0;
 	min-width: 0;
 	overflow: hidden;
 	place-items: stretch;
 }
 
+.app-shell[data-navigation-visible="false"] .app-shell__content {
+	grid-column: 2 / -1;
+}
+
 .app-shell[data-response-visible="false"] .app-shell__content {
 	grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell[data-pane-layout="vertical"] .app-shell__content {
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: minmax(0, 1fr) 4px minmax(180px, min(var(--response-size), 70%));
+}
+
+.app-shell[data-response-visible="false"][data-pane-layout="vertical"] .app-shell__content {
+	grid-template-rows: minmax(0, 1fr);
 }
 
 .request-workbench {
@@ -579,6 +656,36 @@ textarea,
 	min-height: 0;
 	min-width: 0;
 	width: 100%;
+}
+
+.workbench-resizer {
+	background: var(--ui-3);
+	cursor: col-resize;
+	min-height: 0;
+	min-width: 0;
+	position: relative;
+	z-index: 2;
+}
+
+.workbench-resizer::after {
+	background: transparent;
+	content: "";
+	inset: 0 -3px;
+	position: absolute;
+}
+
+.workbench-resizer:hover,
+.workbench-resizer:focus-visible {
+	background: var(--ui-5);
+	outline: none;
+}
+
+.app-shell[data-pane-layout="vertical"] .workbench-resizer {
+	cursor: row-resize;
+}
+
+.app-shell[data-pane-layout="vertical"] .workbench-resizer::after {
+	inset: -3px 0;
 }
 
 .request-workbench__toolbar {
@@ -711,6 +818,11 @@ textarea,
 	overflow: hidden;
 }
 
+.app-shell[data-pane-layout="vertical"] .response-pane {
+	border-left: 0;
+	border-top: 1px solid var(--ui-3);
+}
+
 .response-pane__toolbar {
 	align-items: center;
 	background: var(--ui-1);
@@ -827,8 +939,12 @@ textarea,
 		grid-template-columns: 1fr;
 	}
 
+	.app-shell[data-pane-layout="vertical"] .app-shell__content {
+		grid-template-rows: minmax(0, 1fr) 4px minmax(180px, min(var(--response-size), 70%));
+	}
+
 	.app-titlebar__command {
-		width: min(260px, calc(100vw - 170px));
+		width: min(260px, calc(100vw - 230px));
 	}
 
 	.request-workbench__controls {
@@ -844,7 +960,7 @@ textarea,
 
 @media (min-width: 641px) and (max-width: 940px) {
 	.app-shell__content {
-		grid-template-columns: minmax(0, 1fr) minmax(240px, 30vw);
+		grid-template-columns: minmax(0, 1fr) 4px minmax(220px, min(var(--response-size), 45%));
 	}
 
 	.request-workbench__controls {

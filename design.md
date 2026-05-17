@@ -35,9 +35,10 @@ The desktop app uses a VS Code-like workbench grid:
 - Native macOS titlebar remains visible through `hiddenInset`.
 - App title/command field is centered in the titlebar.
 - App-level settings live at the far right of the titlebar.
+- Titlebar workbench actions include navigation collapse, request/response layout toggle, response collapse, and settings.
 - Left Activity Bar is narrow and icon-only.
 - Navigation Sidebar sits between Activity Bar and workbench content.
-- Main workbench area has a slim toolbar and editor/start surface.
+- Main workbench area has a slim toolbar and resizable request/response panes.
 
 Current column structure:
 
@@ -59,6 +60,8 @@ remaining Workbench
 - Right-side controls should be actual app actions, not decorative placeholders.
 - Settings currently belongs in the titlebar, not the Activity Bar.
 - Response pane visibility is a titlebar-level workbench action beside Settings.
+- Navigation sidebar visibility is a titlebar-level workbench action; the Activity Bar remains visible.
+- Request/response panes can be side-by-side or stacked using a titlebar layout toggle.
 - Titlebar controls must use `electrobun-webkit-app-region-no-drag`.
 
 ## Activity Bar
@@ -85,6 +88,7 @@ remaining Workbench
 - Use editor/workbench patterns: toolbar, start page, quick actions, panels.
 - Request and response editors must use the same dark Monaco theme as the surrounding workbench.
 - Empty editor surfaces should still be dark; no white loading, gutter, or read-only panes.
+- Request and response panes must be resizable in both side-by-side and stacked layouts.
 - Empty state should help the user start real work:
   - Open workspace
   - Connect cluster

@@ -27,11 +27,67 @@ describe("App shell", () => {
     render(<App />);
 
     expect(screen.getByRole("complementary", { name: "Response" })).toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: "Resize request and response panels" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse response panel" }));
 
     expect(screen.queryByRole("complementary", { name: "Response" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("separator", { name: "Resize request and response panels" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Expand response panel" })).toBeInTheDocument();
+  });
+
+  it("collapses the navigation panel from the titlebar", () => {
+    render(<App />);
+
+    expect(screen.getByRole("complementary", { name: "workspace navigation" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse navigation panel" }));
+
+    expect(screen.queryByRole("complementary", { name: "workspace navigation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand navigation panel" })).toBeInTheDocument();
+  });
+
+  it("toggles request and response panes between horizontal and vertical layout", () => {
+    const { container } = render(<App />);
+
+    expect(container.firstElementChild).toHaveAttribute("data-pane-layout", "horizontal");
+    expect(screen.getByRole("separator", { name: "Resize request and response panels" })).toHaveAttribute(
+      "aria-orientation",
+      "vertical",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Stack request and response panels" }));
+
+    expect(container.firstElementChild).toHaveAttribute("data-pane-layout", "vertical");
+    expect(screen.getByRole("button", { name: "Place request and response panels side by side" })).toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: "Resize request and response panels" })).toHaveAttribute(
+      "aria-orientation",
+      "horizontal",
+    );
+  });
+
+  it("resizes request and response panes with the splitter", () => {
+    const { container } = render(<App />);
+    const splitter = screen.getByRole("separator", { name: "Resize request and response panels" });
+
+    splitter.parentElement!.getBoundingClientRect = () =>
+      ({
+        bottom: 700,
+        height: 500,
+        left: 0,
+        right: 1000,
+        top: 200,
+        width: 1000,
+        x: 0,
+        y: 200,
+        toJSON: () => undefined,
+      }) as DOMRect;
+
+    fireEvent.mouseDown(splitter);
+    fireEvent.mouseMove(document, { clientX: 640 });
+    fireEvent.mouseUp(document);
+
+    expect(container.firstElementChild).toHaveStyle({ "--response-size": "360px" });
   });
 
   it("switches the shell and editors to the light theme from settings", () => {
