@@ -38,10 +38,16 @@ public class WorkspaceInfo
     public string Creation { get; set; } = string.Empty;
 }
 
+public enum ClusterType
+{
+    Homogenous,
+    Heterogeneous,
+}
+
 public class ClusterConfig
 {
     [JsonPropertyName("type")]
-    public string Type { get; set; } = "homogenous";
+    public ClusterType Type { get; set; } = ClusterType.Homogenous;
 
     [JsonPropertyName("clusterId")]
     public string ClusterId { get; set; } = string.Empty;

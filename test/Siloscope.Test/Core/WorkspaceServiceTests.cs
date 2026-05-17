@@ -1,8 +1,6 @@
 using AwesomeAssertions;
 using Siloscope.Core.Components.Workspace;
 using Xunit;
-using SiloSource = Siloscope.Core.Components.Workspace.SiloSource;
-using WorkspaceInfo = Siloscope.Core.Components.Workspace.WorkspaceInfo;
 
 namespace Siloscope.Test.Core;
 
@@ -58,7 +56,7 @@ public sealed class WorkspaceServiceTests
         return new Workspace
         {
             Id = "test-workspace-id",
-            WorkspaceInfo = new WorkspaceInfo
+            WorkspaceInfo = new Siloscope.Core.Components.Workspace.WorkspaceInfo
             {
                 Name = "Test Workspace",
                 Description = "A test workspace",
@@ -66,14 +64,14 @@ public sealed class WorkspaceServiceTests
             },
             Cluster = new ClusterConfig
             {
-                Type = "homogenous",
+                Type = ClusterType.Homogenous,
                 ClusterId = "test-cluster",
                 ServiceId = "test-service",
                 DefaultGateway = "127.0.0.1:30000",
             },
             Silos =
             [
-                new SiloSource
+                new Siloscope.Core.Components.Workspace.SiloSource
                 {
                     Reference = "../../test.dll",
                     Source = "DLL",

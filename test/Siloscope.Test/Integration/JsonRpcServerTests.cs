@@ -47,6 +47,7 @@ public class JsonRpcServerTests
             StartInfo = new ProcessStartInfo
             {
                 FileName = corePath,
+                WorkingDirectory = Path.GetDirectoryName(corePath) ?? "",
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

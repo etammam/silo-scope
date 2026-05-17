@@ -118,7 +118,7 @@ public class SiloScopeCommands : ISiloScopeCommands
                 },
                 Cluster = new ClusterConfig
                 {
-                    Type = "homogenous",
+                    Type = ClusterType.Homogenous,
                     ClusterId = workspace.Cluster.ClusterId,
                     ServiceId = workspace.Cluster.ServiceId,
                     DefaultGateway =
