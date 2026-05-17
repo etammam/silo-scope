@@ -1,13 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
 using Siloscope.Core.Cluster;
 using Siloscope.Core.Components.Nuget;
 using Siloscope.Core.Components.Workspace;
 using Siloscope.Core.Endpoints;
 using Siloscope.Core.Interfaces;
+using Siloscope.Core.Serialization;
 using StreamJsonRpc;
 
 var logPath = Path.Combine(
@@ -20,37 +21,48 @@ var logPath = Path.Combine(
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .MinimumLevel.Information()
-    .WriteTo.Console(theme: AnsiConsoleTheme.Literate)
+    .WriteTo.Console(
+        theme: AnsiConsoleTheme.Literate,
+        standardErrorFromLevel: LogEventLevel.Verbose
+    )
     .WriteTo.File(logPath, rollingInterval: RollingInterval.Day, retainedFileCountLimit: 7)
     .CreateLogger();
 
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.Logging.ClearProviders();
-builder.Services.AddLogging(logger => logger.AddSerilog());
+var services = new ServiceCollection();
+services.AddLogging(logger => logger.AddSerilog(dispose: true));
 
 Log.Information("SiloScope Core starting...");
 
 // Core services
-builder.Services.AddSingleton<INugetConnectionManager, NugetConnectionManager>();
-builder.Services.AddSingleton<IWorkspaceService, WorkspaceService>();
-builder.Services.AddSingleton<InterfaceCatalogLoader>();
-builder.Services.AddTransient<IOrleansClientConnectorPool, OrleansClientConnectorPool>();
-builder.Services.AddTransient<IGrainInvocationService, GrainInvocationService>();
+services.AddSingleton<INugetConnectionManager, NugetConnectionManager>();
+services.AddSingleton<IWorkspaceService, WorkspaceService>();
+services.AddSingleton<InterfaceCatalogLoader>();
+services.AddTransient<IOrleansClientConnectorPool, OrleansClientConnectorPool>();
+services.AddTransient<IGrainInvocationService, GrainInvocationService>();
 
 // JSON-RPC command handlers
-builder.Services.AddTransient<ISiloScopeCommands, SiloScopeCommands>();
+services.AddTransient<ISiloScopeCommands, SiloScopeCommands>();
 
-var host = builder.Build();
+await using var serviceProvider = services.BuildServiceProvider();
 
 // Set up JSON-RPC over stdio
 // JsonRpc(sendingStream, receivingStream, target) = (stdout, stdin, commands)
-var commands = host.Services.GetRequiredService<ISiloScopeCommands>();
+var commands = serviceProvider.GetRequiredService<ISiloScopeCommands>();
 
-var jsonRpc = new JsonRpc(Console.OpenStandardOutput(), Console.OpenStandardInput(), commands);
+var formatter = new JsonMessageFormatter();
+formatter.JsonSerializer.Converters.Add(new FluentResultJsonConverter());
+
+var messageHandler = new HeaderDelimitedMessageHandler(
+    Console.OpenStandardOutput(),
+    Console.OpenStandardInput(),
+    formatter
+);
+
+var jsonRpc = new JsonRpc(messageHandler, commands);
 jsonRpc.StartListening();
 
 Log.Information("JSON-RPC server listening...");
 
-// Keep running until stdin is closed
-await Task.Delay(Timeout.Infinite);
+#pragma warning disable VSTHRD003
+await jsonRpc.Completion.ConfigureAwait(false);
+#pragma warning restore VSTHRD003
