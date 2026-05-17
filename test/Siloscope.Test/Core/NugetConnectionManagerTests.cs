@@ -105,4 +105,46 @@ public sealed class NugetConnectionManagerTests
 
         result.IsSuccess.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task GetCredentials_WithCredentials_ReturnsCredentials()
+    {
+        var feedName = $"cred-feed-{Guid.NewGuid():N}";
+        var feed = new NugetFeedSource(
+            "https://api.nuget.org/v3/index.json",
+            feedName,
+            false,
+            new NugetFeedSourceAuthentication("testuser", "testpass", true)
+        );
+        await _manager.CreateAsync(feed);
+
+        var credentials = _manager.GetCredentials(feedName);
+
+        credentials.Should().NotBeNull();
+        credentials!.Username.Should().Be("testuser");
+    }
+
+    [Fact]
+    public void GetCredentials_NoCredentials_ReturnsNull()
+    {
+        var credentials = _manager.GetCredentials("non-existing");
+
+        credentials.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithCredentials_StoresCredentials()
+    {
+        var feedName = $"auth-feed-{Guid.NewGuid():N}";
+        var feed = new NugetFeedSource(
+            "https://api.nuget.org/v3/index.json",
+            feedName,
+            false,
+            new NugetFeedSourceAuthentication("admin", "secret123", true)
+        );
+        await _manager.CreateAsync(feed);
+
+        var result = _manager.Get(feedName);
+        result.Value.Username.Should().Be("admin");
+    }
 }
