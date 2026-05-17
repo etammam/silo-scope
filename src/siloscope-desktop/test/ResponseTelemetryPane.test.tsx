@@ -55,7 +55,10 @@ describe("ResponseTelemetryPane", () => {
     expect(screen.queryByTestId("output-viewer")).not.toBeInTheDocument();
     expect(screen.getByText("1.5 ms")).toBeInTheDocument();
     expect(screen.getByText("12 ms")).toBeInTheDocument();
-    expect(screen.getAllByText("20 ms")).toHaveLength(2);
+    expect(screen.getAllByText("20 ms")).toHaveLength(3);
+    expect(screen.getByText("60%")).toBeInTheDocument();
+    expect(screen.getByText("8%")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Execution: 12 ms" })).toBeInTheDocument();
   });
 
   it("notifies when the selected response tab changes", () => {

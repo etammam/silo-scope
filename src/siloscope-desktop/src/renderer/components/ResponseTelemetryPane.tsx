@@ -86,24 +86,46 @@ function TimingBars({ timing }: { timing: InvocationTiming | null }) {
     { label: "Total", value: timing?.totalMs ?? 0 },
   ];
   const max = Math.max(...items.map((item) => item.value), 1);
+  const total = timing?.totalMs ?? 0;
 
   return (
-    <dl className="response-pane__timing" aria-label="Invocation timing">
-      {items.map((item) => (
-        <div key={item.label} className="response-pane__timing-row">
-          <dt>{item.label}</dt>
-          <dd>
-            <span className="response-pane__bar-track" aria-hidden="true">
-              <span
-                className="response-pane__bar-fill"
-                style={{ width: `${Math.max((item.value / max) * 100, item.value > 0 ? 4 : 0)}%` }}
-              />
-            </span>
-            <span>{formatMs(item.value)}</span>
-          </dd>
+    <div className="response-pane__timing-dashboard">
+      <dl className="response-pane__timing-summary" aria-label="Timing summary">
+        <div>
+          <dt>Total</dt>
+          <dd>{formatMs(total)}</dd>
         </div>
-      ))}
-    </dl>
+        <div>
+          <dt>Execution</dt>
+          <dd>{formatPercent(timing?.executionMs ?? 0, total)}</dd>
+        </div>
+        <div>
+          <dt>Serialization</dt>
+          <dd>{formatPercent(timing?.serializationMs ?? 0, total)}</dd>
+        </div>
+      </dl>
+
+      <dl className="response-pane__timing" aria-label="Invocation timing">
+        {items.map((item) => (
+          <div key={item.label} className="response-pane__timing-row">
+            <dt>{item.label}</dt>
+            <dd>
+              <span
+                aria-label={`${item.label}: ${formatMs(item.value)}`}
+                className="response-pane__bar-track"
+                role="img"
+              >
+                <span
+                  className="response-pane__bar-fill"
+                  style={{ width: `${Math.max((item.value / max) * 100, item.value > 0 ? 4 : 0)}%` }}
+                />
+              </span>
+              <span>{formatMs(item.value)}</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
@@ -141,4 +163,12 @@ function formatTotal(timing: InvocationTiming | undefined): string {
 
 function formatMs(value: number): string {
   return `${value.toFixed(value < 10 && value > 0 ? 1 : 0)} ms`;
+}
+
+function formatPercent(value: number, total: number): string {
+  if (total <= 0) {
+    return "0%";
+  }
+
+  return `${Math.round((value / total) * 100)}%`;
 }

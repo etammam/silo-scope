@@ -1112,6 +1112,53 @@ textarea,
 	text-transform: uppercase;
 }
 
+.response-pane__timing-dashboard {
+	display: grid;
+	gap: 10px;
+	min-height: 0;
+	min-width: 0;
+	overflow: hidden;
+	padding: 10px;
+}
+
+.response-pane__timing-summary {
+	display: grid;
+	gap: 6px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	margin: 0;
+	min-width: 0;
+}
+
+.response-pane__timing-summary div {
+	background: var(--ui-0);
+	border: 1px solid var(--ui-3);
+	border-radius: 4px;
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+	padding: 8px;
+}
+
+.response-pane__timing-summary dt {
+	color: var(--ui-5);
+	font-size: 10px;
+	font-weight: 700;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.response-pane__timing-summary dd {
+	color: var(--ui-7);
+	font-size: 14px;
+	font-weight: 700;
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .response-pane__timing {
 	display: grid;
 	gap: 6px;
@@ -1119,7 +1166,6 @@ textarea,
 	min-height: 0;
 	min-width: 0;
 	overflow: hidden;
-	padding: 8px 10px 10px;
 }
 
 .response-pane__timing-row {
@@ -1313,7 +1359,24 @@ textarea,
 
 	.response-pane__timing {
 		gap: 5px;
-		padding: 6px 8px 8px;
+	}
+
+	.response-pane__timing-dashboard {
+		gap: 8px;
+		padding: 8px;
+	}
+
+	.response-pane__timing-summary {
+		grid-template-columns: 1fr;
+	}
+
+	.response-pane__timing-summary div {
+		grid-template-columns: minmax(0, 1fr) max-content;
+		padding: 6px 8px;
+	}
+
+	.response-pane__timing-summary dd {
+		font-size: 12px;
 	}
 
 	.response-pane__timing-row {
