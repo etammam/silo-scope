@@ -26,6 +26,9 @@ Electroview.defineRPC<SiloScopeRPC>({
       requestGrains: ({ workspaceId }) => {
         console.log("requestGrains for", workspaceId);
       },
+      logEntry: ({ entry }) => {
+        useAppStore.getState().addLog(entry);
+      },
       applicationMenuAction: ({ action }) => {
         window.dispatchEvent(new CustomEvent(applicationMenuEventName, { detail: action }));
         if (action === "newWorkspace") {

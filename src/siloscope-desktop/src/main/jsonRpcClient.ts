@@ -23,6 +23,17 @@ type JsonRpcResponse = {
   };
 };
 
+type JsonRpcNotification = {
+  jsonrpc: "2.0";
+  method: string;
+  params?: unknown;
+};
+
+export type JsonRpcNotificationHandler = (notification: {
+  method: string;
+  params?: unknown;
+}) => void;
+
 type PendingRequest<T> = {
   resolve: (value: T) => void;
   reject: (reason: Error) => void;
@@ -55,6 +66,7 @@ export class SidecarJsonRpcClient {
   private readonly maxRestartAttempts: number;
   private readonly restartDelayMs: number;
   private readonly pendingRequests = new Map<JsonRpcId, PendingRequest<unknown>>();
+  private readonly notificationHandlers = new Set<JsonRpcNotificationHandler>();
   private readonly textEncoder = new TextEncoder();
   private readonly textDecoder = new TextDecoder();
   private process: Bun.PipedSubprocess | null = null;
@@ -72,6 +84,13 @@ export class SidecarJsonRpcClient {
 
   get isRunning(): boolean {
     return this.process?.exitCode === null;
+  }
+
+  onNotification(handler: JsonRpcNotificationHandler): () => void {
+    this.notificationHandlers.add(handler);
+    return () => {
+      this.notificationHandlers.delete(handler);
+    };
   }
 
   start(): void {
@@ -257,26 +276,49 @@ export class SidecarJsonRpcClient {
   }
 
   private handleResponse(body: Uint8Array<ArrayBufferLike>): void {
-    const parsed = JSON.parse(this.textDecoder.decode(body)) as JsonRpcResponse;
+    const parsed = JSON.parse(this.textDecoder.decode(body)) as
+      | JsonRpcResponse
+      | JsonRpcNotification;
 
-    if (parsed.id === undefined) {
+    if ("method" in parsed && !("id" in parsed)) {
+      this.emitNotification(parsed);
       return;
     }
 
-    const pending = this.pendingRequests.get(parsed.id);
+    if (!("id" in parsed) || typeof parsed.id !== "number") {
+      return;
+    }
+
+    const response = parsed as JsonRpcResponse & { id: JsonRpcId };
+    const pending = this.pendingRequests.get(response.id);
     if (!pending) {
       return;
     }
 
-    this.pendingRequests.delete(parsed.id);
+    this.pendingRequests.delete(response.id);
     clearTimeout(pending.timeout);
 
-    if (parsed.error) {
-      pending.reject(new JsonRpcError(parsed.error.message, parsed.error.code, parsed.error.data));
+    if (response.error) {
+      pending.reject(
+        new JsonRpcError(response.error.message, response.error.code, response.error.data),
+      );
       return;
     }
 
-    pending.resolve(parsed.result);
+    pending.resolve(response.result);
+  }
+
+  private emitNotification(notification: JsonRpcNotification): void {
+    for (const handler of this.notificationHandlers) {
+      try {
+        handler({
+          method: notification.method,
+          params: notification.params,
+        });
+      } catch (error) {
+        console.warn("[siloscope-core] notification handler failed", error);
+      }
+    }
   }
 
   private rejectAllPending(error: Error): void {

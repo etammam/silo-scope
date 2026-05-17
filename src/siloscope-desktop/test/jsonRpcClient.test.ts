@@ -109,6 +109,37 @@ describe("SidecarJsonRpcClient", () => {
 
     await client.dispose();
   });
+
+  it("emits JSON-RPC notifications without resolving requests", async () => {
+    const fake = createFakeProcess();
+    vi.stubGlobal("Bun", { spawn: vi.fn(() => fake.process) });
+    const onNotification = vi.fn();
+
+    const client = new SidecarJsonRpcClient({
+      corePath: "/tmp/Siloscope.Core",
+      requestTimeoutMs: 1_000,
+      maxRestartAttempts: 0,
+    });
+    client.onNotification(onNotification);
+
+    client.start();
+    fake.writeStdoutFrame(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method: "log",
+        params: { Level: "information", Message: "Workspace loaded" },
+      }),
+    );
+
+    await vi.waitFor(() => {
+      expect(onNotification).toHaveBeenCalledWith({
+        method: "log",
+        params: { Level: "information", Message: "Workspace loaded" },
+      });
+    });
+
+    await client.dispose();
+  });
 });
 
 function createFakeProcess(): {

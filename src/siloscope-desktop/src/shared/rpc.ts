@@ -45,6 +45,7 @@ export type SiloScopeRPC = {
     messages: {
       requestGrains: { workspaceId: string };
       applicationMenuAction: { action: ApplicationMenuAction };
+      logEntry: { entry: LogEntry };
     };
   }>;
 };

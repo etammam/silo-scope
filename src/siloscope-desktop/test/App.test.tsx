@@ -245,4 +245,27 @@ describe("App shell", () => {
     expect(screen.queryByRole("complementary", { name: "workspace navigation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "Response" })).not.toBeInTheDocument();
   });
+
+  it("stores log entries sent from the sidecar", () => {
+    render(<App />);
+    const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
+
+    act(() => {
+      rpcConfig.handlers.messages.logEntry({
+        entry: {
+          timestamp: "2026-05-17T20:00:00.000Z",
+          level: "info",
+          message: "Workspace loaded",
+        },
+      });
+    });
+
+    expect(useAppStore.getState().logs).toEqual([
+      {
+        timestamp: "2026-05-17T20:00:00.000Z",
+        level: "info",
+        message: "Workspace loaded",
+      },
+    ]);
+  });
 });

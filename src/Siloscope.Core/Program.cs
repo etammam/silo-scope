@@ -66,6 +66,20 @@ var messageHandler = new HeaderDelimitedMessageHandler(
 );
 
 var jsonRpc = new JsonRpc(messageHandler, commands);
+logSink.EntryCaptured += (_, entry) =>
+{
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            await jsonRpc.NotifyAsync("log", entry).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "Failed to send log notification.");
+        }
+    });
+};
 jsonRpc.StartListening();
 
 Log.Information("JSON-RPC server listening...");

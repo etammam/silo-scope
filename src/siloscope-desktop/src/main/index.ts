@@ -1,7 +1,7 @@
 import { ApplicationMenu, BrowserWindow, BrowserView, Utils } from "electrobun/bun";
 import Electrobun from "electrobun/bun";
 import type { SiloScopeRPC } from "../shared/rpc";
-import type { SourceOwnedCatalog } from "../shared/types";
+import type { LogEntry, SourceOwnedCatalog } from "../shared/types";
 import { installApplicationMenu } from "./applicationMenu";
 import { SidecarJsonRpcClient } from "./jsonRpcClient";
 
@@ -43,6 +43,14 @@ type BackendSourceOwnedCatalog = {
       }>;
     }>;
   }>;
+};
+
+type BackendLogEntry = {
+  Timestamp?: string;
+  Level?: string;
+  Category?: string;
+  Message?: string;
+  Exception?: string | null;
 };
 
 const rpc = BrowserView.defineRPC<SiloScopeRPC>({
@@ -170,6 +178,42 @@ function isGrainKeyType(value: string): value is "Guid" | "String" | "Integer" {
   return value === "Guid" || value === "String" || value === "Integer";
 }
 
+function mapLogEntry(params: unknown): LogEntry | null {
+  if (!params || typeof params !== "object") {
+    return null;
+  }
+
+  const entry = params as BackendLogEntry;
+  if (!entry.Message) {
+    return null;
+  }
+
+  const categoryPrefix = entry.Category ? `[${entry.Category}] ` : "";
+  const exceptionSuffix = entry.Exception ? `\n${entry.Exception}` : "";
+
+  return {
+    timestamp: entry.Timestamp ?? new Date().toISOString(),
+    level: mapLogLevel(entry.Level),
+    message: `${categoryPrefix}${entry.Message}${exceptionSuffix}`,
+  };
+}
+
+function mapLogLevel(level?: string): LogEntry["level"] {
+  switch (level?.toLowerCase()) {
+    case "trace":
+    case "debug":
+      return "debug";
+    case "warning":
+    case "warn":
+      return "warn";
+    case "error":
+    case "critical":
+      return "error";
+    default:
+      return "info";
+  }
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -189,6 +233,19 @@ const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
   },
+});
+
+sidecar.onNotification(({ method, params }) => {
+  if (method !== "log") {
+    return;
+  }
+
+  const entry = mapLogEntry(params);
+  if (!entry) {
+    return;
+  }
+
+  mainWindow.webview.rpc?.send.logEntry({ entry });
 });
 
 installApplicationMenu({
