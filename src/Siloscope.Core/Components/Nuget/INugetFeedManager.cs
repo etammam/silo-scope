@@ -1,9 +1,13 @@
+using System.IO.Compression;
 using System.Text.Json;
 using FluentResults;
 using Microsoft.Extensions.Logging;
+using NuGet.Common;
 using NuGet.Configuration;
+using NuGet.Packaging;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
+using NuGet.Versioning;
 using Siloscope.Core.Nuget.Models;
 using Siloscope.Core.Nuget.Store;
 
@@ -19,9 +23,22 @@ public interface INugetConnectionManager
     Result<Feed> Get(string name);
     ValueTask<Result<Feed>> UpdateAsync(Feed feed, CancellationToken cancellationToken = default);
     ValueTask<Result> DeleteAsync(Feed feed, CancellationToken cancellationToken = default);
+
+    Task<Result<string>> DownloadPackageAsync(
+        string packageId,
+        string version,
+        string? sourceUrl = null,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<Result<string>> RestorePackagesAsync(
+        IEnumerable<(string Id, string Version)> packages,
+        string? sourceUrl = null,
+        CancellationToken cancellationToken = default
+    );
 }
 
-internal class NugetConnectionManager : INugetConnectionManager
+public class NugetConnectionManager : INugetConnectionManager
 {
     private readonly List<Feed> _feeds = new List<Feed>();
     private readonly string _sourcePath;
@@ -200,5 +217,136 @@ internal class NugetConnectionManager : INugetConnectionManager
         {
             return Result.Fail(new Error(e.Message));
         }
+    }
+
+    public async Task<Result<string>> DownloadPackageAsync(
+        string packageId,
+        string version,
+        string? sourceUrl = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        try
+        {
+            var packageSourceUrl = string.IsNullOrEmpty(sourceUrl)
+                ? "https://api.nuget.org/v3/index.json"
+                : sourceUrl;
+
+            _logger.LogInformation(
+                "Downloading {PackageId} {Version} from {Source}",
+                packageId,
+                version,
+                packageSourceUrl
+            );
+
+            var source = new PackageSource(packageSourceUrl);
+            var provider = Repository.Factory.GetCoreV3(source);
+
+            var findPackageResource = await provider.GetResourceAsync<FindPackageByIdResource>(
+                cancellationToken
+            );
+            var packageVersion = NuGetVersion.Parse(version);
+
+            var nugetPackagesPath = GetNuGetPackagesPath();
+            var targetPath = Path.Combine(nugetPackagesPath, packageId.ToLowerInvariant(), version);
+
+            if (Directory.Exists(targetPath))
+            {
+                _logger.LogInformation("Package already exists at {Path}", targetPath);
+                return Result.Ok(targetPath);
+            }
+
+            Directory.CreateDirectory(targetPath);
+
+            var nupkgPath = Path.Combine(targetPath, $"{packageId}.{version}.nupkg");
+            var fileStream = new FileStream(
+                nupkgPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None
+            );
+
+            try
+            {
+                await findPackageResource.CopyNupkgToStreamAsync(
+                    packageId,
+                    packageVersion,
+                    fileStream,
+                    new SourceCacheContext(),
+                    NullLogger.Instance,
+                    cancellationToken
+                );
+            }
+            finally
+            {
+                await fileStream.DisposeAsync();
+            }
+
+            var extractionFolder = Path.Combine(targetPath, "extracted");
+            ExtractNupkg(nupkgPath, extractionFolder);
+
+            _logger.LogInformation("Package extracted to {Path}", extractionFolder);
+            return Result.Ok(targetPath);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(
+                e,
+                "Failed to download package {PackageId} {Version}",
+                packageId,
+                version
+            );
+            return Result.Fail<string>(e.Message);
+        }
+    }
+
+    public async Task<Result<string>> RestorePackagesAsync(
+        IEnumerable<(string Id, string Version)> packages,
+        string? sourceUrl = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var results = new List<string>();
+        var errors = new List<string>();
+
+        foreach (var (id, version) in packages)
+        {
+            var result = await DownloadPackageAsync(id, version, sourceUrl, cancellationToken);
+            if (result.IsSuccess)
+            {
+                results.Add(result.Value);
+            }
+            else
+            {
+                errors.Add($"{id} {version}: {result.Errors.FirstOrDefault()?.Message}");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            return Result.Fail<string>(
+                $"Failed to restore {errors.Count} packages:\n{string.Join("\n", errors)}"
+            );
+        }
+
+        return Result.Ok($"Restored {results.Count} packages");
+    }
+
+    private static string GetNuGetPackagesPath()
+    {
+        var fromEnv = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        if (!string.IsNullOrWhiteSpace(fromEnv))
+        {
+            return fromEnv;
+        }
+
+        var userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return Path.Combine(userHome, ".nuget", "packages");
+    }
+
+    private static void ExtractNupkg(string nupkgPath, string targetFolder)
+    {
+        Directory.CreateDirectory(targetFolder);
+        ZipFile.ExtractToDirectory(nupkgPath, targetFolder, overwriteFiles: true);
     }
 }
