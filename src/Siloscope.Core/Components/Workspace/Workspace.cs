@@ -96,4 +96,7 @@ public class SessionConfig
 {
     [JsonPropertyName("activeEnvironment")]
     public string ActiveEnvironment { get; set; } = string.Empty;
+
+    [JsonPropertyName("lastWorkspaceId")]
+    public string? LastWorkspaceId { get; set; }
 }
