@@ -5,7 +5,8 @@ export type ViewMenuAction =
   | "toggleTelemetryPane"
   | "zoomIn"
   | "zoomOut";
-export type ApplicationMenuAction = FileMenuAction | ViewMenuAction;
+export type HelpMenuAction = "openDocumentation" | "showAbout";
+export type ApplicationMenuAction = FileMenuAction | ViewMenuAction | HelpMenuAction;
 
 type ApplicationMenuItem =
   | { type: "divider" | "separator" }
@@ -37,6 +38,11 @@ export const viewMenuActions = {
   toggleTelemetryPane: "view:toggle-telemetry-pane",
   zoomIn: "view:zoom-in",
   zoomOut: "view:zoom-out",
+} as const;
+
+export const helpMenuActions = {
+  openDocumentation: "help:open-documentation",
+  showAbout: "help:show-about",
 } as const;
 
 export function createApplicationMenuTemplate(): ApplicationMenuItem[] {
@@ -71,6 +77,13 @@ export function createApplicationMenuTemplate(): ApplicationMenuItem[] {
         { type: "separator" },
         { label: "Zoom In", action: viewMenuActions.zoomIn },
         { label: "Zoom Out", action: viewMenuActions.zoomOut },
+      ],
+    },
+    {
+      label: "Help",
+      submenu: [
+        { label: "Documentation", action: helpMenuActions.openDocumentation },
+        { label: "About SiloScope", action: helpMenuActions.showAbout },
       ],
     },
   ];
@@ -126,6 +139,14 @@ export function getApplicationMenuAction(event: unknown): ApplicationMenuAction 
 
   if (action === viewMenuActions.zoomOut) {
     return "zoomOut";
+  }
+
+  if (action === helpMenuActions.openDocumentation) {
+    return "openDocumentation";
+  }
+
+  if (action === helpMenuActions.showAbout) {
+    return "showAbout";
   }
 
   return null;

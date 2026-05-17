@@ -1,4 +1,4 @@
-import { ApplicationMenu, BrowserWindow, BrowserView } from "electrobun/bun";
+import { ApplicationMenu, BrowserWindow, BrowserView, Utils } from "electrobun/bun";
 import Electrobun from "electrobun/bun";
 import type { SiloScopeRPC } from "../shared/rpc";
 import type { SourceOwnedCatalog } from "../shared/types";
@@ -195,6 +195,23 @@ installApplicationMenu({
   ApplicationMenu,
   events: Electrobun.events,
   onMenuAction: (action) => {
+    if (action === "openDocumentation") {
+      Utils.openExternal("https://github.com/etammam/silo-scope");
+      return;
+    }
+
+    if (action === "showAbout") {
+      void Utils.showMessageBox({
+        type: "info",
+        title: "About SiloScope",
+        message: "SiloScope",
+        detail: "Version 1.0.0\nOrleans cluster workbench",
+        buttons: ["OK"],
+        defaultId: 0,
+      });
+      return;
+    }
+
     if (action === "zoomIn" || action === "zoomOut") {
       pageZoom = clamp(action === "zoomIn" ? pageZoom + 0.1 : pageZoom - 0.1, 0.7, 1.6);
       mainWindow.setPageZoom(pageZoom);

@@ -3,6 +3,7 @@ import {
   createApplicationMenuTemplate,
   fileMenuActions,
   getApplicationMenuAction,
+  helpMenuActions,
   installApplicationMenu,
   viewMenuActions,
 } from "@/main/applicationMenu";
@@ -44,6 +45,13 @@ describe("application menu", () => {
           { label: "Zoom Out", action: viewMenuActions.zoomOut },
         ],
       },
+      {
+        label: "Help",
+        submenu: [
+          { label: "Documentation", action: helpMenuActions.openDocumentation },
+          { label: "About SiloScope", action: helpMenuActions.showAbout },
+        ],
+      },
     ]);
   });
 
@@ -55,6 +63,10 @@ describe("application menu", () => {
       "toggleTelemetryPane",
     );
     expect(getApplicationMenuAction({ data: { action: viewMenuActions.zoomIn } })).toBe("zoomIn");
+    expect(getApplicationMenuAction({ data: { action: helpMenuActions.openDocumentation } })).toBe(
+      "openDocumentation",
+    );
+    expect(getApplicationMenuAction({ data: { action: helpMenuActions.showAbout } })).toBe("showAbout");
     expect(getApplicationMenuAction({ data: { action: "unknown" } })).toBeNull();
   });
 
