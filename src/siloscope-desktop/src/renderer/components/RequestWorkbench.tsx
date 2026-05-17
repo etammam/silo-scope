@@ -29,7 +29,7 @@ export function RequestWorkbench({
 }: RequestWorkbenchProps) {
   const [grainKey, setGrainKey] = useState("");
   const [keyType, setKeyType] = useState<GrainKeyType>("String");
-  const [payload, setPayload] = useState("{\n  \n}");
+  const [payload, setPayload] = useState("{\n}");
 
   const activeGrain = useMemo(
     () => grains.find((grain) => grain.interfaceId === selectedGrain) ?? null,

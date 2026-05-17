@@ -16,6 +16,7 @@
 
 body {
 	background: var(--ui-0);
+	color-scheme: dark;
 	color: var(--ui-7);
 	font-family:
 		"IBM Plex Sans",
@@ -494,6 +495,7 @@ textarea,
 
 .request-workbench__toolbar button {
 	appearance: none;
+	-webkit-appearance: none;
 	background: var(--ui-2);
 	border: 1px solid var(--ui-4);
 	border-radius: 4px;
@@ -538,9 +540,12 @@ textarea,
 
 .request-workbench__controls input,
 .request-workbench__controls select {
-	background: var(--ui-1);
+	-webkit-appearance: none;
+	appearance: none;
+	background-color: var(--ui-1);
 	border: 1px solid var(--ui-3);
 	border-radius: 4px;
+	color-scheme: dark;
 	color: var(--ui-6);
 	font: inherit;
 	font-size: 13px;
@@ -549,10 +554,28 @@ textarea,
 	padding: 0 8px;
 }
 
+.request-workbench__controls select {
+	background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23858585' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-position: calc(100% - 11px) 50%;
+	background-repeat: no-repeat;
+	background-size: 10px 6px;
+	padding-right: 28px;
+}
+
+.request-workbench__controls input::placeholder {
+	color: var(--ui-5);
+	opacity: 0.75;
+}
+
 .request-workbench__controls input:focus,
 .request-workbench__controls select:focus {
 	border-color: var(--focus-ring);
 	outline: none;
+}
+
+.request-workbench__controls select:disabled {
+	color: var(--ui-5);
+	opacity: 0.6;
 }
 
 .request-workbench__editor {
@@ -674,6 +697,12 @@ textarea,
 	background: var(--ui-6);
 	display: block;
 	height: 100%;
+}
+
+.monaco-editor,
+.monaco-editor .margin,
+.monaco-editor-background {
+	background-color: var(--ui-0) !important;
 }
 
 @media (max-width: 640px) {

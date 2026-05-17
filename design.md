@@ -80,6 +80,8 @@ remaining Workbench
 - Avoid hero-page layout.
 - Avoid large floating cards.
 - Use editor/workbench patterns: toolbar, start page, quick actions, panels.
+- Request and response editors must use the same dark Monaco theme as the surrounding workbench.
+- Empty editor surfaces should still be dark; no white loading, gutter, or read-only panes.
 - Empty state should help the user start real work:
   - Open workspace
   - Connect cluster
@@ -97,6 +99,7 @@ remaining Workbench
 ## Controls
 
 - Buttons should look like native workbench controls: small, bordered, and flat.
+- Form fields should be flat dark workbench controls, not browser or macOS default glossy controls.
 - Use icon buttons for persistent chrome actions.
 - Use text buttons for explicit commands such as `Open Workspace`.
 - Preserve accessibility labels on icon-only controls.
