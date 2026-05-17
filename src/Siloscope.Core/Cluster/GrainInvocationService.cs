@@ -6,8 +6,15 @@ using Siloscope.Core.Interfaces;
 
 namespace Siloscope.Core.Cluster;
 
-public sealed class GrainInvocationService(OrleansClientConnectorPool connectorPool)
+public sealed class GrainInvocationService : IGrainInvocationService
 {
+    private readonly IOrleansClientConnectorPool _connectorPool;
+
+    public GrainInvocationService(IOrleansClientConnectorPool connectorPool)
+    {
+        _connectorPool = connectorPool;
+    }
+
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -42,7 +49,7 @@ public sealed class GrainInvocationService(OrleansClientConnectorPool connectorP
         }
 
         if (
-            !connectorPool.TryGetConnectorForGateway(grain.Gateway, out var connector)
+            !_connectorPool.TryGetConnectorForGateway(grain.Gateway, out var connector)
             || connector is null
         )
         {

@@ -27,8 +27,8 @@ Log.Information("SiloScope Core starting...");
 builder.Services.AddSingleton<INugetConnectionManager, NugetConnectionManager>();
 builder.Services.AddSingleton<IWorkspaceService, WorkspaceService>();
 builder.Services.AddSingleton<InterfaceCatalogLoader>();
-builder.Services.AddTransient<OrleansClientConnectorPool>();
-builder.Services.AddTransient<GrainInvocationService>();
+builder.Services.AddTransient<IOrleansClientConnectorPool, OrleansClientConnectorPool>();
+builder.Services.AddTransient<IGrainInvocationService, GrainInvocationService>();
 
 // JSON-RPC command handlers
 builder.Services.AddTransient<ISiloScopeCommands, SiloScopeCommands>();

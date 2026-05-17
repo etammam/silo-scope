@@ -9,8 +9,8 @@ namespace Siloscope.Core.Endpoints;
 
 public class SiloScopeCommands : ISiloScopeCommands
 {
-    private readonly OrleansClientConnectorPool _connectorPool;
-    private readonly GrainInvocationService _grainInvocationService;
+    private readonly IOrleansClientConnectorPool _connectorPool;
+    private readonly IGrainInvocationService _grainInvocationService;
     private readonly InterfaceCatalogLoader _catalogLoader;
     private readonly IWorkspaceService _workspaceService;
     private readonly ILogger<SiloScopeCommands> _logger;
@@ -19,8 +19,8 @@ public class SiloScopeCommands : ISiloScopeCommands
     private Workspace? _currentWorkspace;
 
     public SiloScopeCommands(
-        OrleansClientConnectorPool connectorPool,
-        GrainInvocationService grainInvocationService,
+        IOrleansClientConnectorPool connectorPool,
+        IGrainInvocationService grainInvocationService,
         InterfaceCatalogLoader catalogLoader,
         IWorkspaceService workspaceService,
         ILogger<SiloScopeCommands> logger

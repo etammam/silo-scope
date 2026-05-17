@@ -4,7 +4,7 @@ using Siloscope.Core.Interfaces;
 
 namespace Siloscope.Core.Cluster;
 
-public sealed class OrleansClientConnectorPool : IDisposable
+public sealed class OrleansClientConnectorPool : IOrleansClientConnectorPool, IDisposable
 {
     private readonly Dictionary<string, OrleansClientConnector> _connectors = new(
         StringComparer.OrdinalIgnoreCase
