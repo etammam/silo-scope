@@ -2,6 +2,7 @@ import { Electroview } from "electrobun/view";
 import { useState } from "react";
 import type { SiloScopeRPC } from "../shared/rpc";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
+import { NavigationSidebar } from "./components/NavigationSidebar";
 import { useAppStore } from "./store";
 
 Electroview.defineRPC<SiloScopeRPC>({
@@ -21,7 +22,7 @@ Electroview.defineRPC<SiloScopeRPC>({
 });
 
 function App() {
-  const { workspace, isConnected } = useAppStore();
+  const { grains, isConnected, selectedGrain, setSelectedGrain, workspace } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
 
   return (
@@ -45,27 +46,14 @@ function App() {
         </div>
       </header>
 
-      <aside className="navigation-sidebar" aria-label={`${activeView} navigation`}>
-        <div className="navigation-sidebar__header">
-          <span>{activeView}</span>
-        </div>
-
-        <div className="navigation-sidebar__section">
-          <div className="navigation-sidebar__section-title">Connection</div>
-          <div className="navigation-sidebar__row">
-            <span className="navigation-sidebar__dot" />
-            <span>{isConnected ? "Connected" : "Disconnected"}</span>
-          </div>
-        </div>
-
-        <div className="navigation-sidebar__section">
-          <div className="navigation-sidebar__section-title">Workspace</div>
-          <div className="navigation-sidebar__row">
-            <span className="navigation-sidebar__file-icon" />
-            <span>{workspace?.name ?? "No workspace loaded"}</span>
-          </div>
-        </div>
-      </aside>
+      <NavigationSidebar
+        activeView={activeView}
+        grains={grains}
+        isConnected={isConnected}
+        onSelectGrain={setSelectedGrain}
+        selectedGrain={selectedGrain}
+        workspace={workspace}
+      />
 
       <main className="app-shell__content">
         <section className="workspace-summary" aria-labelledby="workspace-summary-title">
