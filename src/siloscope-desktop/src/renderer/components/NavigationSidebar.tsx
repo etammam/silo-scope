@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import type { ActivityView } from "./ActivityBar";
 import type { GrainInterfaceDescriptor, Workspace } from "../../shared/types";
 
@@ -57,6 +58,21 @@ function WorkspaceNavigator({
   workspace,
   onSelectGrain,
 }: WorkspaceNavigatorProps) {
+  const grainGroups = useMemo(() => groupGrainsByNamespace(grains), [grains]);
+  const [collapsedNamespaces, setCollapsedNamespaces] = useState<Set<string>>(() => new Set());
+
+  const toggleNamespace = (namespaceName: string) => {
+    setCollapsedNamespaces((current) => {
+      const next = new Set(current);
+      if (next.has(namespaceName)) {
+        next.delete(namespaceName);
+      } else {
+        next.add(namespaceName);
+      }
+      return next;
+    });
+  };
+
   return (
     <>
       <section className="navigation-sidebar__section" aria-labelledby="workspace-select-title">
@@ -65,11 +81,19 @@ function WorkspaceNavigator({
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Active workspace</span>
-          <select value={workspace?.id ?? "none"} disabled={!workspace}>
+          <select value={workspace?.id ?? "none"} disabled={!workspace} onChange={() => undefined}>
             <option value="none">No workspace loaded</option>
             {workspace && <option value={workspace.id}>{workspace.name}</option>}
           </select>
         </label>
+        <div className="navigation-sidebar__command-row">
+          <button className="navigation-sidebar__command" type="button">
+            Import
+          </button>
+          <button className="navigation-sidebar__command" type="button" disabled={!workspace}>
+            Export
+          </button>
+        </div>
       </section>
 
       <section className="navigation-sidebar__section" aria-labelledby="silo-registry-title">
@@ -77,10 +101,18 @@ function WorkspaceNavigator({
           Silo Registry
         </div>
         {workspace ? (
-          <label className="navigation-sidebar__check-row">
-            <input type="checkbox" defaultChecked />
-            <span>{workspace.siloAddress}:{workspace.gatewayPort}</span>
-          </label>
+          <div className="navigation-sidebar__sources">
+            <label className="navigation-sidebar__check-row">
+              <input type="checkbox" defaultChecked />
+              <span className="navigation-sidebar__source-type">DLL</span>
+              <span>{workspace.siloAddress}:{workspace.gatewayPort}</span>
+            </label>
+            <label className="navigation-sidebar__check-row">
+              <input type="checkbox" defaultChecked />
+              <span className="navigation-sidebar__source-type">NuGet</span>
+              <span>nuget.org</span>
+            </label>
+          </div>
         ) : (
           <div className="navigation-sidebar__empty">No silo sources</div>
         )}
@@ -92,16 +124,35 @@ function WorkspaceNavigator({
         </div>
         {grains.length > 0 ? (
           <ul className="navigation-sidebar__tree">
-            {grains.map((grain) => (
-              <li key={grain.interfaceId}>
+            {grainGroups.map((group) => (
+              <li key={group.namespaceName}>
                 <button
-                  aria-pressed={selectedGrain === grain.interfaceId}
-                  onClick={() => onSelectGrain(grain.interfaceId)}
+                  aria-label={`${group.namespaceName} ${group.grains.length}`}
+                  aria-expanded={!collapsedNamespaces.has(group.namespaceName)}
+                  className="navigation-sidebar__namespace"
+                  onClick={() => toggleNamespace(group.namespaceName)}
                   type="button"
                 >
-                  <span className="navigation-sidebar__grain-icon" aria-hidden="true" />
-                  <span>{grain.interfaceName}</span>
+                  <span className="navigation-sidebar__disclosure" aria-hidden="true" />
+                  <span>{group.namespaceName}</span>
+                  <small>{group.grains.length}</small>
                 </button>
+                {!collapsedNamespaces.has(group.namespaceName) && (
+                  <ul className="navigation-sidebar__tree navigation-sidebar__tree--nested">
+                    {group.grains.map((grain) => (
+                      <li key={grain.interfaceId}>
+                        <button
+                          aria-pressed={selectedGrain === grain.interfaceId}
+                          onClick={() => onSelectGrain(grain.interfaceId)}
+                          type="button"
+                        >
+                          <span className="navigation-sidebar__grain-icon" aria-hidden="true" />
+                          <span>{grain.interfaceName}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
@@ -207,8 +258,8 @@ function SystemSettings({
             value={theme}
             onChange={(event) => onThemeChange(event.target.value as "dark" | "light")}
           >
-            <option value="dark">Dark Mono</option>
-            <option value="light">Light Mono</option>
+            <option value="dark">Codex Dark</option>
+            <option value="light">Codex Light</option>
           </select>
         </label>
       </section>
@@ -222,4 +273,25 @@ function formatViewTitle(view: ActivityView): string {
   }
 
   return view;
+}
+
+function groupGrainsByNamespace(grains: GrainInterfaceDescriptor[]) {
+  const groups = new Map<string, GrainInterfaceDescriptor[]>();
+
+  for (const grain of grains) {
+    const namespaceName = getNamespaceName(grain.interfaceName);
+    groups.set(namespaceName, [...(groups.get(namespaceName) ?? []), grain]);
+  }
+
+  return [...groups.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([namespaceName, groupedGrains]) => ({
+      namespaceName,
+      grains: groupedGrains.sort((left, right) => left.interfaceName.localeCompare(right.interfaceName)),
+    }));
+}
+
+function getNamespaceName(interfaceName: string): string {
+  const lastDot = interfaceName.lastIndexOf(".");
+  return lastDot > 0 ? interfaceName.slice(0, lastDot) : "Application";
 }

@@ -1,13 +1,16 @@
 import { Electroview } from "electrobun/view";
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, useCallback, useState } from "react";
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useState } from "react";
 import type { SiloScopeRPC } from "../shared/rpc";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { RequestWorkbench } from "./components/RequestWorkbench";
-import { ResponseTelemetryPane } from "./components/ResponseTelemetryPane";
+import { ResponseTelemetryPane, type ResponsePaneTab } from "./components/ResponseTelemetryPane";
 import { useAppStore } from "./store";
 
 type PaneLayout = "horizontal" | "vertical";
+type WorkbenchTheme = "dark" | "light";
+
+const themeStorageKey = "siloscope.theme";
 
 Electroview.defineRPC<SiloScopeRPC>({
   handlers: {
@@ -38,12 +41,17 @@ function App() {
     workspace,
   } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<WorkbenchTheme>(() => readStoredTheme());
   const [isNavigationVisible, setIsNavigationVisible] = useState(true);
   const [isResponseVisible, setIsResponseVisible] = useState(true);
+  const [responseTab, setResponseTab] = useState<ResponsePaneTab>("response");
   const [paneLayout, setPaneLayout] = useState<PaneLayout>("horizontal");
   const [horizontalResponseSize, setHorizontalResponseSize] = useState(320);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
+
+  useEffect(() => {
+    window.localStorage.setItem(themeStorageKey, theme);
+  }, [theme]);
 
   const responseSize = paneLayout === "horizontal" ? horizontalResponseSize : verticalResponseSize;
   const shellStyle = {
@@ -178,10 +186,26 @@ function App() {
             tabIndex={0}
           />
         )}
-        {isResponseVisible && <ResponseTelemetryPane result={invocationResult} theme={theme} />}
+        {isResponseVisible && (
+          <ResponseTelemetryPane
+            activeTab={responseTab}
+            onTabChange={setResponseTab}
+            result={invocationResult}
+            theme={theme}
+          />
+        )}
       </main>
     </div>
   );
+}
+
+function readStoredTheme(): WorkbenchTheme {
+  if (typeof window === "undefined") {
+    return "dark";
+  }
+
+  const storedTheme = window.localStorage.getItem(themeStorageKey);
+  return storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
 }
 
 function clamp(value: number, min: number, max: number): number {

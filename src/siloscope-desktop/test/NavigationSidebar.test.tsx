@@ -60,7 +60,15 @@ describe("NavigationSidebar", () => {
     );
 
     expect(screen.getByLabelText("Active workspace")).toHaveValue("workspace-1");
+    expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
+    expect(screen.getByText("DLL")).toBeInTheDocument();
+    expect(screen.getByText("NuGet")).toBeInTheDocument();
     expect(screen.getByText("127.0.0.1:30000")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Application 2" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
     expect(screen.getByRole("button", { name: "IGameGrain" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -69,6 +77,44 @@ describe("NavigationSidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "IPlayerGrain" }));
 
     expect(onSelectGrain).toHaveBeenCalledWith("grain-1");
+  });
+
+  it("groups discovered grains by namespace and supports collapsing groups", () => {
+    const namespacedGrains = [
+      {
+        interfaceId: "inventory-1",
+        interfaceName: "SiloScope.Inventory.IItemGrain",
+        methods: [],
+      },
+      {
+        interfaceId: "matchmaking-1",
+        interfaceName: "SiloScope.Matchmaking.IGameGrain",
+        methods: [],
+      },
+    ];
+
+    render(
+      <NavigationSidebar
+        activeView="workspace"
+        grains={namespacedGrains}
+        isConnected
+        onSelectGrain={vi.fn()}
+        onThemeChange={vi.fn()}
+        selectedGrain={null}
+        theme="dark"
+        workspace={workspace}
+      />,
+    );
+
+    const inventoryGroup = screen.getByRole("button", { name: "SiloScope.Inventory 1" });
+
+    expect(inventoryGroup).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "SiloScope.Inventory.IItemGrain" })).toBeInTheDocument();
+
+    fireEvent.click(inventoryGroup);
+
+    expect(inventoryGroup).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "SiloScope.Inventory.IItemGrain" })).not.toBeInTheDocument();
   });
 
   it("renders NuGet registry manager when NuGet view is active", () => {

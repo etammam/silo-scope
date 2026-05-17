@@ -2,36 +2,79 @@ import { useMemo } from "react";
 import type { InvocationResult, InvocationTiming } from "../../shared/types";
 import { MonacoEditor } from "./MonacoEditor";
 
+export type ResponsePaneTab = "response" | "timing";
+
 type ResponseTelemetryPaneProps = {
+  activeTab: ResponsePaneTab;
+  onTabChange: (tab: ResponsePaneTab) => void;
   result: InvocationResult | null;
   theme: "dark" | "light";
 };
 
-export function ResponseTelemetryPane({ result, theme }: ResponseTelemetryPaneProps) {
+export function ResponseTelemetryPane({
+  activeTab,
+  onTabChange,
+  result,
+  theme,
+}: ResponseTelemetryPaneProps) {
   const output = useMemo(() => formatResult(result), [result]);
 
   return (
     <aside className="response-pane" aria-labelledby="response-pane-title">
       <div className="response-pane__toolbar">
-        <span id="response-pane-title">Response</span>
+        <div className="response-pane__tabs" role="tablist" aria-label="Response views">
+          <button
+            aria-controls="response-output-panel"
+            aria-selected={activeTab === "response"}
+            id="response-pane-title"
+            onClick={() => onTabChange("response")}
+            role="tab"
+            type="button"
+          >
+            Response
+          </button>
+          <button
+            aria-controls="response-timing-panel"
+            aria-selected={activeTab === "timing"}
+            onClick={() => onTabChange("timing")}
+            role="tab"
+            type="button"
+          >
+            Timing
+          </button>
+        </div>
         <span>{result ? (result.isSuccess ? "Success" : "Error") : "Idle"}</span>
       </div>
 
-      <div className="response-pane__section response-pane__section--editor">
-        <div className="response-pane__section-header">
-          <span>Output</span>
-          <span>Read-only</span>
+      {activeTab === "response" && (
+        <div
+          aria-labelledby="response-pane-title"
+          className="response-pane__section response-pane__section--editor"
+          id="response-output-panel"
+          role="tabpanel"
+        >
+          <div className="response-pane__section-header">
+            <span>Output</span>
+            <span>Read-only</span>
+          </div>
+          <MonacoEditor value={output} onChange={() => undefined} readOnly theme={theme} />
         </div>
-        <MonacoEditor value={output} onChange={() => undefined} readOnly theme={theme} />
-      </div>
+      )}
 
-      <div className="response-pane__section response-pane__section--timing">
-        <div className="response-pane__section-header">
-          <span>Timing</span>
-          <span>{formatTotal(result?.timing)}</span>
+      {activeTab === "timing" && (
+        <div
+          aria-label="Timing"
+          className="response-pane__section response-pane__section--timing"
+          id="response-timing-panel"
+          role="tabpanel"
+        >
+          <div className="response-pane__section-header">
+            <span>Breakdown</span>
+            <span>{formatTotal(result?.timing)}</span>
+          </div>
+          <TimingBars timing={result?.timing ?? null} />
         </div>
-        <TimingBars timing={result?.timing ?? null} />
-      </div>
+      )}
     </aside>
   );
 }

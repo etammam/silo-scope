@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/renderer/App";
 
 vi.mock("electrobun/view", () => ({
@@ -23,6 +23,10 @@ vi.mock("@/renderer/components/MonacoEditor", () => ({
 }));
 
 describe("App shell", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("collapses the response pane from the titlebar", () => {
     render(<App />);
 
@@ -41,10 +45,29 @@ describe("App shell", () => {
 
     expect(screen.getByRole("complementary", { name: "workspace navigation" })).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("tab", { name: "Timing" }));
+    expect(screen.getByRole("tab", { name: "Timing" })).toHaveAttribute("aria-selected", "true");
+
     fireEvent.click(screen.getByRole("button", { name: "Collapse navigation panel" }));
 
     expect(screen.queryByRole("complementary", { name: "workspace navigation" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Expand navigation panel" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Timing" })).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand navigation panel" }));
+
+    expect(screen.getByRole("complementary", { name: "workspace navigation" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Timing" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("preserves the selected response tab when the response pane is collapsed", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Timing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collapse response panel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand response panel" }));
+
+    expect(screen.getByRole("tab", { name: "Timing" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("toggles request and response panes between horizontal and vertical layout", () => {
@@ -97,6 +120,16 @@ describe("App shell", () => {
     fireEvent.change(screen.getByLabelText("Workbench theme"), {
       target: { value: "light" },
     });
+
+    expect(container.firstElementChild).toHaveAttribute("data-theme", "light");
+    expect(window.localStorage.getItem("siloscope.theme")).toBe("light");
+    expect(screen.getAllByTestId("mock-editor")[0]).toHaveAttribute("data-theme", "light");
+  });
+
+  it("restores the persisted workbench theme", () => {
+    window.localStorage.setItem("siloscope.theme", "light");
+
+    const { container } = render(<App />);
 
     expect(container.firstElementChild).toHaveAttribute("data-theme", "light");
     expect(screen.getAllByTestId("mock-editor")[0]).toHaveAttribute("data-theme", "light");
