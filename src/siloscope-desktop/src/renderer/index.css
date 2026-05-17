@@ -31,8 +31,10 @@
 html,
 body,
 #root {
+	block-size: 100%;
 	height: 100%;
-	overflow: hidden;
+	overflow: clip;
+	inline-size: 100%;
 	width: 100%;
 }
 
@@ -68,8 +70,10 @@ textarea,
 	display: grid;
 	grid-template-columns: 48px 256px minmax(0, 1fr);
 	grid-template-rows: 34px minmax(0, 1fr);
-	height: 100vh;
-	overflow: hidden;
+	block-size: 100%;
+	height: 100%;
+	inline-size: 100%;
+	overflow: clip;
 	--response-size: 320px;
 	width: 100%;
 }
@@ -267,6 +271,8 @@ textarea,
 	grid-column: 1;
 	grid-row: 2;
 	min-block-size: 0;
+	min-height: 0;
+	overflow: hidden;
 	padding: 8px 4px;
 }
 
@@ -411,6 +417,7 @@ textarea,
 	color: var(--ui-6);
 	grid-column: 2;
 	grid-row: 2;
+	min-height: 0;
 	min-width: 0;
 	overflow: hidden;
 	padding: 8px 0;
@@ -621,7 +628,7 @@ textarea,
 	display: grid;
 	grid-column: 3 / -1;
 	grid-row: 2;
-	grid-template-columns: minmax(0, 1fr) 4px minmax(240px, min(var(--response-size), 65%));
+	grid-template-columns: minmax(0, 1fr) 4px minmax(0, min(var(--response-size), 65%));
 	grid-template-rows: minmax(0, 1fr);
 	min-height: 0;
 	min-width: 0;
@@ -639,7 +646,7 @@ textarea,
 
 .app-shell[data-pane-layout="vertical"] .app-shell__content {
 	grid-template-columns: minmax(0, 1fr);
-	grid-template-rows: minmax(0, 1fr) 4px minmax(180px, min(var(--response-size), 70%));
+	grid-template-rows: minmax(0, 1fr) 4px minmax(0, min(var(--response-size), 70%));
 }
 
 .app-shell[data-response-visible="false"][data-pane-layout="vertical"] .app-shell__content {
@@ -811,8 +818,9 @@ textarea,
 .response-pane {
 	background: var(--ui-1);
 	border-left: 1px solid var(--ui-3);
+	container-type: inline-size;
 	display: grid;
-	grid-template-rows: 34px minmax(0, 1fr) minmax(136px, auto);
+	grid-template-rows: 34px minmax(0, 1fr) minmax(104px, auto);
 	min-height: 0;
 	min-width: 0;
 	overflow: hidden;
@@ -854,7 +862,9 @@ textarea,
 
 .response-pane__section--timing {
 	border-top: 1px solid var(--ui-3);
-	grid-template-rows: 30px auto;
+	grid-template-rows: 30px minmax(0, auto);
+	min-height: 0;
+	overflow: hidden;
 }
 
 .response-pane__section-header {
@@ -872,29 +882,35 @@ textarea,
 
 .response-pane__timing {
 	display: grid;
-	gap: 8px;
+	gap: 6px;
 	margin: 0;
+	min-height: 0;
 	min-width: 0;
-	padding: 10px 12px 12px;
+	overflow: hidden;
+	padding: 8px 10px 10px;
 }
 
 .response-pane__timing-row {
 	display: grid;
-	gap: 5px;
+	gap: 4px;
+	min-width: 0;
 }
 
 .response-pane__timing-row dt {
 	color: var(--ui-5);
-	font-size: 11px;
+	font-size: 10px;
 	font-weight: 700;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	text-transform: uppercase;
+	white-space: nowrap;
 }
 
 .response-pane__timing-row dd {
 	align-items: center;
 	display: grid;
-	gap: 6px;
-	grid-template-columns: minmax(48px, 1fr) max-content;
+	gap: 5px;
+	grid-template-columns: minmax(0, 1fr) max-content;
 	margin: 0;
 	min-width: 0;
 }
@@ -910,6 +926,7 @@ textarea,
 	border: 1px solid var(--ui-3);
 	border-radius: 999px;
 	height: 6px;
+	min-width: 0;
 	overflow: hidden;
 }
 
@@ -940,7 +957,7 @@ textarea,
 	}
 
 	.app-shell[data-pane-layout="vertical"] .app-shell__content {
-		grid-template-rows: minmax(0, 1fr) 4px minmax(180px, min(var(--response-size), 70%));
+		grid-template-rows: minmax(0, 1fr) 4px minmax(0, min(var(--response-size), 70%));
 	}
 
 	.app-titlebar__command {
@@ -954,16 +971,47 @@ textarea,
 	.response-pane {
 		border-left: 0;
 		border-top: 1px solid var(--ui-3);
-		min-height: 320px;
 	}
 }
 
 @media (min-width: 641px) and (max-width: 940px) {
 	.app-shell__content {
-		grid-template-columns: minmax(0, 1fr) 4px minmax(220px, min(var(--response-size), 45%));
+		grid-template-columns: minmax(0, 1fr) 4px minmax(0, min(var(--response-size), 45%));
 	}
 
 	.request-workbench__controls {
 		grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr);
+	}
+}
+
+@container (max-width: 260px) {
+	.response-pane {
+		grid-template-rows: 34px minmax(0, 1fr) minmax(90px, auto);
+	}
+
+	.response-pane__section-header {
+		font-size: 10px;
+		padding: 0 8px;
+	}
+
+	.response-pane__timing {
+		gap: 5px;
+		padding: 6px 8px 8px;
+	}
+
+	.response-pane__timing-row {
+		grid-template-columns: minmax(0, 1fr) max-content;
+	}
+
+	.response-pane__timing-row dt {
+		display: none;
+	}
+
+	.response-pane__timing-row dd {
+		grid-template-columns: minmax(0, 1fr) 34px;
+	}
+
+	.response-pane__timing-row dd > span:last-child {
+		font-size: 11px;
 	}
 }

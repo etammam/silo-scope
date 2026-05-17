@@ -62,7 +62,7 @@ function App() {
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (paneLayout === "horizontal") {
-          const nextSize = clamp(bounds.right - moveEvent.clientX, 240, bounds.width * 0.65);
+          const nextSize = clamp(bounds.right - moveEvent.clientX, 180, bounds.width * 0.65);
           setHorizontalResponseSize(nextSize);
           return;
         }
