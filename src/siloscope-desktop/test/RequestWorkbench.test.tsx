@@ -74,7 +74,7 @@ describe("RequestWorkbench", () => {
       />,
     );
 
-    expect(screen.getByRole("option", { name: "SetName(name)" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Method")).toHaveValue("SetName(name)");
 
     fireEvent.change(screen.getByLabelText("Key type"), {
       target: { value: "Guid" },
@@ -94,6 +94,72 @@ describe("RequestWorkbench", () => {
       method: "SetName",
       payload: '{"name":"Ada"}',
     });
+  });
+
+  it("selects methods from a searchable method input", () => {
+    const onSelectMethod = vi.fn();
+
+    render(
+      <RequestWorkbench
+        grains={grains}
+        onInvoke={vi.fn()}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={onSelectMethod}
+        selectedGrain="grain-1"
+        selectedMethod={null}
+        theme="dark"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Method"), {
+      target: { value: "GetState()" },
+    });
+
+    expect(onSelectMethod).toHaveBeenCalledWith("GetState");
+  });
+
+  it("prevents invocation until the payload is valid JSON", () => {
+    render(
+      <RequestWorkbench
+        grains={grains}
+        onInvoke={vi.fn()}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        theme="dark"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Grain ID"), {
+      target: { value: "player-1" },
+    });
+    fireEvent.change(screen.getByLabelText("Payload editor"), {
+      target: { value: "{" },
+    });
+
+    expect(screen.getByRole("button", { name: "Invoke Grain" })).toBeDisabled();
+    expect(screen.getByText(/Expected property name|Unexpected end|JSON/)).toBeInTheDocument();
+  });
+
+  it("inserts environment token placeholders into the payload", () => {
+    render(
+      <RequestWorkbench
+        grains={grains}
+        onInvoke={vi.fn()}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        theme="dark"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "clusterId" }));
+
+    expect(screen.getByLabelText("Payload editor")).toHaveValue(
+      '{\n  "clusterId": "${env:clusterId}"\n}',
+    );
   });
 
   it("clears the selected method when a new grain is chosen", () => {

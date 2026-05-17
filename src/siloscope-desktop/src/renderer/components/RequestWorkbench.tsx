@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { GrainInterfaceDescriptor, GrainMethodDescriptor } from "../../shared/types";
 import { MonacoEditor } from "./MonacoEditor";
 
@@ -31,7 +31,9 @@ export function RequestWorkbench({
 }: RequestWorkbenchProps) {
   const [grainKey, setGrainKey] = useState("");
   const [keyType, setKeyType] = useState<GrainKeyType>("String");
+  const [methodQuery, setMethodQuery] = useState("");
   const [payload, setPayload] = useState("{\n}");
+  const methodListId = useId();
 
   const activeGrain = useMemo(
     () => grains.find((grain) => grain.interfaceId === selectedGrain) ?? null,
@@ -39,7 +41,20 @@ export function RequestWorkbench({
   );
   const methods = activeGrain?.methods ?? [];
   const activeMethod = methods.find((method) => method.name === selectedMethod) ?? null;
-  const canInvoke = Boolean(activeGrain && activeMethod && grainKey.trim());
+  const filteredMethods = useMemo(
+    () =>
+      methods.filter((method) =>
+        formatMethodLabel(method).toLowerCase().includes(methodQuery.trim().toLowerCase()),
+      ),
+    [methodQuery, methods],
+  );
+  const payloadError = useMemo(() => validateJson(payload), [payload]);
+  const canInvoke = Boolean(activeGrain && activeMethod && grainKey.trim() && !payloadError);
+
+  useEffect(() => {
+    const selected = methods.find((method) => method.name === selectedMethod) ?? null;
+    setMethodQuery(selected ? formatMethodLabel(selected) : "");
+  }, [methods, selectedMethod]);
 
   const handleGrainChange = (grainId: string) => {
     const nextGrain = grainId.length > 0 ? grainId : null;
@@ -47,8 +62,21 @@ export function RequestWorkbench({
     onSelectMethod(null);
   };
 
-  const handleMethodChange = (methodName: string) => {
-    onSelectMethod(methodName.length > 0 ? methodName : null);
+  const handleMethodQueryChange = (query: string) => {
+    setMethodQuery(query);
+    const nextMethod = methods.find((method) => method.name === query || formatMethodLabel(method) === query);
+    onSelectMethod(nextMethod?.name ?? null);
+  };
+
+  const insertEnvToken = (token: string) => {
+    setPayload((currentPayload) => {
+      const insertAt = Math.max(currentPayload.lastIndexOf("}"), 0);
+      const prefix = currentPayload.slice(0, insertAt).trimEnd();
+      const suffix = currentPayload.slice(insertAt);
+      const separator = prefix.endsWith("{") ? "\n  " : ",\n  ";
+
+      return `${prefix}${separator}"${token}": "\${env:${token}}"\n${suffix}`;
+    });
   };
 
   const handleInvoke = () => {
@@ -69,9 +97,7 @@ export function RequestWorkbench({
     <section className="request-workbench" aria-labelledby="request-workbench-title">
       <div className="request-workbench__toolbar">
         <span id="request-workbench-title">Request</span>
-        <button disabled={!canInvoke} onClick={handleInvoke} type="button">
-          Invoke Grain
-        </button>
+        <span>{activeMethod ? formatMethodLabel(activeMethod) : "No method selected"}</span>
       </div>
 
       <div className="request-workbench__controls">
@@ -89,18 +115,19 @@ export function RequestWorkbench({
 
         <label>
           <span>Method</span>
-          <select
+          <input
+            aria-label="Method"
+            list={methodListId}
             disabled={!activeGrain}
-            value={selectedMethod ?? ""}
-            onChange={(event) => handleMethodChange(event.target.value)}
-          >
-            <option value="">Select method</option>
-            {methods.map((method) => (
-              <option key={method.name} value={method.name}>
-                {formatMethodLabel(method)}
-              </option>
+            placeholder="Search methods"
+            value={methodQuery}
+            onChange={(event) => handleMethodQueryChange(event.target.value)}
+          />
+          <datalist id={methodListId}>
+            {filteredMethods.map((method) => (
+              <option key={method.name} value={formatMethodLabel(method)} />
             ))}
-          </select>
+          </datalist>
         </label>
 
         <label>
@@ -125,9 +152,25 @@ export function RequestWorkbench({
       <div className="request-workbench__editor">
         <div className="request-workbench__editor-header">
           <span>Payload</span>
-          <span>JSON</span>
+          <div className="request-workbench__tokens" aria-label="Environment token autocomplete">
+            <button onClick={() => insertEnvToken("clusterId")} type="button">
+              clusterId
+            </button>
+            <button onClick={() => insertEnvToken("workspaceId")} type="button">
+              workspaceId
+            </button>
+          </div>
         </div>
         <MonacoEditor value={payload} onChange={setPayload} theme={theme} />
+      </div>
+
+      <div className="request-workbench__trigger-bar">
+        <span className={payloadError ? "request-workbench__status request-workbench__status--error" : "request-workbench__status"}>
+          {payloadError ?? "JSON valid"}
+        </span>
+        <button disabled={!canInvoke} onClick={handleInvoke} type="button">
+          Invoke Grain
+        </button>
       </div>
     </section>
   );
@@ -139,4 +182,13 @@ function formatMethodLabel(method: GrainMethodDescriptor): string {
   }
 
   return `${method.name}(${method.parameters.map((parameter) => parameter.name).join(", ")})`;
+}
+
+function validateJson(value: string): string | null {
+  try {
+    JSON.parse(value);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Invalid JSON";
+  }
 }
