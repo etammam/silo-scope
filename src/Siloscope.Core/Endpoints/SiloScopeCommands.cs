@@ -1,6 +1,7 @@
 using FluentResults;
 using Microsoft.Extensions.Logging;
 using Siloscope.Core.Cluster;
+using Siloscope.Core.Components.Nuget;
 using Siloscope.Core.Components.Workspace;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.Interfaces;
@@ -13,6 +14,7 @@ public class SiloScopeCommands : ISiloScopeCommands
     private readonly IGrainInvocationService _grainInvocationService;
     private readonly InterfaceCatalogLoader _catalogLoader;
     private readonly IWorkspaceService _workspaceService;
+    private readonly INugetConnectionManager _nugetManager;
     private readonly ILogger<SiloScopeCommands> _logger;
 
     private InterfaceCatalog? _catalog;
@@ -23,6 +25,7 @@ public class SiloScopeCommands : ISiloScopeCommands
         IGrainInvocationService grainInvocationService,
         InterfaceCatalogLoader catalogLoader,
         IWorkspaceService workspaceService,
+        INugetConnectionManager nugetManager,
         ILogger<SiloScopeCommands> logger
     )
     {
@@ -30,6 +33,7 @@ public class SiloScopeCommands : ISiloScopeCommands
         _grainInvocationService = grainInvocationService;
         _catalogLoader = catalogLoader;
         _workspaceService = workspaceService;
+        _nugetManager = nugetManager;
         _logger = logger;
     }
 
@@ -328,5 +332,54 @@ public class SiloScopeCommands : ISiloScopeCommands
         }
 
         return Result.Ok(new InvocationResult(true, result.Value, null, null));
+    }
+
+    public async Task<Result<RestoreResult>> RestorePackagesAsync(
+        IEnumerable<SiloSource> silos,
+        string? sourceUrl = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var nugetPackages = silos
+            .Where(s => s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase))
+            .Where(s => !string.IsNullOrEmpty(s.Reference) && !string.IsNullOrEmpty(s.Version))
+            .Select(s => (s.Reference, s.Version!))
+            .ToList();
+
+        if (nugetPackages.Count == 0)
+        {
+            return Result.Ok(new RestoreResult(0, 0, [], []));
+        }
+
+        _logger.LogInformation("Restoring {Count} NuGet packages", nugetPackages.Count);
+
+        var restored = new List<string>();
+        var failed = new List<string>();
+
+        foreach (var (id, version) in nugetPackages)
+        {
+            var result = await _nugetManager.DownloadPackageAsync(
+                id,
+                version,
+                sourceUrl,
+                cancellationToken
+            );
+            if (result.IsSuccess)
+            {
+                restored.Add($"{id} {version}");
+            }
+            else
+            {
+                failed.Add($"{id} {version}: {result.Errors.FirstOrDefault()?.Message}");
+            }
+        }
+
+        _logger.LogInformation(
+            "Restore complete: {Restored} restored, {Failed} failed",
+            restored.Count,
+            failed.Count
+        );
+
+        return Result.Ok(new RestoreResult(restored.Count, failed.Count, restored, failed));
     }
 }

@@ -18,6 +18,7 @@ public sealed class SiloScopeCommandsTests
     private readonly Mock<IGrainInvocationService> _grainInvocationServiceMock;
     private readonly InterfaceCatalogLoader _catalogLoader;
     private readonly Mock<IWorkspaceService> _workspaceServiceMock;
+    private readonly Mock<INugetConnectionManager> _nugetManagerMock;
     private readonly Mock<ILogger<SiloScopeCommands>> _loggerMock;
     private readonly SiloScopeCommands _commands;
 
@@ -27,6 +28,7 @@ public sealed class SiloScopeCommandsTests
         _grainInvocationServiceMock = new Mock<IGrainInvocationService>(MockBehavior.Strict);
         _catalogLoader = new InterfaceCatalogLoader();
         _workspaceServiceMock = new Mock<IWorkspaceService>(MockBehavior.Strict);
+        _nugetManagerMock = new Mock<INugetConnectionManager>(MockBehavior.Strict);
         _loggerMock = new Mock<ILogger<SiloScopeCommands>>();
 
         _commands = new SiloScopeCommands(
@@ -34,6 +36,7 @@ public sealed class SiloScopeCommandsTests
             _grainInvocationServiceMock.Object,
             _catalogLoader,
             _workspaceServiceMock.Object,
+            _nugetManagerMock.Object,
             _loggerMock.Object
         );
     }
@@ -243,5 +246,64 @@ public sealed class SiloScopeCommandsTests
             Environments = [],
             Session = new SessionConfig { ActiveEnvironment = "default" },
         };
+    }
+
+    [Fact]
+    public async Task RestorePackagesAsync_NoNugetSilos_ReturnsEmptyResult()
+    {
+        var silos = new Siloscope.Core.Endpoints.SiloSource[]
+        {
+            new("test.dll", "DLL", null, null, true),
+        };
+
+        var result = await _commands.RestorePackagesAsync(silos, null, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.RestoredCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RestorePackagesAsync_WithNugetSilos_RestoresPackages()
+    {
+        var silos = new Siloscope.Core.Endpoints.SiloSource[]
+        {
+            new("Newtonsoft.Json", "nuget", "13.0.3", null, true),
+        };
+
+        _nugetManagerMock
+            .Setup(m =>
+                m.DownloadPackageAsync(
+                    "Newtonsoft.Json",
+                    "13.0.3",
+                    null,
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .ReturnsAsync(Result.Ok("/path/to/package"));
+
+        var result = await _commands.RestorePackagesAsync(silos, null, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.RestoredCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task RestorePackagesAsync_FailedDownload_TracksFailure()
+    {
+        var silos = new Siloscope.Core.Endpoints.SiloSource[]
+        {
+            new("NonExistent", "nuget", "1.0.0", null, true),
+        };
+
+        _nugetManagerMock
+            .Setup(m =>
+                m.DownloadPackageAsync("NonExistent", "1.0.0", null, It.IsAny<CancellationToken>())
+            )
+            .ReturnsAsync(Result.Fail<string>("Package not found"));
+
+        var result = await _commands.RestorePackagesAsync(silos, null, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.FailedCount.Should().Be(1);
     }
 }

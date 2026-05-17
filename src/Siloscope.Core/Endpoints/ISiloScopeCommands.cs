@@ -31,6 +31,13 @@ public interface ISiloScopeCommands
         string? payload,
         CancellationToken cancellationToken = default
     );
+
+    // NuGet
+    Task<Result<RestoreResult>> RestorePackagesAsync(
+        IEnumerable<SiloSource> silos,
+        string? sourceUrl = null,
+        CancellationToken cancellationToken = default
+    );
 }
 
 public record WorkspaceInfo(
@@ -72,3 +79,10 @@ public record InvocationResult(
 );
 
 public record TimingInfo(long SerializationMs, long ExecutionMs, long TotalMs);
+
+public record RestoreResult(
+    int RestoredCount,
+    int FailedCount,
+    IReadOnlyList<string> RestoredPackages,
+    IReadOnlyList<string> FailedPackages
+);
