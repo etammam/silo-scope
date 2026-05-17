@@ -198,9 +198,70 @@ public class SiloScopeCommands : ISiloScopeCommands
         CancellationToken cancellationToken = default
     )
     {
-        // TODO: Implement - use InterfaceCatalogLoader
-        _logger.LogInformation("DiscoverGrains called");
-        return Task.FromResult(Result.Ok(new GrainCatalog([], [])));
+        return DiscoverGrainsAsync(null, cancellationToken);
+    }
+
+    public async Task<Result<GrainCatalog>> DiscoverGrainsAsync(
+        string? path,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (_currentWorkspace is null)
+        {
+            var loadResult = await LoadWorkspaceAsync(path, cancellationToken);
+            if (loadResult.IsFailed)
+            {
+                return Result.Fail<GrainCatalog>("No workspace loaded and none specified");
+            }
+        }
+
+        var enabledSilos = _currentWorkspace!.Silos.Where(s => s.Enabled).ToList();
+        if (enabledSilos.Count == 0)
+        {
+            _logger.LogWarning("No enabled silos in workspace");
+            return Result.Ok(new GrainCatalog([], []));
+        }
+
+        var entries = enabledSilos
+            .Select(s => new InterfaceEntry(
+                s.Gateway,
+                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase)
+                    ? InterfaceSourceType.NuGet
+                    : InterfaceSourceType.Dll,
+                s.Source.Equals("DLL", StringComparison.OrdinalIgnoreCase) ? s.Reference : null,
+                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Reference : null,
+                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Version : null,
+                null,
+                null
+            ))
+            .ToList();
+
+        var catalogResult = _catalogLoader.LoadAll(entries);
+        if (catalogResult.IsFailed)
+        {
+            return Result.Fail<GrainCatalog>(catalogResult.Errors.Select(e => e.Message));
+        }
+
+        var catalog = catalogResult.Value;
+        var grainInfos = catalog
+            .Grains.Select(g => new GrainInfo(
+                g.Name,
+                g.InterfaceType.Name,
+                g.InterfaceType.Namespace ?? "",
+                g.Methods.Select(m => new MethodInfo(
+                        m.MethodInfo.Name,
+                        m.Signature ?? "",
+                        m.MethodInfo.ReturnType.Name
+                    ))
+                    .ToList(),
+                g.Gateway
+            ))
+            .ToList();
+
+        _catalog = catalog;
+        _logger.LogInformation("Discovered {Count} grain interfaces", grainInfos.Count);
+
+        return Result.Ok(new GrainCatalog(grainInfos, catalog.AssemblyPaths));
     }
 
     public Task<Result<InvocationResult>> InvokeGrainAsync(

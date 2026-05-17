@@ -16,6 +16,7 @@ public sealed class SiloScopeCommandsTests
 {
     private readonly Mock<IOrleansClientConnectorPool> _connectorPoolMock;
     private readonly Mock<IGrainInvocationService> _grainInvocationServiceMock;
+    private readonly InterfaceCatalogLoader _catalogLoader;
     private readonly Mock<IWorkspaceService> _workspaceServiceMock;
     private readonly Mock<ILogger<SiloScopeCommands>> _loggerMock;
     private readonly SiloScopeCommands _commands;
@@ -24,13 +25,14 @@ public sealed class SiloScopeCommandsTests
     {
         _connectorPoolMock = new Mock<IOrleansClientConnectorPool>(MockBehavior.Strict);
         _grainInvocationServiceMock = new Mock<IGrainInvocationService>(MockBehavior.Strict);
+        _catalogLoader = new InterfaceCatalogLoader();
         _workspaceServiceMock = new Mock<IWorkspaceService>(MockBehavior.Strict);
         _loggerMock = new Mock<ILogger<SiloScopeCommands>>();
 
         _commands = new SiloScopeCommands(
             _connectorPoolMock.Object,
             _grainInvocationServiceMock.Object,
-            null!,
+            _catalogLoader,
             _workspaceServiceMock.Object,
             _loggerMock.Object
         );
@@ -119,5 +121,62 @@ public sealed class SiloScopeCommandsTests
             p => p.DisconnectAllAsync(It.IsAny<CancellationToken>()),
             Times.Once
         );
+    }
+
+    [Fact]
+    public async Task DiscoverGrainsAsync_NoWorkspace_LoadsDefaultWorkspace()
+    {
+        var workspace = CreateTestWorkspace();
+        _workspaceServiceMock.Setup(s => s.GetDefaultWorkspacePath()).Returns("/test/path");
+        _workspaceServiceMock.Setup(s => s.LoadAsync(It.IsAny<string>())).ReturnsAsync(workspace);
+
+        var result = await _commands.DiscoverGrainsAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Grains.Should().BeEmpty();
+        _workspaceServiceMock.Verify(s => s.GetDefaultWorkspacePath(), Times.Once);
+    }
+
+    [Fact]
+    public async Task DiscoverGrainsAsync_WithNoEnabledSilos_ReturnsEmptyCatalog()
+    {
+        SetWorkspace(new Workspace { Id = "test", Silos = [] });
+
+        var result = await _commands.DiscoverGrainsAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Grains.Should().BeEmpty();
+        result.Value.AssemblyPaths.Should().BeEmpty();
+    }
+
+    private void SetWorkspace(Workspace workspace)
+    {
+        var field = typeof(SiloScopeCommands).GetField(
+            "_currentWorkspace",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
+        );
+        field?.SetValue(_commands, workspace);
+    }
+
+    private static Workspace CreateTestWorkspace()
+    {
+        return new Workspace
+        {
+            Id = "test-workspace",
+            WorkspaceInfo = new Siloscope.Core.Components.Workspace.WorkspaceInfo
+            {
+                Name = "Test",
+                Description = "Test workspace",
+            },
+            Cluster = new ClusterConfig
+            {
+                ClusterId = "cluster",
+                ServiceId = "service",
+                DefaultGateway = "localhost:30000",
+            },
+            Silos = [],
+            Environments = [],
+            Session = new SessionConfig { ActiveEnvironment = "default" },
+        };
     }
 }
