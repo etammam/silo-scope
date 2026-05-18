@@ -8,7 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { SiloScopeRPC } from "../shared/rpc";
-import type { GrainKeyType, Workspace } from "../shared/types";
+import type { ClusterType, GrainKeyType, Workspace, WorkspaceSource } from "../shared/types";
 import { buildSourceCatalogFromGrains, findCatalogFunction } from "./catalog";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import { NavigationSidebar } from "./components/NavigationSidebar";
@@ -54,10 +54,6 @@ const rendererRpc = Electroview.defineRPC<SiloScopeRPC>({
         window.dispatchEvent(
           new CustomEvent(applicationMenuEventName, { detail: action }),
         );
-        if (action === "newWorkspace") {
-          createNewWorkspaceState();
-          return;
-        }
 
         if (action === "openWorkspace") {
           void loadWorkspace();
@@ -87,6 +83,7 @@ function App() {
     nugetFeeds,
     nugetPackages,
     clearLogs,
+    setWorkspace,
     setSelectedGrain,
     setSelectedFunction,
     setSelectedMethod,
@@ -100,21 +97,50 @@ function App() {
   const [isResponseVisible, setIsResponseVisible] = useState(true);
   const [responseTab, setResponseTab] = useState<ResponsePaneTab>("response");
   const [paneLayout, setPaneLayout] = useState<PaneLayout>("horizontal");
-  const [horizontalResponseSize, setHorizontalResponseSize] = useState(320);
+  const [horizontalResponseSize, setHorizontalResponseSize] = useState(420);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
-  const handleNewWorkspace = useCallback(() => createNewWorkspaceState(), []);
-
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [isWorkspaceDialogOpen, setIsWorkspaceDialogOpen] = useState(false);
+  const [workspaceDraft, setWorkspaceDraft] = useState<Workspace | null>(null);
+  const handleNewWorkspace = useCallback(() => {
+    setWorkspaceDraft(null);
+    setIsWorkspaceDialogOpen(true);
+  }, []);
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
 
   useEffect(() => {
     void refreshNugetFeeds();
+    void refreshPersistedWorkspaces();
+  }, []);
+
+  useEffect(() => {
+    const handleWorkspaceLoaded = (event: Event) => {
+      const loadedWorkspace = (event as CustomEvent<Workspace>).detail;
+      setWorkspaces((current) => upsertWorkspace(current, loadedWorkspace));
+    };
+    const handleWorkspacesLoaded = (event: Event) => {
+      const loadedWorkspaces = (event as CustomEvent<Workspace[]>).detail;
+      setWorkspaces(loadedWorkspaces);
+    };
+
+    window.addEventListener("siloscope:workspace-loaded", handleWorkspaceLoaded);
+    window.addEventListener("siloscope:workspaces-loaded", handleWorkspacesLoaded);
+    return () => {
+      window.removeEventListener("siloscope:workspace-loaded", handleWorkspaceLoaded);
+      window.removeEventListener("siloscope:workspaces-loaded", handleWorkspacesLoaded);
+    };
   }, []);
 
   useEffect(() => {
     const handleApplicationMenuAction = (event: Event) => {
       const action = (event as CustomEvent<string>).detail;
+      if (action === "newWorkspace") {
+        setWorkspaceDraft(null);
+        setIsWorkspaceDialogOpen(true);
+      }
+
       if (action === "toggleActivityBar") {
         setIsActivityBarVisible((visible) => !visible);
       }
@@ -148,12 +174,12 @@ function App() {
   }, [grains, sourceCatalog, workspace]);
 
   useEffect(() => {
-    if (!workspace) {
+    if (!workspace || !isConnected) {
       return;
     }
 
     void refreshWorkspaceCatalog(workspace.id);
-  }, [workspace?.id]);
+  }, [isConnected, workspace?.id]);
 
   const handleSelectFunction = useCallback(
     (functionId: string | null) => {
@@ -229,6 +255,47 @@ function App() {
     setResponseTab("response");
     void invokeGrain(request);
   }, []);
+
+  const handleSelectWorkspace = useCallback(
+    (workspaceId: string) => {
+      const nextWorkspace = workspaces.find((candidate) => candidate.id === workspaceId);
+      if (!nextWorkspace) {
+        return;
+      }
+
+      setWorkspace(nextWorkspace);
+      useAppStore.getState().setGrains([]);
+      useAppStore.getState().setSourceCatalog({ sources: [] });
+      useAppStore.getState().setInvocationResult(null);
+      useAppStore.getState().setIsConnected(false);
+    },
+    [setWorkspace, workspaces],
+  );
+
+  const handleCreateWorkspace = useCallback(
+    (nextWorkspace: Workspace) => {
+      setWorkspaces((current) => upsertWorkspace(current, nextWorkspace));
+      setWorkspace(nextWorkspace);
+      useAppStore.getState().setGrains([]);
+      useAppStore.getState().setSourceCatalog({ sources: [] });
+      useAppStore.getState().setSelectedFunction(null);
+      useAppStore.getState().setInvocationResult(null);
+      useAppStore.getState().setIsConnected(false);
+      setIsWorkspaceDialogOpen(false);
+      setWorkspaceDraft(null);
+      void persistWorkspace(nextWorkspace);
+    },
+    [setWorkspace],
+  );
+
+  const handleEditWorkspace = useCallback(() => {
+    if (!workspace) {
+      return;
+    }
+
+    setWorkspaceDraft(workspace);
+    setIsWorkspaceDialogOpen(true);
+  }, [workspace]);
 
   return (
     <div
@@ -336,6 +403,8 @@ function App() {
           onDiscoverGrains={discoverWorkspaceGrains}
           onLoadWorkspace={loadWorkspace}
           onSaveWorkspace={saveCurrentWorkspace}
+          onSelectWorkspace={handleSelectWorkspace}
+          onEditWorkspace={handleEditWorkspace}
           onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
           onNewWorkspace={handleNewWorkspace}
@@ -345,6 +414,7 @@ function App() {
           sourceCatalog={effectiveSourceCatalog}
           theme={theme}
           workspace={workspace}
+          workspaces={workspaces}
         />
       )}
 
@@ -382,43 +452,274 @@ function App() {
           />
         )}
       </main>
+      {isWorkspaceDialogOpen && (
+        <NewWorkspaceDialog
+          initialWorkspace={workspaceDraft}
+          onCancel={() => {
+            setIsWorkspaceDialogOpen(false);
+            setWorkspaceDraft(null);
+          }}
+          onCreate={handleCreateWorkspace}
+        />
+      )}
+    </div>
+  );
+}
+
+function NewWorkspaceDialog({
+  initialWorkspace,
+  onCancel,
+  onCreate,
+}: {
+  initialWorkspace?: Workspace | null;
+  onCancel: () => void;
+  onCreate: (workspace: Workspace) => void;
+}) {
+  const isEditing = Boolean(initialWorkspace);
+  const [name, setName] = useState(initialWorkspace?.name ?? "Untitled Workspace");
+  const [description, setDescription] = useState(initialWorkspace?.description ?? "");
+  const [clusterType, setClusterType] = useState<ClusterType>(initialWorkspace?.clusterType ?? "Homogenous");
+  const [clusterId, setClusterId] = useState(initialWorkspace?.clusterId ?? "dev");
+  const [serviceId, setServiceId] = useState(initialWorkspace?.serviceId ?? "SiloScope");
+  const [gatewayEndpoint, setGatewayEndpoint] = useState(initialWorkspace?.gatewayEndpoints?.[0] ?? "127.0.0.1:30000");
+  const [sources, setSources] = useState<WorkspaceSource[]>(initialWorkspace?.sources ?? []);
+  const [sourceType, setSourceType] = useState<WorkspaceSource["sourceType"]>("DLL");
+  const [sourceReference, setSourceReference] = useState("");
+  const [sourceVersion, setSourceVersion] = useState("");
+  const [sourceGateway, setSourceGateway] = useState("");
+
+  const addSource = () => {
+    const reference = sourceReference.trim();
+    if (!reference) {
+      return;
+    }
+
+    const source: WorkspaceSource = {
+      sourceId: `${sourceType}:${reference}:${sourceVersion.trim()}:${sourceGateway.trim()}`,
+      sourceType,
+      reference,
+      label: sourceType === "DLL" ? reference.split(/[\\/]/).pop() || reference : reference,
+      version: sourceType === "NuGet" ? sourceVersion.trim() || null : null,
+      gateway: clusterType === "Heterogeneous" ? sourceGateway.trim() || null : null,
+      enabled: true,
+    };
+
+    setSources((current) => [...current, source]);
+    setSourceReference("");
+    setSourceVersion("");
+    setSourceGateway("");
+  };
+
+  const saveWorkspace = () => {
+    const [siloAddress, portRaw] = gatewayEndpoint.split(":");
+    const gatewayPort = Number(portRaw);
+    const workspace: Workspace = {
+      id: initialWorkspace?.id ?? `workspace-${Date.now()}`,
+      name: name.trim() || "Untitled Workspace",
+      description: description.trim() || null,
+      siloAddress: siloAddress || "127.0.0.1",
+      gatewayPort: Number.isFinite(gatewayPort) ? gatewayPort : 30000,
+      orleansVersion: "10.0",
+      clusterId: clusterId.trim() || "dev",
+      serviceId: serviceId.trim() || "SiloScope",
+      clusterType,
+      gatewayEndpoints: clusterType === "Homogenous" && gatewayEndpoint.trim() ? [gatewayEndpoint.trim()] : [],
+      environmentVariables: {},
+      sources,
+    };
+
+    onCreate(workspace);
+  };
+
+  return (
+    <div className="workspace-dialog__backdrop" role="presentation">
+      <section aria-labelledby="new-workspace-title" aria-modal="true" className="workspace-dialog" role="dialog">
+        <header className="workspace-dialog__header">
+          <div>
+            <h2 id="new-workspace-title">{isEditing ? "Edit workspace" : "New workspace"}</h2>
+            <p>Configure the workspace, cluster, and interface sources before connecting.</p>
+          </div>
+          <button aria-label="Close new workspace" onClick={onCancel} type="button">
+            Close
+          </button>
+        </header>
+
+        <div className="workspace-dialog__grid">
+          <section className="workspace-dialog__section">
+            <h3>Workspace</h3>
+            <label>
+              <span>Name</span>
+              <input aria-label="Workspace name" value={name} onChange={(event) => setName(event.target.value)} />
+            </label>
+            <label>
+              <span>Description</span>
+              <input aria-label="Workspace description" value={description} onChange={(event) => setDescription(event.target.value)} />
+            </label>
+          </section>
+
+          <section className="workspace-dialog__section">
+            <h3>Cluster</h3>
+            <label>
+              <span>Cluster type</span>
+              <select aria-label="Cluster type" value={clusterType} onChange={(event) => setClusterType(event.target.value as ClusterType)}>
+                <option value="Homogenous">Homogeneous</option>
+                <option value="Heterogeneous">Heterogeneous</option>
+              </select>
+            </label>
+            <label>
+              <span>Cluster ID</span>
+              <input aria-label="Cluster ID" value={clusterId} onChange={(event) => setClusterId(event.target.value)} />
+            </label>
+            <label>
+              <span>Service ID</span>
+              <input aria-label="Service ID" value={serviceId} onChange={(event) => setServiceId(event.target.value)} />
+            </label>
+            {clusterType === "Homogenous" && (
+              <label>
+                <span>Gateway</span>
+                <input aria-label="Gateway endpoint" value={gatewayEndpoint} onChange={(event) => setGatewayEndpoint(event.target.value)} />
+              </label>
+            )}
+          </section>
+
+          <section className="workspace-dialog__section workspace-dialog__section--wide">
+            <h3>Sources</h3>
+            <div className="workspace-dialog__source-form">
+              <label>
+                <span>Type</span>
+                <select aria-label="Source type" value={sourceType} onChange={(event) => setSourceType(event.target.value as WorkspaceSource["sourceType"])}>
+                  <option value="DLL">DLL</option>
+                  <option value="NuGet">NuGet</option>
+                </select>
+              </label>
+              <label>
+                <span>{sourceType === "DLL" ? "DLL path" : "Package ID"}</span>
+                <input
+                  aria-label="Source reference"
+                  onChange={(event) => setSourceReference(event.target.value)}
+                  placeholder={sourceType === "DLL" ? "/path/to/contracts.dll" : "Company.Contracts"}
+                  value={sourceReference}
+                />
+              </label>
+              {sourceType === "NuGet" && (
+                <label>
+                  <span>Version</span>
+                  <input aria-label="Package version" value={sourceVersion} onChange={(event) => setSourceVersion(event.target.value)} />
+                </label>
+              )}
+              {clusterType === "Heterogeneous" && (
+                <label>
+                  <span>Gateway</span>
+                  <input aria-label="Source gateway" value={sourceGateway} onChange={(event) => setSourceGateway(event.target.value)} />
+                </label>
+              )}
+              <button disabled={!sourceReference.trim()} onClick={addSource} type="button">
+                Add Source
+              </button>
+            </div>
+            {sources.length > 0 ? (
+              <ul className="workspace-dialog__sources" aria-label="Workspace sources">
+                {sources.map((source) => (
+                  <li key={source.sourceId}>
+                    <strong>{source.label}</strong>
+                    <span>{source.sourceType}{source.version ? ` ${source.version}` : ""}{source.gateway ? ` · ${source.gateway}` : ""}</span>
+                    <button
+                      aria-label={`Remove ${source.label}`}
+                      onClick={() => setSources((current) => current.filter((candidate) => candidate.sourceId !== source.sourceId))}
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="workspace-dialog__empty">No sources added yet</div>
+            )}
+          </section>
+        </div>
+
+        <footer className="workspace-dialog__footer">
+          <button onClick={onCancel} type="button">Cancel</button>
+          <button disabled={!name.trim()} onClick={saveWorkspace} type="button">{isEditing ? "Save Workspace" : "Create Workspace"}</button>
+        </footer>
+      </section>
     </div>
   );
 }
 
 function readStoredTheme(): WorkbenchTheme {
   if (typeof window === "undefined") {
-    return "dark";
+    return "light";
   }
 
   const storedTheme = window.localStorage.getItem(themeStorageKey);
   return storedTheme === "light" || storedTheme === "dark"
     ? storedTheme
-    : "dark";
+    : "light";
 }
 
-function createNewWorkspaceState() {
-  const workspace: Workspace = {
-    id: `workspace-${Date.now()}`,
-    name: "Untitled Workspace",
-    description: null,
-    siloAddress: "127.0.0.1",
-    gatewayPort: 30000,
-    orleansVersion: "10.0",
-    clusterId: "dev",
-    serviceId: "SiloScope",
-    gatewayEndpoints: ["127.0.0.1:30000"],
-    environmentVariables: {},
-    sources: [],
-  };
-  const store = useAppStore.getState();
+async function setActiveWorkspace(workspace: Workspace): Promise<boolean> {
+  try {
+    const response = await electroview.rpc!.request.setActiveWorkspace({ workspace });
+    useAppStore.getState().setWorkspace(response.workspace);
+    return true;
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to set active workspace.",
+    });
+    return false;
+  }
+}
 
-  store.setWorkspace(workspace);
-  store.setGrains([]);
-  store.setSourceCatalog({ sources: [] });
-  store.setSelectedFunction(null);
-  store.setInvocationResult(null);
-  store.setIsConnected(false);
+function upsertWorkspace(workspaces: Workspace[], workspace: Workspace): Workspace[] {
+  const existingIndex = workspaces.findIndex((candidate) => candidate.id === workspace.id);
+  if (existingIndex === -1) {
+    return [...workspaces, workspace];
+  }
+
+  return workspaces.map((candidate, index) => (index === existingIndex ? workspace : candidate));
+}
+
+async function refreshPersistedWorkspaces() {
+  try {
+    const response = await electroview.rpc!.request.getWorkspaces();
+    const store = useAppStore.getState();
+    const workspaces = response.workspaces;
+
+    window.dispatchEvent(new CustomEvent<Workspace[]>("siloscope:workspaces-loaded", { detail: workspaces }));
+    if (!store.workspace && workspaces.length > 0) {
+      store.setWorkspace(workspaces[0]);
+      await setActiveWorkspace(workspaces[0]);
+    }
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error ? error.message : "Failed to load persisted workspaces.",
+    });
+  }
+}
+
+async function persistWorkspace(workspace: Workspace) {
+  try {
+    await electroview.rpc!.request.saveWorkspace({ workspace, path: undefined });
+    await setActiveWorkspace(workspace);
+    addWorkspaceToSession(workspace);
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error ? error.message : "Failed to persist workspace.",
+    });
+  }
 }
 
 async function loadWorkspace(path?: string) {
@@ -429,6 +730,7 @@ async function loadWorkspace(path?: string) {
     const store = useAppStore.getState();
 
     store.setWorkspace(response.workspace);
+    addWorkspaceToSession(response.workspace);
     store.setIsConnected(false);
     store.setInvocationResult(null);
     await refreshWorkspaceCatalog(response.workspace.id);
@@ -447,6 +749,10 @@ async function loadWorkspace(path?: string) {
   }
 }
 
+function addWorkspaceToSession(workspace: Workspace) {
+  window.dispatchEvent(new CustomEvent<Workspace>("siloscope:workspace-loaded", { detail: workspace }));
+}
+
 async function saveCurrentWorkspace(path?: string) {
   const workspace = useAppStore.getState().workspace;
   if (!workspace) {
@@ -460,6 +766,7 @@ async function saveCurrentWorkspace(path?: string) {
 
   try {
     await electroview.rpc!.request.saveWorkspace({ workspace, path });
+    addWorkspaceToSession(workspace);
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "info",
@@ -487,6 +794,10 @@ async function connectCluster() {
   }
 
   try {
+    if (!(await setActiveWorkspace(workspace))) {
+      return;
+    }
+
     const response = await electroview.rpc!.request.connectCluster({ workspace });
     const store = useAppStore.getState();
     store.setIsConnected(true);
@@ -495,6 +806,7 @@ async function connectCluster() {
       level: "info",
       message: response.message,
     });
+    await refreshWorkspaceCatalog(workspace.id);
   } catch (error) {
     const store = useAppStore.getState();
     store.setIsConnected(false);
@@ -529,6 +841,13 @@ async function disconnectCluster() {
 
 async function refreshWorkspaceCatalog(workspaceId: string) {
   try {
+    const workspace = useAppStore.getState().workspace;
+    if (workspace) {
+      if (!(await setActiveWorkspace(workspace))) {
+        return;
+      }
+    }
+
     const response = await electroview.rpc!.request.discoverGrains({ workspaceId });
     const store = useAppStore.getState();
 
@@ -612,6 +931,7 @@ async function searchNugetPackages(request: {
 async function addNugetPackageSource(request: {
   packageId: string;
   version: string;
+  gateway?: string;
   sourceUrl?: string;
   feedName?: string;
 }) {
@@ -619,8 +939,10 @@ async function addNugetPackageSource(request: {
     await electroview.rpc!.request.addNugetPackageSource(request);
   const store = useAppStore.getState();
   store.setWorkspace(response.workspace);
+  addWorkspaceToSession(response.workspace);
   store.setSourceCatalog({ sources: [] });
   store.setGrains([]);
+  await electroview.rpc!.request.saveWorkspace({ workspace: response.workspace, path: undefined });
   await refreshWorkspaceCatalog(response.workspace.id);
 }
 

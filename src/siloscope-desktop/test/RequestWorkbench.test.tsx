@@ -82,6 +82,10 @@ const sourceCatalog = {
                   name: "name",
                   typeName: "System.String",
                 },
+                {
+                  name: "cancellationToken",
+                  typeName: "System.Threading.CancellationToken",
+                },
               ],
             },
           ],
@@ -180,7 +184,7 @@ describe("RequestWorkbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
 
     expect(onInvoke).toHaveBeenCalledWith({
-      grainType: "IPlayerGrain",
+      grainType: "grain-1",
       grainKey: "player-1",
       keyType: "String",
       method: "SetName",
@@ -241,7 +245,7 @@ describe("RequestWorkbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
 
     expect(onInvoke).toHaveBeenCalledWith({
-      grainType: "IPlayerGrain",
+      grainType: "grain-1",
       grainKey: "player-1",
       keyType: "String",
       method: "SetName",

@@ -5,6 +5,7 @@ using FluentResults;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Serialization;
 using Orleans.Serialization.Configuration;
 using Siloscope.Core.Configuration;
@@ -15,13 +16,16 @@ namespace Siloscope.Core.Cluster;
 
 public sealed class OrleansClientConnector(
     ToolClusterOptions options,
-    IReadOnlyList<string>? interfaceAssemblyPaths = null
+    IReadOnlyList<string>? interfaceAssemblyPaths = null,
+    ILogger<OrleansClientConnector>? logger = null
 ) : IDisposable
 {
     private const int DefaultConnectTimeoutSeconds = 20;
     private const int MinConnectTimeoutSeconds = 3;
     private const int MaxConnectTimeoutSeconds = 300;
 
+    private readonly ILogger<OrleansClientConnector> _logger =
+        logger ?? NullLogger<OrleansClientConnector>.Instance;
     private IHost? _host;
     private IClusterClient? _client;
     private Action<string>? _diagnosticSink;
@@ -43,7 +47,7 @@ public sealed class OrleansClientConnector(
     {
         if (_client is not null)
         {
-            LogDiagnostic("Connect skipped: client already connected.");
+            _logger.LogInformation("Connect skipped: client already connected.");
             return Result.Ok("Already connected.");
         }
 
@@ -53,13 +57,20 @@ public sealed class OrleansClientConnector(
                 Environment.GetEnvironmentVariable("ORLEANS_TUI_CONNECT_TIMEOUT_SECONDS")
                 ?? "<unset>";
             var clusteringMode = ResolveClusteringProvider(options);
-            LogDiagnostic(
-                $"Connect requested: ClusterId='{options.ClusterId}', ServiceId='{options.ServiceId}', Clustering='{clusteringMode}', Gateways='{FormatGateways(options.GatewayEndpoints)}', InterfaceAssemblyPaths='{FormatAssemblyPaths(interfaceAssemblyPaths)}'."
+            _logger.LogInformation(
+                "Connect requested: ClusterId='{ClusterId}', ServiceId='{ServiceId}', Clustering='{Clustering}', Gateways='{Gateways}', InterfaceAssemblyPaths='{AssemblyPaths}'.",
+                options.ClusterId,
+                options.ServiceId,
+                clusteringMode,
+                FormatGateways(options.GatewayEndpoints),
+                FormatAssemblyPaths(interfaceAssemblyPaths)
             );
 
             var timeoutSeconds = ResolveConnectTimeoutSeconds();
-            LogDiagnostic(
-                $"Connect timeout: {timeoutSeconds}s (env ORLEANS_TUI_CONNECT_TIMEOUT_SECONDS='{rawTimeout}')."
+            _logger.LogInformation(
+                "Connect timeout: {TimeoutSeconds}s (env ORLEANS_TUI_CONNECT_TIMEOUT_SECONDS='{RawTimeout}').",
+                timeoutSeconds,
+                rawTimeout
             );
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken
@@ -77,7 +88,10 @@ public sealed class OrleansClientConnector(
                 StringComparison.OrdinalIgnoreCase
             );
 
-            LogDiagnostic($"Verbose host logging enabled: {verboseLogsEnabled}.");
+            _logger.LogInformation(
+                "Verbose host logging enabled: {VerboseLogsEnabled}.",
+                verboseLogsEnabled
+            );
 
             if (verboseLogsEnabled)
             {
@@ -87,13 +101,20 @@ public sealed class OrleansClientConnector(
             var resolvedAssemblies = ResolveInterfaceAssemblies(interfaceAssemblyPaths);
             if (resolvedAssemblies.Count > 0)
             {
-                LogDiagnostic(
-                    $"Interface assemblies resolved ({resolvedAssemblies.Count}): {string.Join(", ", resolvedAssemblies.Select(static a => a.GetName().Name))}"
+                _logger.LogInformation(
+                    "Interface assemblies resolved ({Count}): {AssemblyNames}",
+                    resolvedAssemblies.Count,
+                    string.Join(", ", resolvedAssemblies.Select(static a => a.GetName().Name))
                 );
 
                 var serializerAssemblies = ResolveSerializerAssemblies(resolvedAssemblies);
-                LogDiagnostic(
-                    $"Serializer assemblies ({serializerAssemblies.Count}): {string.Join(", ", serializerAssemblies.Select(static assembly => assembly.GetName().Name))}"
+                _logger.LogInformation(
+                    "Serializer assemblies ({Count}): {AssemblyNames}",
+                    serializerAssemblies.Count,
+                    string.Join(
+                        ", ",
+                        serializerAssemblies.Select(static assembly => assembly.GetName().Name)
+                    )
                 );
 
                 builder.Services.AddSerializer(serializer =>
@@ -107,13 +128,13 @@ public sealed class OrleansClientConnector(
                         ConfigureTypeManifest(manifestOptions, serializerAssemblies)
                     );
                 });
-                LogDiagnostic(
+                _logger.LogInformation(
                     "Serializer registration: interface assemblies added to Orleans type manifest."
                 );
             }
             else
             {
-                LogDiagnostic(
+                _logger.LogInformation(
                     "No interface assemblies resolved; serializer interface-assembly registration skipped."
                 );
             }
@@ -143,35 +164,44 @@ public sealed class OrleansClientConnector(
                         redisOptions.ConfigurationOptions = config;
                     });
 
-                    LogDiagnostic(
-                        $"Gateway mode: redis clustering discovery (DefaultDatabase={config.DefaultDatabase?.ToString() ?? "none"}, Endpoints={string.Join(", ", config.EndPoints.Select(static endpoint => endpoint.ToString()))})."
+                    _logger.LogInformation(
+                        "Gateway mode: redis clustering discovery (DefaultDatabase={DefaultDatabase}, Endpoints={Endpoints}).",
+                        config.DefaultDatabase?.ToString() ?? "none",
+                        string.Join(
+                            ", ",
+                            config.EndPoints.Select(static endpoint => endpoint.ToString())
+                        )
                     );
                 }
                 else if (options.GatewayEndpoints.Count == 0)
                 {
-                    LogDiagnostic("Gateway mode: localhost clustering.");
+                    _logger.LogInformation("Gateway mode: localhost clustering.");
                     client.UseLocalhostClustering();
                 }
                 else
                 {
                     var endpoints = options.GatewayEndpoints.Select(ParseEndpoint).ToArray();
-                    LogDiagnostic(
-                        $"Gateway mode: static clustering endpoints [{string.Join(", ", endpoints.Select(static endpoint => endpoint.ToString()))}]."
+                    _logger.LogInformation(
+                        "Gateway mode: static clustering endpoints [{Endpoints}].",
+                        string.Join(", ", endpoints.Select(static endpoint => endpoint.ToString()))
                     );
                     client.UseStaticClustering(endpoints);
                 }
             });
 
             _host = builder.Build();
-            LogDiagnostic("Host built. Starting Orleans client host...");
+            _logger.LogInformation("Host built. Starting Orleans client host...");
             await _host.StartAsync(timeoutCts.Token);
             _client = _host.Services.GetRequiredService<IClusterClient>();
-            LogDiagnostic($"Connected. Client runtime type='{_client.GetType().FullName}'.");
+            _logger.LogInformation(
+                "Connected. Client runtime type='{ClientType}'.",
+                _client.GetType().FullName
+            );
             return Result.Ok("Connected to Orleans cluster.");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            LogDiagnostic("Connection timed out.");
+            _logger.LogWarning("Connection timed out.");
             await CleanupHostAsync(CancellationToken.None);
             return Result.Ok(
                 $"Connection timed out after {ResolveConnectTimeoutSeconds()} seconds."
@@ -179,13 +209,18 @@ public sealed class OrleansClientConnector(
         }
         catch (OperationCanceledException)
         {
-            LogDiagnostic("Connection canceled by caller.");
+            _logger.LogWarning("Connection canceled by caller.");
             await CleanupHostAsync(CancellationToken.None);
             return Result.Fail("Connection canceled.");
         }
         catch (Exception ex)
         {
-            LogDiagnostic($"Connection failed with {ex.GetType().FullName}: {ex.Message}");
+            _logger.LogError(
+                ex,
+                "Connection failed with {ExceptionType}: {Message}",
+                ex.GetType().FullName,
+                ex.Message
+            );
             await CleanupHostAsync(CancellationToken.None);
             return Result.Fail($"Connection failed: {ex.Message}");
         }
@@ -264,11 +299,6 @@ public sealed class OrleansClientConnector(
         _host.Dispose();
         _host = null;
         _client = null;
-    }
-
-    private void LogDiagnostic(string message)
-    {
-        _diagnosticSink?.Invoke($"[Connect] {message}");
     }
 
     private static string FormatAssemblyPaths(IReadOnlyList<string>? paths)

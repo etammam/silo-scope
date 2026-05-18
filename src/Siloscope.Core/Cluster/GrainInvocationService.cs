@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 using FluentResults;
+using Microsoft.Extensions.Logging;
 using Siloscope.Core.Interfaces;
 
 namespace Siloscope.Core.Cluster;
@@ -10,10 +11,15 @@ namespace Siloscope.Core.Cluster;
 public sealed class GrainInvocationService : IGrainInvocationService
 {
     private readonly IOrleansClientConnectorPool _connectorPool;
+    private readonly ILogger<GrainInvocationService> _logger;
 
-    public GrainInvocationService(IOrleansClientConnectorPool connectorPool)
+    public GrainInvocationService(
+        IOrleansClientConnectorPool connectorPool,
+        ILogger<GrainInvocationService> logger
+    )
     {
         _connectorPool = connectorPool;
+        _logger = logger;
     }
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -62,15 +68,18 @@ public sealed class GrainInvocationService : IGrainInvocationService
 
         payloadJson ??= string.Empty;
 
-        LogSection(
-            "Invoke",
-            $"Start {grain.Name}.{method.MethodInfo.Name}, key='{grainKey}', payloadChars={payloadJson.Length}"
+        _logger.LogInformation(
+            "[Invoke] Start {GrainName}.{MethodName}, key='{GrainKey}', payloadChars={PayloadChars}",
+            grain.Name,
+            method.MethodInfo.Name,
+            grainKey,
+            payloadJson.Length
         );
-        LogSection("Payload", $"JSON={FormatPayloadForLog(payloadJson)}");
+        _logger.LogInformation("[Payload] JSON={JsonPayload}", FormatPayloadForLog(payloadJson));
 
         if (string.IsNullOrWhiteSpace(grainKey))
         {
-            LogSection("Invoke", "Rejected: empty grain key.");
+            _logger.LogError("[Invoke] Rejected: empty grain key.");
             return Result.Fail("Grain key is required.");
         }
 
@@ -79,99 +88,119 @@ public sealed class GrainInvocationService : IGrainInvocationService
             || connector is null
         )
         {
-            LogSection(
-                "Invoke",
-                $"Rejected: no connector for gateway '{grain.Gateway ?? "null"}'."
+            _logger.LogError(
+                "[Invoke] Rejected: no connector for gateway '{Gateway}'.",
+                grain.Gateway ?? "null"
             );
             return Result.Fail($"No connector available for gateway '{grain.Gateway}'.");
         }
 
+        _logger.LogInformation(
+            "[Invoke] Found connector for gateway {Gateway}, IsConnected={IsConnected}",
+            grain.Gateway,
+            connector.IsConnected
+        );
+
         if (!connector.TryGetClient(out var client))
         {
-            LogSection("Invoke", "Rejected: Orleans client is not connected.");
+            _logger.LogError("[Invoke] Rejected: Orleans client is not connected.");
             return Result.Fail("Client is not connected. Click Connect first.");
         }
 
         var keyType = DetectGrainKeyType(grain.InterfaceType);
         if (keyType == GrainKeyType.Unknown)
         {
-            LogSection("Invoke", $"Rejected: unsupported key type for '{grain.Name}'.");
+            _logger.LogError(
+                "[Invoke] Rejected: unsupported key type for '{GrainName}'.",
+                grain.Name
+            );
             return Result.Fail(
                 $"Grain '{grain.Name}' does not implement a supported key interface (string, integer, guid, or compound)."
             );
         }
 
-        LogSection("Invoke", $"Detected grain key type: {keyType}.");
+        _logger.LogInformation("[Invoke] Detected grain key type: {KeyType}.", keyType);
 
-        LogSection(
-            "TypeLoad",
-            $"Discovered interface '{grain.InterfaceType.FullName}' in '{grain.InterfaceType.Assembly.FullName}'."
+        _logger.LogInformation(
+            "[TypeLoad] Discovered interface '{InterfaceType}' in '{AssemblyName}'.",
+            grain.InterfaceType.FullName,
+            grain.InterfaceType.Assembly.FullName
         );
-        LogSection("TypeLoad", BuildTypeDiagnostics(grain.InterfaceType, "catalog"));
-        LogSection("TypeLoad", $"Discovered method '{BuildMethodSignature(method.MethodInfo)}'.");
+        _logger.LogInformation(
+            "[TypeLoad] {Diagnostics}",
+            BuildTypeDiagnostics(grain.InterfaceType, "catalog")
+        );
+        _logger.LogInformation(
+            "[TypeLoad] Discovered method '{MethodSignature}'.",
+            BuildMethodSignature(method.MethodInfo)
+        );
 
         var runtimeResolution = ResolveRuntimeTargets(grain.InterfaceType, method.MethodInfo);
         if (!runtimeResolution.IsSuccess)
         {
             foreach (var error in runtimeResolution.Errors)
             {
-                LogSection("TypeLoad", $"Failed: {error.Message}");
+                _logger.LogWarning("[TypeLoad] Failed: {ErrorMessage}", error.Message);
             }
 
             return Result.Fail(errors: runtimeResolution.Errors);
         }
 
         var (runtimeInterfaceType, runtimeMethodInfo) = runtimeResolution.Value;
-        LogSection("TypeLoad", BuildTypeDiagnostics(runtimeInterfaceType, "runtime"));
-        LogSection("TypeLoad", $"Resolved method '{BuildMethodSignature(runtimeMethodInfo)}'.");
+        _logger.LogInformation(
+            "[TypeLoad] {Diagnostics}",
+            BuildTypeDiagnostics(runtimeInterfaceType, "runtime")
+        );
+        _logger.LogInformation(
+            "[TypeLoad] Resolved method '{MethodSignature}'.",
+            BuildMethodSignature(runtimeMethodInfo)
+        );
 
         try
         {
             if (client is not IGrainFactory grainFactory)
             {
-                LogSection("Invoke", "Rejected: connected client is not an IGrainFactory.");
+                _logger.LogWarning("[Invoke] Rejected: connected client is not an IGrainFactory.");
                 return Result.Fail("Connected Orleans client does not expose IGrainFactory.");
             }
 
-            var grainRef = ResolveGrain(
-                grainFactory,
-                runtimeInterfaceType,
-                keyType,
-                grainKey,
-                LogSection
-            );
+            var grainRef = ResolveGrain(grainFactory, runtimeInterfaceType, keyType, grainKey);
             if (!grainRef.IsSuccess)
             {
                 foreach (var error in grainRef.Errors)
                 {
-                    LogSection("Invoke", $"Grain resolution failed: {error.Message}");
+                    _logger.LogError(
+                        "[Invoke] Grain resolution failed: {ErrorMessage}",
+                        error.Message
+                    );
                 }
 
                 return Result.Fail(errors: grainRef.Errors);
             }
 
             var grainReference = grainRef.Value!;
-            LogSection(
-                "Invoke",
-                $"Grain reference resolved as '{grainReference.GetType().FullName}'."
+            _logger.LogInformation(
+                "[Invoke] Grain reference resolved as '{GrainReferenceType}'.",
+                grainReference.GetType().FullName
             );
 
             serializationStopwatch.Start();
             var arguments = BindArguments(runtimeMethodInfo, payloadJson);
             serializationStopwatch.Stop();
 
-            LogSection(
-                "Bind",
-                $"Bound {arguments.Length} argument(s). [{DescribeArguments(runtimeMethodInfo, arguments)}]"
+            _logger.LogInformation(
+                "[Bind] Bound {ArgCount} argument(s). [{Arguments}]",
+                arguments.Length,
+                DescribeArguments(runtimeMethodInfo, arguments)
             );
 
             var executionStopwatch = Stopwatch.StartNew();
             var rawResult = runtimeMethodInfo.Invoke(grainReference, arguments);
             executionStopwatch.Stop();
 
-            LogSection(
-                "Invoke",
-                $"Method invocation returned '{rawResult?.GetType().FullName ?? "null"}'."
+            _logger.LogInformation(
+                "[Invoke] Method invocation returned '{ResultType}'.",
+                rawResult?.GetType().FullName ?? "null"
             );
 
             var normalized = await AwaitResultAsync(
@@ -179,16 +208,19 @@ public sealed class GrainInvocationService : IGrainInvocationService
                 runtimeMethodInfo.ReturnType,
                 cancellationToken
             );
-            LogSection(
-                "Result",
-                $"Normalized result type '{normalized?.GetType().FullName ?? "null"}'."
+            _logger.LogInformation(
+                "[Result] Normalized result type '{ResultType}'.",
+                normalized?.GetType().FullName ?? "null"
             );
 
             serializationStopwatch.Start();
             var response = JsonSerializer.Serialize(normalized, SerializerOptions);
             serializationStopwatch.Stop();
 
-            LogSection("Result", $"Serialized response size={response.Length} chars.");
+            _logger.LogInformation(
+                "[Result] Serialized response size={ResponseSize} chars.",
+                response.Length
+            );
 
             totalStopwatch.Stop();
 
@@ -213,17 +245,15 @@ public sealed class GrainInvocationService : IGrainInvocationService
                 flattened += " | " + BuildTypeDiagnostics(runtimeInterfaceType, "runtime");
             }
 
-            LogSection("Error", flattened);
-            LogSection("Error", $"Exception chain: {BuildExceptionChain(ex)}");
-            LogSection("Error", $"Stack trace: {ex}");
+            _logger.LogWarning("[Error] {ErrorDetails}", flattened);
+            _logger.LogWarning(
+                "[Error] Exception chain: {ExceptionChain}",
+                BuildExceptionChain(ex)
+            );
+            _logger.LogError(ex, "[Error] Stack trace: {StackTrace}", ex);
 
             return Result.Fail($"Invocation failed: {flattened}");
         }
-    }
-
-    private void LogSection(string section, string message)
-    {
-        _diagnosticSink?.Invoke($"[{section}] {message}");
     }
 
     private static string BuildMethodSignature(MethodInfo methodInfo)
@@ -307,23 +337,25 @@ public sealed class GrainInvocationService : IGrainInvocationService
         var fullName = discoveredInterfaceType.FullName;
         if (string.IsNullOrWhiteSpace(fullName))
         {
-            LogSection(
-                "TypeLoad",
-                "Type resolution skipped: discovered interface has no full name."
+            _logger.LogWarning(
+                "[TypeLoad] Type resolution skipped: discovered interface has no full name."
             );
             return null;
         }
 
-        LogSection("TypeLoad", $"Resolving type '{fullName}' in AssemblyLoadContext.Default.");
+        _logger.LogInformation(
+            "[TypeLoad] Resolving type '{FullName}' in AssemblyLoadContext.Default.",
+            fullName
+        );
 
         foreach (var assembly in AssemblyLoadContext.Default.Assemblies)
         {
             var found = assembly.GetType(fullName, throwOnError: false, ignoreCase: false);
             if (found is not null)
             {
-                LogSection(
-                    "TypeLoad",
-                    $"Resolved from already loaded assembly '{assembly.FullName}'."
+                _logger.LogInformation(
+                    "[TypeLoad] Resolved from already loaded assembly '{AssemblyName}'.",
+                    assembly.FullName
                 );
                 return found;
             }
@@ -337,24 +369,27 @@ public sealed class GrainInvocationService : IGrainInvocationService
             var byNameType = loadedByName.GetType(fullName, throwOnError: false, ignoreCase: false);
             if (byNameType is not null)
             {
-                LogSection(
-                    "TypeLoad",
-                    $"Resolved after LoadFromAssemblyName('{discoveredInterfaceType.Assembly.GetName().Name}')."
+                _logger.LogInformation(
+                    "[TypeLoad] Resolved after LoadFromAssemblyName('{AssemblyName}').",
+                    discoveredInterfaceType.Assembly.GetName().Name
                 );
                 return byNameType;
             }
         }
         catch (Exception ex)
         {
-            LogSection("TypeLoad", $"LoadFromAssemblyName failed: {ex.Message}");
+            _logger.LogWarning(
+                "[TypeLoad] LoadFromAssemblyName failed: {ErrorMessage}",
+                ex.Message
+            );
         }
 
         var assemblyPath = discoveredInterfaceType.Assembly.Location;
         if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath))
         {
-            LogSection(
-                "TypeLoad",
-                $"Type resolution fallback skipped: assembly path not found for '{discoveredInterfaceType.Assembly.FullName}'."
+            _logger.LogWarning(
+                "[TypeLoad] Type resolution fallback skipped: assembly path not found for '{AssemblyFullName}'.",
+                discoveredInterfaceType.Assembly.FullName
             );
             return null;
         }
@@ -365,14 +400,20 @@ public sealed class GrainInvocationService : IGrainInvocationService
             var resolved = assembly.GetType(fullName, throwOnError: false, ignoreCase: false);
             if (resolved is not null)
             {
-                LogSection("TypeLoad", $"Resolved after LoadFromAssemblyPath('{assemblyPath}').");
+                _logger.LogInformation(
+                    "[TypeLoad] Resolved after LoadFromAssemblyPath('{AssemblyPath}').",
+                    assemblyPath
+                );
             }
 
             return resolved;
         }
         catch (Exception ex)
         {
-            LogSection("TypeLoad", $"LoadFromAssemblyPath failed: {ex.Message}");
+            _logger.LogWarning(
+                "[TypeLoad] LoadFromAssemblyPath failed: {ErrorMessage}",
+                ex.Message
+            );
             return null;
         }
     }
@@ -459,12 +500,11 @@ public sealed class GrainInvocationService : IGrainInvocationService
         };
     }
 
-    private static Result<object> ResolveGrain(
+    private Result<object> ResolveGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
         GrainKeyType keyType,
-        string grainKey,
-        Action<string, string>? logSection = null
+        string grainKey
     )
     {
         return keyType switch
@@ -472,42 +512,32 @@ public sealed class GrainInvocationService : IGrainInvocationService
             GrainKeyType.String => ResolveStringKeyGrain(
                 grainFactory,
                 grainInterfaceType,
-                grainKey,
-                logSection
+                grainKey
             ),
             GrainKeyType.Integer => ResolveIntegerKeyGrain(
                 grainFactory,
                 grainInterfaceType,
-                grainKey,
-                logSection
+                grainKey
             ),
-            GrainKeyType.Guid => ResolveGuidKeyGrain(
-                grainFactory,
-                grainInterfaceType,
-                grainKey,
-                logSection
-            ),
+            GrainKeyType.Guid => ResolveGuidKeyGrain(grainFactory, grainInterfaceType, grainKey),
             GrainKeyType.IntegerCompound => ResolveIntegerCompoundKeyGrain(
                 grainFactory,
                 grainInterfaceType,
-                grainKey,
-                logSection
+                grainKey
             ),
             GrainKeyType.GuidCompound => ResolveGuidCompoundKeyGrain(
                 grainFactory,
                 grainInterfaceType,
-                grainKey,
-                logSection
+                grainKey
             ),
             _ => Result.Fail($"Unsupported grain key type for '{grainInterfaceType.Name}'."),
         };
     }
 
-    private static Result<object> ResolveStringKeyGrain(
+    private Result<object> ResolveStringKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
-        string grainKey,
-        Action<string, string>? logSection = null
+        string grainKey
     )
     {
         try
@@ -518,23 +548,22 @@ public sealed class GrainInvocationService : IGrainInvocationService
                 typeof(string),
                 grainKey
             );
-            logSection?.Invoke("Invoke", "Grain reference path: GetGrain<T>(string).");
+            _logger.LogInformation("[Invoke] Grain reference path: GetGrain<T>(string).");
             return Result.Ok<object>(genericRef);
         }
         catch (Exception ex)
         {
-            logSection?.Invoke("Invoke", $"GetGrain<T>(string) failed: {FlattenException(ex)}");
+            _logger.LogError("[Invoke] GetGrain<T>(string) failed: {Error}", FlattenException(ex));
             return Result.Fail<object>(
                 $"Failed to resolve string-key grain: {FlattenException(ex)}"
             );
         }
     }
 
-    private static Result<object> ResolveIntegerKeyGrain(
+    private Result<object> ResolveIntegerKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
-        string grainKey,
-        Action<string, string>? logSection = null
+        string grainKey
     )
     {
         if (!long.TryParse(grainKey, out var longKey))
@@ -550,23 +579,22 @@ public sealed class GrainInvocationService : IGrainInvocationService
                 typeof(long),
                 longKey
             );
-            logSection?.Invoke("Invoke", "Grain reference path: GetGrain<T>(long).");
+            _logger.LogInformation("[Invoke] Grain reference path: GetGrain<T>(long).");
             return Result.Ok<object>(genericRef);
         }
         catch (Exception ex)
         {
-            logSection?.Invoke("Invoke", $"GetGrain<T>(long) failed: {FlattenException(ex)}");
+            _logger.LogWarning("[Invoke] GetGrain<T>(long) failed: {Error}", FlattenException(ex));
             return Result.Fail<object>(
                 $"Failed to resolve integer-key grain: {FlattenException(ex)}"
             );
         }
     }
 
-    private static Result<object> ResolveGuidKeyGrain(
+    private Result<object> ResolveGuidKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
-        string grainKey,
-        Action<string, string>? logSection = null
+        string grainKey
     )
     {
         if (!Guid.TryParse(grainKey, out var guidKey))
@@ -582,21 +610,20 @@ public sealed class GrainInvocationService : IGrainInvocationService
                 typeof(Guid),
                 guidKey
             );
-            logSection?.Invoke("Invoke", "Grain reference path: GetGrain<T>(Guid).");
+            _logger.LogInformation("[Invoke] Grain reference path: GetGrain<T>(Guid).");
             return Result.Ok<object>(genericRef);
         }
         catch (Exception ex)
         {
-            logSection?.Invoke("Invoke", $"GetGrain<T>(Guid) failed: {FlattenException(ex)}");
+            _logger.LogWarning("[Invoke] GetGrain<T>(Guid) failed: {Error}", FlattenException(ex));
             return Result.Fail<object>($"Failed to resolve GUID-key grain: {FlattenException(ex)}");
         }
     }
 
-    private static Result<object> ResolveIntegerCompoundKeyGrain(
+    private Result<object> ResolveIntegerCompoundKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
-        string grainKey,
-        Action<string, string>? logSection = null
+        string grainKey
     )
     {
         var (primaryKey, keyExtension) = ParseCompoundKey(grainKey);
@@ -624,17 +651,17 @@ public sealed class GrainInvocationService : IGrainInvocationService
             var result =
                 closed.Invoke(grainFactory, [longKey, keyExtension])
                 ?? throw new InvalidOperationException("GetGrain returned null.");
-            logSection?.Invoke(
-                "Invoke",
-                $"Grain reference path: GetGrain<T>(long, string) with extension='{keyExtension}'."
+            _logger.LogInformation(
+                "[Invoke] Grain reference path: GetGrain<T>(long, string) with extension='{KeyExtension}'.",
+                keyExtension
             );
             return Result.Ok<object>(result);
         }
         catch (Exception ex)
         {
-            logSection?.Invoke(
-                "Invoke",
-                $"GetGrain<T>(long, string) failed: {FlattenException(ex)}"
+            _logger.LogWarning(
+                "[Invoke] GetGrain<T>(long, string) failed: {Error}",
+                FlattenException(ex)
             );
             return Result.Fail<object>(
                 $"Failed to resolve integer-compound-key grain: {FlattenException(ex)}"
@@ -642,11 +669,10 @@ public sealed class GrainInvocationService : IGrainInvocationService
         }
     }
 
-    private static Result<object> ResolveGuidCompoundKeyGrain(
+    private Result<object> ResolveGuidCompoundKeyGrain(
         IGrainFactory grainFactory,
         Type grainInterfaceType,
-        string grainKey,
-        Action<string, string>? logSection = null
+        string grainKey
     )
     {
         var (primaryKey, keyExtension) = ParseCompoundKey(grainKey);
@@ -674,17 +700,17 @@ public sealed class GrainInvocationService : IGrainInvocationService
             var result =
                 closed.Invoke(grainFactory, [guidKey, keyExtension])
                 ?? throw new InvalidOperationException("GetGrain returned null.");
-            logSection?.Invoke(
-                "Invoke",
-                $"Grain reference path: GetGrain<T>(Guid, string) with extension='{keyExtension}'."
+            _logger.LogInformation(
+                "[Invoke] Grain reference path: GetGrain<T>(Guid, string) with extension='{KeyExtension}'.",
+                keyExtension
             );
             return Result.Ok<object>(result);
         }
         catch (Exception ex)
         {
-            logSection?.Invoke(
-                "Invoke",
-                $"GetGrain<T>(Guid, string) failed: {FlattenException(ex)}"
+            _logger.LogWarning(
+                "[Invoke] GetGrain<T>(Guid, string) failed: {Error}",
+                FlattenException(ex)
             );
             return Result.Fail<object>(
                 $"Failed to resolve GUID-compound-key grain: {FlattenException(ex)}"

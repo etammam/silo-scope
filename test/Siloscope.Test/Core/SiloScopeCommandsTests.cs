@@ -14,6 +14,11 @@ using Xunit;
 
 namespace Siloscope.Test.Core;
 
+public interface ITokenAwareGrain : IGrainWithStringKey
+{
+    Task<string> GetAsync(string tenantId, CancellationToken cancellationToken);
+}
+
 public sealed class SiloScopeCommandsTests
 {
     private readonly Mock<IOrleansClientConnectorPool> _connectorPoolMock;
@@ -113,6 +118,58 @@ public sealed class SiloScopeCommandsTests
     }
 
     [Fact]
+    public async Task ConnectClusterAsync_WithWorkspaceSources_ConfiguresDiscoveredGatewayConnectors()
+    {
+        var assemblyPath = typeof(ITestStringGrain).Assembly.Location;
+        SetWorkspace(
+            new Workspace
+            {
+                Id = "workspace-1",
+                Silos =
+                [
+                    new Siloscope.Core.Components.Workspace.SiloSource
+                    {
+                        Reference = assemblyPath,
+                        Source = "DLL",
+                        Gateway = "127.0.0.1:30000",
+                        Enabled = true,
+                    },
+                ],
+            }
+        );
+
+        InterfaceCatalog? capturedCatalog = null;
+        IReadOnlyList<InterfaceEntry>? capturedEntries = null;
+        _connectorPoolMock
+            .Setup(p =>
+                p.Configure(
+                    It.IsAny<ToolClusterOptions>(),
+                    It.IsAny<InterfaceCatalog>(),
+                    It.IsAny<IReadOnlyList<InterfaceEntry>?>()
+                )
+            )
+            .Callback<ToolClusterOptions, InterfaceCatalog, IReadOnlyList<InterfaceEntry>?>(
+                (_, catalog, entries) =>
+                {
+                    capturedCatalog = catalog;
+                    capturedEntries = entries;
+                }
+            );
+        _connectorPoolMock
+            .Setup(p => p.ConnectAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Ok("Connected to 1 gateway(s)."));
+
+        var result = await _commands.ConnectClusterAsync(
+            new ClusterOptions("test-cluster", "test-service", ["127.0.0.1:30000"])
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        capturedCatalog.Should().NotBeNull();
+        capturedCatalog!.Gateways.Should().Contain("127.0.0.1:30000");
+        capturedEntries.Should().ContainSingle(entry => entry.Gateway == "127.0.0.1:30000");
+    }
+
+    [Fact]
     public async Task DisconnectClusterAsync_CallsDisconnectOnPool()
     {
         _connectorPoolMock
@@ -126,6 +183,48 @@ public sealed class SiloScopeCommandsTests
             p => p.DisconnectAllAsync(It.IsAny<CancellationToken>()),
             Times.Once
         );
+    }
+
+    [Fact]
+    public async Task SetWorkspaceAsync_StoresActiveWorkspaceForDiscovery()
+    {
+        var workspace = new Siloscope.Core.Endpoints.WorkspaceInfo(
+            "workspace-1",
+            "Local",
+            "Local dev workspace",
+            new ClusterOptions("dev", "SiloScope", ["127.0.0.1:30000"]),
+            [new Siloscope.Core.Endpoints.SiloSource("missing.dll", "DLL", null, null, false)],
+            new Dictionary<string, string> { ["ASPNETCORE_ENVIRONMENT"] = "Development" }
+        );
+
+        var setResult = await _commands.SetWorkspaceAsync(workspace);
+        var discoverResult = await _commands.DiscoverSourceCatalogAsync();
+
+        setResult.IsSuccess.Should().BeTrue();
+        setResult.Value.Cluster.GatewayEndpoints.Should().ContainSingle("127.0.0.1:30000");
+        setResult.Value.Silos.Should().ContainSingle(source => source.Reference == "missing.dll");
+        discoverResult.IsSuccess.Should().BeTrue();
+        discoverResult
+            .Value.Sources.Should()
+            .ContainSingle(source => source.Reference == "missing.dll" && source.Enabled == false);
+    }
+
+    [Fact]
+    public async Task ListWorkspacesAsync_ReturnsPersistedWorkspaceSummaries()
+    {
+        var workspace = CreateTestWorkspace();
+        workspace.Id = "workspace-1";
+        workspace.WorkspaceInfo.Name = "Actors Workspace";
+        _workspaceServiceMock.Setup(service => service.ListAsync()).ReturnsAsync([workspace]);
+
+        var result = await _commands.ListWorkspacesAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result
+            .Value.Should()
+            .ContainSingle(summary =>
+                summary.Id == "workspace-1" && summary.Name == "Actors Workspace"
+            );
     }
 
     [Fact]
@@ -377,6 +476,111 @@ public sealed class SiloScopeCommandsTests
         result.Value.Timing.SerializationMs.Should().Be(1);
         result.Value.Timing.ExecutionMs.Should().Be(10);
         result.Value.Timing.TotalMs.Should().Be(15);
+    }
+
+    [Fact]
+    public async Task InvokeGrainAsync_WithFunctionId_ResolvesSourceOwnedGrain()
+    {
+        var methodInfo = typeof(ITestStringGrain).GetMethod("Echo")!;
+        var sourceId = "NuGet:Contracts:1.2.3:";
+        var signature = "string Echo()";
+        var functionId = $"{sourceId}:{typeof(ITestStringGrain).FullName}:{signature}";
+        var catalog = new InterfaceCatalog(
+            [
+                new GrainInterfaceDescriptor(
+                    typeof(ITestStringGrain).FullName!,
+                    typeof(ITestStringGrain),
+                    [new GrainMethodDescriptor(signature, methodInfo)],
+                    "localhost:30000",
+                    sourceId
+                ),
+            ],
+            ["/test/path.dll"]
+        );
+        SetCatalog(catalog);
+
+        GrainInterfaceDescriptor? invokedGrain = null;
+        _grainInvocationServiceMock
+            .Setup(s =>
+                s.InvokeWithTimingAsync(
+                    It.IsAny<GrainInterfaceDescriptor>(),
+                    It.IsAny<GrainMethodDescriptor>(),
+                    "key123",
+                    "{}",
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .Callback<
+                GrainInterfaceDescriptor,
+                GrainMethodDescriptor,
+                string,
+                string?,
+                CancellationToken
+            >((grain, _, _, _, _) => invokedGrain = grain)
+            .ReturnsAsync(
+                Result.Ok(("{\"result\": \"success\"}", new InvocationTiming(1, 10, 15)))
+            );
+
+        var result = await _commands.InvokeGrainAsync(
+            "ITestStringGrain",
+            "Echo",
+            "key123",
+            "{}",
+            sourceId,
+            functionId
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        invokedGrain.Should().NotBeNull();
+        invokedGrain!.Name.Should().Be(typeof(ITestStringGrain).FullName);
+    }
+
+    [Fact]
+    public async Task DiscoverSourceCatalogAsync_OmitsCancellationTokenParameters()
+    {
+        var sourceId = "DLL:Contracts.dll::";
+        SetWorkspace(
+            new Workspace
+            {
+                Id = "test",
+                Silos =
+                [
+                    new Siloscope.Core.Components.Workspace.SiloSource
+                    {
+                        Reference = "Contracts.dll",
+                        Source = "DLL",
+                        Enabled = true,
+                    },
+                ],
+            }
+        );
+        SetCatalog(
+            new InterfaceCatalog(
+                [
+                    new GrainInterfaceDescriptor(
+                        typeof(ITokenAwareGrain).FullName!,
+                        typeof(ITokenAwareGrain),
+                        [
+                            new GrainMethodDescriptor(
+                                "Task<String> GetAsync(String tenantId)",
+                                typeof(ITokenAwareGrain).GetMethod(
+                                    nameof(ITokenAwareGrain.GetAsync)
+                                )!
+                            ),
+                        ],
+                        null,
+                        sourceId
+                    ),
+                ],
+                []
+            )
+        );
+
+        var result = await _commands.DiscoverSourceCatalogAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Sources[0].Interfaces[0].Methods[0].Parameters.Should().ContainSingle();
+        result.Value.Sources[0].Interfaces[0].Methods[0].Parameters[0].Name.Should().Be("tenantId");
     }
 
     private void SetWorkspace(Workspace workspace)

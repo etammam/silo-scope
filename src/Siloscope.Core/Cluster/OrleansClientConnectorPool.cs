@@ -1,4 +1,5 @@
 using FluentResults;
+using Microsoft.Extensions.Logging;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.Interfaces;
 
@@ -9,18 +10,25 @@ public sealed class OrleansClientConnectorPool : IOrleansClientConnectorPool, ID
     private readonly Dictionary<string, OrleansClientConnector> _connectors = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private readonly ILogger<OrleansClientConnectorPool>? _logger;
     private ToolClusterOptions? _clusterOptions;
     private List<string>? _assemblyPaths;
 
-    public OrleansClientConnectorPool() { }
+    public OrleansClientConnectorPool(ILogger<OrleansClientConnectorPool>? logger = null)
+    {
+        _logger = logger;
+        _logger?.LogInformation("OrleansClientConnectorPool created (no args)");
+    }
 
     public OrleansClientConnectorPool(
         ToolClusterOptions clusterOptions,
         InterfaceCatalog catalog,
-        IReadOnlyList<InterfaceEntry> entries
+        IReadOnlyList<InterfaceEntry> entries,
+        ILogger<OrleansClientConnectorPool>? logger = null
     )
-        : this()
+        : this(logger)
     {
+        _logger?.LogInformation("OrleansClientConnectorPool created (with cluster options)");
         Configure(clusterOptions, catalog, entries);
     }
 
@@ -30,8 +38,20 @@ public sealed class OrleansClientConnectorPool : IOrleansClientConnectorPool, ID
         IReadOnlyList<InterfaceEntry>? entries = null
     )
     {
+        foreach (var connector in _connectors.Values)
+        {
+            connector.Dispose();
+        }
+
+        _connectors.Clear();
         _clusterOptions = clusterOptions;
         _assemblyPaths = catalog.AssemblyPaths.Count > 0 ? catalog.AssemblyPaths.ToList() : null;
+
+        _logger?.LogInformation(
+            "Configure: catalog has {GatewayCount} gateways: {Gateways}",
+            catalog.Gateways.Count,
+            string.Join(", ", catalog.Gateways)
+        );
 
         var gatewayToAssemblyPaths = new Dictionary<string, List<string>>(
             StringComparer.OrdinalIgnoreCase
@@ -73,6 +93,12 @@ public sealed class OrleansClientConnectorPool : IOrleansClientConnectorPool, ID
         {
             _connectors["localhost"] = new OrleansClientConnector(clusterOptions, _assemblyPaths);
         }
+
+        _logger?.LogInformation(
+            "Configured {ConnectorCount} connectors: {Connectors}",
+            _connectors.Count,
+            string.Join(", ", _connectors.Keys)
+        );
     }
 
     public async Task DisconnectAllAsync(CancellationToken cancellationToken = default)
@@ -99,14 +125,39 @@ public sealed class OrleansClientConnectorPool : IOrleansClientConnectorPool, ID
     {
         var errors = new List<string>();
 
+        _logger?.LogInformation(
+            "ConnectAllAsync: connecting to {Count} connectors",
+            _connectors.Count
+        );
+
         foreach (var (gateway, connector) in _connectors)
         {
+            _logger?.LogInformation("Connecting to gateway {Gateway}", gateway);
             var result = await connector.ConnectAsync(cancellationToken);
             if (result.IsFailed)
             {
+                _logger?.LogWarning(
+                    "Gateway {Gateway} connection failed: {Error}",
+                    gateway,
+                    result.Errors.Select(e => e.Message)
+                );
                 errors.AddRange(result.Errors.Select(e => $"[{gateway}] {e.Message}"));
             }
+            else
+            {
+                _logger?.LogInformation(
+                    "Gateway {Gateway} connected: {Message}",
+                    gateway,
+                    result.Value
+                );
+            }
         }
+
+        _logger?.LogInformation(
+            "After ConnectAllAsync, IsConnected={IsConnected}, connectors: {Status}",
+            IsConnected,
+            string.Join(", ", _connectors.Select(kv => $"{kv.Key}={kv.Value.IsConnected}"))
+        );
 
         return errors.Count > 0
             ? Result.Fail($"Connection errors:\n{string.Join("\n", errors)}")
@@ -117,17 +168,29 @@ public sealed class OrleansClientConnectorPool : IOrleansClientConnectorPool, ID
     {
         connector = null;
 
+        _logger?.LogDebug(
+            "TryGetConnectorForGateway: looking for '{Gateway}', available: {Keys}",
+            gateway ?? "null",
+            string.Join(", ", _connectors.Keys)
+        );
+
         if (gateway is not null && _connectors.TryGetValue(gateway, out connector))
         {
+            _logger?.LogDebug(
+                "TryGetConnectorForGateway: found exact match for '{Gateway}'",
+                gateway
+            );
             return true;
         }
 
         if (_connectors.Count > 0)
         {
             connector = _connectors.Values.First();
+            _logger?.LogDebug("TryGetConnectorForGateway: falling back to first connector");
             return true;
         }
 
+        _logger?.LogWarning("TryGetConnectorForGateway: no connectors available");
         return false;
     }
 

@@ -159,52 +159,34 @@ export function RequestWorkbench({
       return;
     }
 
-    onInvoke({
-      grainType: activeFunction?.interfaceName ?? activeGrain!.interfaceName,
+    const request = {
+      grainType: activeFunction?.interfaceId ?? activeGrain!.interfaceName,
       grainKey: grainKey.trim(),
       keyType,
       method: activeFunction?.methodName ?? activeMethod.name,
       payload,
-      sourceId: activeFunction?.sourceId,
-      functionId: activeFunction?.functionId,
-    });
+      ...(activeFunction
+        ? {
+            sourceId: activeFunction.sourceId,
+            functionId: activeFunction.functionId,
+          }
+        : {}),
+    };
+
+    onInvoke(request);
   };
 
   return (
     <section className="request-workbench" aria-labelledby="request-workbench-title">
       <div className="request-workbench__toolbar">
-        <span id="request-workbench-title">Request</span>
-        <span>{activeFunction ? activeFunction.signature : activeMethod ? formatMethodLabel(activeMethod) : "No method selected"}</span>
+        <div className="request-workbench__title">
+          <span id="request-workbench-title">Request</span>
+          <strong>{activeSource?.label ?? "No collection selected"}</strong>
+        </div>
+        <span>{activeFunction ? activeFunction.signature : activeMethod ? formatMethodLabel(activeMethod) : "Pick a function from the catalog"}</span>
       </div>
 
-      <div className="request-workbench__selection" aria-label="Selected function">
-        <div>
-          <span>Source</span>
-          <strong>{activeSource?.label ?? "No source selected"}</strong>
-        </div>
-        <div>
-          <span>Interface</span>
-          <strong>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</strong>
-        </div>
-        <div>
-          <span>Method</span>
-          <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
-        </div>
-        <div>
-          <span>Key</span>
-          <strong>{activeFunction?.keyType ?? keyType}</strong>
-        </div>
-        <div>
-          <span>Return</span>
-          <strong>{activeFunction?.returnType ?? activeMethod?.returnType ?? "unknown"}</strong>
-        </div>
-        <div>
-          <span>Parameters</span>
-          <strong>{formatParameterList(activeFunction?.parameters ?? activeMethod?.parameters ?? [])}</strong>
-        </div>
-      </div>
-
-      <div className="request-workbench__controls">
+      <div className="request-workbench__request-line">
         <label>
           <span>Grain</span>
           <select value={selectedGrain ?? ""} onChange={(event) => handleGrainChange(event.target.value)}>
@@ -251,6 +233,36 @@ export function RequestWorkbench({
             onChange={(event) => setGrainKey(event.target.value)}
           />
         </label>
+
+        <button className="request-workbench__invoke-button" disabled={!canInvoke} onClick={handleInvoke} type="button">
+          Invoke Grain
+        </button>
+      </div>
+
+      <div className="request-workbench__tabs" aria-label="Request sections">
+        <button aria-selected="true" type="button">Payload</button>
+        <button type="button">Selection</button>
+        <button type="button">Context</button>
+        <button type="button">Docs</button>
+      </div>
+
+      <div className="request-workbench__selection" aria-label="Selected function">
+        <div>
+          <span>Interface</span>
+          <strong>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</strong>
+        </div>
+        <div>
+          <span>Method</span>
+          <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
+        </div>
+        <div>
+          <span>Return</span>
+          <strong>{activeFunction?.returnType ?? activeMethod?.returnType ?? "unknown"}</strong>
+        </div>
+        <div>
+          <span>Parameters</span>
+          <strong>{formatParameterList(visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []))}</strong>
+        </div>
       </div>
 
       <div className="request-workbench__editor">
@@ -272,9 +284,7 @@ export function RequestWorkbench({
         <span className={payloadError ? "request-workbench__status request-workbench__status--error" : "request-workbench__status"}>
           {payloadError ?? "JSON valid"}
         </span>
-        <button disabled={!canInvoke} onClick={handleInvoke} type="button">
-          Invoke Grain
-        </button>
+        <span>{activeFunction?.keyType ?? keyType} key</span>
       </div>
     </section>
   );
@@ -289,13 +299,13 @@ function formatMethodLabel(method: GrainMethodDescriptor): string {
     return `${method.name}()`;
   }
 
-  return `${method.name}(${method.parameters.map((parameter) => parameter.name).join(", ")})`;
+  return `${method.name}(${visibleParameters(method.parameters).map((parameter) => parameter.name).join(", ")})`;
 }
 
 function toGrainMethod(catalogFunction: SourceCatalogFunction): GrainMethodDescriptor {
   return {
     name: catalogFunction.methodName,
-    parameters: catalogFunction.parameters,
+    parameters: visibleParameters(catalogFunction.parameters),
     signature: catalogFunction.signature,
     returnType: catalogFunction.returnType,
     keyType: catalogFunction.keyType,
@@ -303,11 +313,12 @@ function toGrainMethod(catalogFunction: SourceCatalogFunction): GrainMethodDescr
 }
 
 function createPayloadTemplate(catalogFunction: SourceCatalogFunction): string {
-  if (catalogFunction.parameters.length === 0) {
+  const parameters = visibleParameters(catalogFunction.parameters);
+  if (parameters.length === 0) {
     return "{\n}";
   }
 
-  const lines = catalogFunction.parameters.map((parameter) => {
+  const lines = parameters.map((parameter) => {
     return `  "${parameter.name}": ${defaultJsonValue(parameter.typeName)}`;
   });
 
@@ -320,6 +331,18 @@ function formatParameterList(parameters: GrainMethodDescriptor["parameters"]): s
   }
 
   return parameters.map((parameter) => `${parameter.name}: ${parameter.typeName}`).join(", ");
+}
+
+function visibleParameters<T extends { name: string; typeName: string }>(parameters: T[]): T[] {
+  return parameters.filter((parameter) => !isCancellationTokenParameter(parameter));
+}
+
+function isCancellationTokenParameter(parameter: { name: string; typeName: string }): boolean {
+  return (
+    parameter.typeName === "CancellationToken" ||
+    parameter.typeName === "System.Threading.CancellationToken" ||
+    parameter.name.toLowerCase() === "cancellationtoken"
+  );
 }
 
 function defaultJsonValue(typeName: string): string {

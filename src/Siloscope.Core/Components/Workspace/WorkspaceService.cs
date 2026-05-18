@@ -5,14 +5,24 @@ namespace Siloscope.Core.Components.Workspace;
 public interface IWorkspaceService
 {
     Task<Workspace> LoadAsync(string path);
+    Task<IReadOnlyList<Workspace>> ListAsync();
     Task SaveAsync(string path, Workspace workspace);
     string GetDefaultWorkspacePath();
+    string GetWorkspacePath(string workspaceId);
     string GetLastWorkspacePath();
     Task SetLastWorkspacePathAsync(string path);
 }
 
 public class WorkspaceService : IWorkspaceService
 {
+    private readonly string _appDataRoot;
+
+    public WorkspaceService(string? appDataRoot = null)
+    {
+        _appDataRoot =
+            appDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -21,8 +31,7 @@ public class WorkspaceService : IWorkspaceService
 
     private string GetSessionFilePath()
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appData, "SiloScope", "session.json");
+        return Path.Combine(_appDataRoot, "SiloScope", "session.json");
     }
 
     public string GetLastWorkspacePath()
@@ -67,6 +76,25 @@ public class WorkspaceService : IWorkspaceService
         return workspace;
     }
 
+    public async Task<IReadOnlyList<Workspace>> ListAsync()
+    {
+        var workspaceDirectory = GetWorkspaceDirectory();
+        if (!Directory.Exists(workspaceDirectory))
+        {
+            return [];
+        }
+
+        var workspaces = new List<Workspace>();
+        foreach (var path in Directory.EnumerateFiles(workspaceDirectory, "*.workspace.json"))
+        {
+            workspaces.Add(await LoadAsync(path));
+        }
+
+        return workspaces
+            .OrderBy(workspace => workspace.WorkspaceInfo.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     public async Task SaveAsync(string path, Workspace workspace)
     {
         var directory = Path.GetDirectoryName(path);
@@ -83,8 +111,30 @@ public class WorkspaceService : IWorkspaceService
 
     public string GetDefaultWorkspacePath()
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appData, "SiloScope", "workspaces", "default.workspace.json");
+        return GetWorkspacePath("default");
+    }
+
+    public string GetWorkspacePath(string workspaceId)
+    {
+        var safeWorkspaceId = SanitizeFileName(
+            string.IsNullOrWhiteSpace(workspaceId) ? "default" : workspaceId
+        );
+        return Path.Combine(GetWorkspaceDirectory(), $"{safeWorkspaceId}.workspace.json");
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var invalidCharacters = Path.GetInvalidFileNameChars().Append(':').ToArray();
+        return new string(
+            value
+                .Select(character => invalidCharacters.Contains(character) ? '-' : character)
+                .ToArray()
+        );
+    }
+
+    private string GetWorkspaceDirectory()
+    {
+        return Path.Combine(_appDataRoot, "SiloScope", "workspaces");
     }
 }
 

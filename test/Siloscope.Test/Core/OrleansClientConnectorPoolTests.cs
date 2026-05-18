@@ -47,4 +47,35 @@ public sealed class OrleansClientConnectorPoolTests
 
         pool.Connectors.Keys.Should().ContainSingle().Which.Should().Be("localhost");
     }
+
+    [Fact]
+    public void Configure_ReplacesExistingConnectors()
+    {
+        using var pool = new OrleansClientConnectorPool(
+            new ToolClusterOptions("dev", "svc", []),
+            new InterfaceCatalog(
+                [
+                    new GrainInterfaceDescriptor(
+                        "g1",
+                        typeof(ITestStringGrain),
+                        [],
+                        "127.0.0.1:30000"
+                    ),
+                ],
+                []
+            ),
+            []
+        );
+
+        pool.Configure(
+            new ToolClusterOptions("dev", "svc", []),
+            new InterfaceCatalog(
+                [new GrainInterfaceDescriptor("g2", typeof(ITestGuidGrain), [], "127.0.0.1:30001")],
+                []
+            ),
+            []
+        );
+
+        pool.Connectors.Keys.Should().ContainSingle().Which.Should().Be("127.0.0.1:30001");
+    }
 }

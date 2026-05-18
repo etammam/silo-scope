@@ -306,7 +306,10 @@ public sealed class InterfaceCatalogLoader(
         var returnType = FormatTypeName(method.ReturnType);
         var args = string.Join(
             ", ",
-            method.GetParameters().Select(p => $"{FormatTypeName(p.ParameterType)} {p.Name}")
+            method
+                .GetParameters()
+                .Where(static p => p.ParameterType != typeof(CancellationToken))
+                .Select(p => $"{FormatTypeName(p.ParameterType)} {p.Name}")
         );
         return $"{returnType} {method.Name}({args})";
     }

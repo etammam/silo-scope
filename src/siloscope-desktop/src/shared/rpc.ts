@@ -22,6 +22,7 @@ export type SiloScopeRPC = {
   bun: RPCSchema<{
     requests: {
       loadWorkspace: { params: { path?: string } | void; response: { workspace: Workspace } };
+      setActiveWorkspace: { params: { workspace: Workspace }; response: { workspace: Workspace } };
       saveWorkspace: { params: { workspace: Workspace; path?: string }; response: { success: boolean } };
       connectCluster: { params: { workspace: Workspace }; response: { message: string } };
       disconnectCluster: { params: void; response: { success: boolean } };
@@ -35,7 +36,7 @@ export type SiloScopeRPC = {
         response: { packages: NugetPackage[] };
       };
       addNugetPackageSource: {
-        params: { packageId: string; version: string; sourceUrl?: string; feedName?: string };
+        params: { packageId: string; version: string; gateway?: string; sourceUrl?: string; feedName?: string };
         response: { workspace: Workspace };
       };
       invokeGrain: {

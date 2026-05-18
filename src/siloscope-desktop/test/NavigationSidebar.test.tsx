@@ -8,6 +8,9 @@ const workspace = {
   siloAddress: "127.0.0.1",
   gatewayPort: 30000,
   orleansVersion: "10.0",
+  clusterId: "dev",
+  serviceId: "SiloScope",
+  gatewayEndpoints: ["127.0.0.1:30000"],
 };
 
 const grains = [
@@ -39,7 +42,7 @@ describe("NavigationSidebar", () => {
     );
 
     expect(screen.getByLabelText("Active workspace")).toHaveValue("none");
-    expect(screen.getByText("Function Catalog")).toBeInTheDocument();
+    expect(screen.getByText("Sources")).toBeInTheDocument();
     expect(screen.getAllByText("No workspace loaded")).toHaveLength(2);
     expect(screen.getByText("Disconnected")).toBeInTheDocument();
   });
@@ -64,6 +67,34 @@ describe("NavigationSidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
 
     expect(onNewWorkspace).toHaveBeenCalledOnce();
+  });
+
+  it("selects an existing workspace from the sidebar", () => {
+    const onSelectWorkspace = vi.fn();
+
+    render(
+      <NavigationSidebar
+        activeView="workspace"
+        grains={[]}
+        isConnected={false}
+        onSelectWorkspace={onSelectWorkspace}
+        onSelectGrain={vi.fn()}
+        onThemeChange={vi.fn()}
+        selectedGrain={null}
+        theme="dark"
+        workspace={workspace}
+        workspaces={[
+          workspace,
+          { ...workspace, id: "workspace-2", name: "Remote Cluster" },
+        ]}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Active workspace"), {
+      target: { value: "workspace-2" },
+    });
+
+    expect(onSelectWorkspace).toHaveBeenCalledWith("workspace-2");
   });
 
   it("renders source-owned function catalog and selectable method leaves", () => {

@@ -56,7 +56,8 @@ public class SiloScopeCommands : ISiloScopeCommands
                 workspace.Cluster.ServiceId,
                 string.IsNullOrEmpty(workspace.Cluster.DefaultGateway)
                     ? []
-                    : [workspace.Cluster.DefaultGateway]
+                    : [workspace.Cluster.DefaultGateway],
+                workspace.Cluster.Type
             );
 
             var siloSources = workspace
@@ -107,52 +108,16 @@ public class SiloScopeCommands : ISiloScopeCommands
         CancellationToken cancellationToken = default
     )
     {
-        path ??= _workspaceService.GetDefaultWorkspacePath();
+        path ??= _workspaceService.GetWorkspacePath(workspace.Id);
         _logger.LogInformation("Saving workspace to {Path}", path);
 
         try
         {
-            var workspaceModel = new Workspace
-            {
-                Id = workspace.Id,
-                WorkspaceInfo = new Components.Workspace.WorkspaceInfo
-                {
-                    Name = workspace.Name,
-                    Description = workspace.Description ?? string.Empty,
-                    Creation = DateTime.UtcNow.ToString("O"),
-                },
-                Cluster = new ClusterConfig
-                {
-                    Type = ClusterType.Homogenous,
-                    ClusterId = workspace.Cluster.ClusterId,
-                    ServiceId = workspace.Cluster.ServiceId,
-                    DefaultGateway =
-                        workspace.Cluster.GatewayEndpoints.FirstOrDefault() ?? string.Empty,
-                },
-                Silos = workspace
-                    .Silos.Select(s => new Components.Workspace.SiloSource
-                    {
-                        Reference = s.Reference,
-                        Source = s.Source,
-                        Version = s.Version,
-                        Gateway = s.Gateway,
-                        Enabled = s.Enabled,
-                    })
-                    .ToList(),
-                Security = new SecurityConfig(),
-                Environments = new List<EnvironmentConfig>
-                {
-                    new EnvironmentConfig
-                    {
-                        Name = "default",
-                        Variables = workspace.EnvironmentVariables,
-                    },
-                },
-                Session = new SessionConfig { ActiveEnvironment = "default" },
-            };
+            var workspaceModel = ToWorkspaceModel(workspace);
 
             await _workspaceService.SaveAsync(path, workspaceModel);
             _currentWorkspace = workspaceModel;
+            _catalog = null;
 
             _logger.LogInformation("Workspace saved: {WorkspaceName}", workspace.Name);
             return Result.Ok();
@@ -164,6 +129,46 @@ public class SiloScopeCommands : ISiloScopeCommands
         }
     }
 
+    public async Task<Result<IReadOnlyList<WorkspaceInfo>>> ListWorkspacesAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        try
+        {
+            var workspaces = await _workspaceService.ListAsync();
+            return Result.Ok<IReadOnlyList<WorkspaceInfo>>(
+                workspaces.Select(ToWorkspaceInfo).ToList()
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to list workspaces");
+            return Result.Fail<IReadOnlyList<WorkspaceInfo>>(ex.Message);
+        }
+    }
+
+    public Task<Result<WorkspaceInfo>> SetWorkspaceAsync(
+        WorkspaceInfo workspace,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (string.IsNullOrWhiteSpace(workspace.Id))
+        {
+            return Task.FromResult(Result.Fail<WorkspaceInfo>("Workspace id is required."));
+        }
+
+        if (string.IsNullOrWhiteSpace(workspace.Name))
+        {
+            return Task.FromResult(Result.Fail<WorkspaceInfo>("Workspace name is required."));
+        }
+
+        _currentWorkspace = ToWorkspaceModel(workspace);
+        _catalog = null;
+
+        _logger.LogInformation("Active workspace set: {WorkspaceName}", workspace.Name);
+        return Task.FromResult(Result.Ok(ToWorkspaceInfo(_currentWorkspace)));
+    }
+
     public async Task<Result<string>> ConnectClusterAsync(
         ClusterOptions options,
         CancellationToken cancellationToken = default
@@ -171,17 +176,27 @@ public class SiloScopeCommands : ISiloScopeCommands
     {
         _logger.LogInformation("Connecting to cluster {ClusterId}", options.ClusterId);
 
+        InterfaceCatalog catalog = new([], []);
+        IReadOnlyList<InterfaceEntry>? entries = null;
+        if (_currentWorkspace is not null)
+        {
+            var discoverResult = await DiscoverGrainsAsync(null, cancellationToken);
+            if (discoverResult.IsFailed)
+            {
+                return Result.Fail<string>(discoverResult.Errors.Select(e => e.Message));
+            }
+
+            catalog = _catalog ?? catalog;
+            entries = BuildInterfaceEntries(_currentWorkspace.Silos.Where(s => s.Enabled).ToList());
+        }
+
         var toolOptions = new ToolClusterOptions(
             options.ClusterId,
             options.ServiceId,
             options.GatewayEndpoints
         );
 
-        var emptyCatalog = new InterfaceCatalog(
-            Array.Empty<GrainInterfaceDescriptor>(),
-            Array.Empty<string>()
-        );
-        _connectorPool.Configure(toolOptions, emptyCatalog);
+        _connectorPool.Configure(toolOptions, catalog, entries);
         var result = await _connectorPool.ConnectAllAsync(cancellationToken);
 
         if (result.IsSuccess)
@@ -224,23 +239,11 @@ public class SiloScopeCommands : ISiloScopeCommands
         if (enabledSilos.Count == 0)
         {
             _logger.LogWarning("No enabled silos in workspace");
+            _catalog = new InterfaceCatalog([], []);
             return Result.Ok(new GrainCatalog([], []));
         }
 
-        var entries = enabledSilos
-            .Select(s => new InterfaceEntry(
-                s.Gateway,
-                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase)
-                    ? InterfaceSourceType.NuGet
-                    : InterfaceSourceType.Dll,
-                s.Source.Equals("DLL", StringComparison.OrdinalIgnoreCase) ? s.Reference : null,
-                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Reference : null,
-                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Version : null,
-                null,
-                null,
-                BuildSourceId(s)
-            ))
-            .ToList();
+        var entries = BuildInterfaceEntries(enabledSilos);
 
         var catalogResult = _catalogLoader.LoadAll(entries);
         if (catalogResult.IsFailed)
@@ -312,6 +315,8 @@ public class SiloScopeCommands : ISiloScopeCommands
         string methodName,
         string grainKey,
         string? payload,
+        string? sourceId = null,
+        string? functionId = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -328,14 +333,7 @@ public class SiloScopeCommands : ISiloScopeCommands
             );
         }
 
-        var grain = _catalog.Grains.FirstOrDefault(g =>
-            string.Equals(g.Name, grainType, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(
-                g.InterfaceType.FullName,
-                grainType,
-                StringComparison.OrdinalIgnoreCase
-            )
-        );
+        var grain = ResolveGrain(grainType, sourceId, functionId);
 
         if (grain is null)
         {
@@ -344,9 +342,7 @@ public class SiloScopeCommands : ISiloScopeCommands
             );
         }
 
-        var method = grain.Methods.FirstOrDefault(m =>
-            string.Equals(m.MethodInfo.Name, methodName, StringComparison.OrdinalIgnoreCase)
-        );
+        var method = ResolveMethod(grain, methodName, functionId);
 
         if (method is null)
         {
@@ -526,6 +522,7 @@ public class SiloScopeCommands : ISiloScopeCommands
     public async Task<Result<WorkspaceInfo>> AddNugetPackageSourceAsync(
         string packageId,
         string version,
+        string? gateway = null,
         string? sourceUrl = null,
         string? feedName = null,
         CancellationToken cancellationToken = default
@@ -575,6 +572,7 @@ public class SiloScopeCommands : ISiloScopeCommands
                     Reference = packageId,
                     Source = "nuget",
                     Version = version,
+                    Gateway = gateway,
                     Enabled = true,
                 }
             );
@@ -582,12 +580,17 @@ public class SiloScopeCommands : ISiloScopeCommands
         else
         {
             existing.Enabled = true;
+            if (!string.IsNullOrWhiteSpace(gateway))
+            {
+                existing.Gateway = gateway;
+            }
         }
 
         _logger.LogInformation(
-            "Added NuGet package source {PackageId} {Version}",
+            "Added NuGet package source {PackageId} {Version} with gateway {Gateway}",
             packageId,
-            version
+            version,
+            gateway ?? "<none>"
         );
 
         return Result.Ok(ToWorkspaceInfo(_currentWorkspace));
@@ -630,6 +633,9 @@ public class SiloScopeCommands : ISiloScopeCommands
                                 GetGrainKeyType(grain.InterfaceType),
                                 method
                                     .MethodInfo.GetParameters()
+                                    .Where(static parameter =>
+                                        parameter.ParameterType != typeof(CancellationToken)
+                                    )
                                     .Select(parameter => new FunctionParameterInfo(
                                         parameter.Name ?? "value",
                                         FormatTypeName(parameter.ParameterType)
@@ -665,6 +671,26 @@ public class SiloScopeCommands : ISiloScopeCommands
         return new SourceOwnedGrainCatalog(sources);
     }
 
+    private static List<InterfaceEntry> BuildInterfaceEntries(
+        IReadOnlyList<Components.Workspace.SiloSource> enabledSilos
+    )
+    {
+        return enabledSilos
+            .Select(s => new InterfaceEntry(
+                s.Gateway,
+                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase)
+                    ? InterfaceSourceType.NuGet
+                    : InterfaceSourceType.Dll,
+                s.Source.Equals("DLL", StringComparison.OrdinalIgnoreCase) ? s.Reference : null,
+                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Reference : null,
+                s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Version : null,
+                null,
+                null,
+                BuildSourceId(s)
+            ))
+            .ToList();
+    }
+
     private static WorkspaceInfo ToWorkspaceInfo(Components.Workspace.Workspace workspace)
     {
         var clusterOptions = new ClusterOptions(
@@ -672,7 +698,8 @@ public class SiloScopeCommands : ISiloScopeCommands
             workspace.Cluster.ServiceId,
             string.IsNullOrEmpty(workspace.Cluster.DefaultGateway)
                 ? []
-                : [workspace.Cluster.DefaultGateway]
+                : [workspace.Cluster.DefaultGateway],
+            workspace.Cluster.Type
         );
 
         var siloSources = workspace
@@ -699,6 +726,48 @@ public class SiloScopeCommands : ISiloScopeCommands
         );
     }
 
+    private static Components.Workspace.Workspace ToWorkspaceModel(WorkspaceInfo workspace)
+    {
+        return new Components.Workspace.Workspace
+        {
+            Id = workspace.Id,
+            WorkspaceInfo = new Components.Workspace.WorkspaceInfo
+            {
+                Name = workspace.Name,
+                Description = workspace.Description ?? string.Empty,
+                Creation = DateTime.UtcNow.ToString("O"),
+            },
+            Cluster = new ClusterConfig
+            {
+                Type = workspace.Cluster.Type,
+                ClusterId = workspace.Cluster.ClusterId,
+                ServiceId = workspace.Cluster.ServiceId,
+                DefaultGateway =
+                    workspace.Cluster.GatewayEndpoints.FirstOrDefault() ?? string.Empty,
+            },
+            Silos = workspace
+                .Silos.Select(s => new Components.Workspace.SiloSource
+                {
+                    Reference = s.Reference,
+                    Source = s.Source,
+                    Version = s.Version,
+                    Gateway = s.Gateway,
+                    Enabled = s.Enabled,
+                })
+                .ToList(),
+            Security = new SecurityConfig(),
+            Environments =
+            [
+                new EnvironmentConfig
+                {
+                    Name = "default",
+                    Variables = workspace.EnvironmentVariables,
+                },
+            ],
+            Session = new SessionConfig { ActiveEnvironment = "default" },
+        };
+    }
+
     private static string BuildSourceId(Components.Workspace.SiloSource silo)
     {
         return $"{NormalizeSourceType(silo.Source)}:{silo.Reference}:{silo.Version ?? ""}:{silo.Gateway ?? ""}";
@@ -711,6 +780,77 @@ public class SiloScopeCommands : ISiloScopeCommands
     )
     {
         return $"{sourceId}:{grain.Name}:{method.Signature}";
+    }
+
+    private GrainInterfaceDescriptor? ResolveGrain(
+        string grainType,
+        string? sourceId,
+        string? functionId
+    )
+    {
+        var grains = _catalog!.Grains.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(sourceId))
+        {
+            grains = grains.Where(grain =>
+                string.Equals(grain.SourceId, sourceId, StringComparison.Ordinal)
+            );
+        }
+
+        if (!string.IsNullOrWhiteSpace(functionId))
+        {
+            var functionGrain = grains.FirstOrDefault(grain =>
+                grain.Methods.Any(method =>
+                    string.Equals(
+                        BuildFunctionId(grain.SourceId ?? string.Empty, grain, method),
+                        functionId,
+                        StringComparison.Ordinal
+                    )
+                )
+            );
+
+            if (functionGrain is not null)
+            {
+                return functionGrain;
+            }
+        }
+
+        return grains.FirstOrDefault(g =>
+            string.Equals(g.Name, grainType, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                g.InterfaceType.FullName,
+                grainType,
+                StringComparison.OrdinalIgnoreCase
+            )
+            || string.Equals(g.InterfaceType.Name, grainType, StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
+    private static GrainMethodDescriptor? ResolveMethod(
+        GrainInterfaceDescriptor grain,
+        string methodName,
+        string? functionId
+    )
+    {
+        if (!string.IsNullOrWhiteSpace(functionId))
+        {
+            var sourceId = grain.SourceId ?? string.Empty;
+            var functionMethod = grain.Methods.FirstOrDefault(method =>
+                string.Equals(
+                    BuildFunctionId(sourceId, grain, method),
+                    functionId,
+                    StringComparison.Ordinal
+                )
+            );
+
+            if (functionMethod is not null)
+            {
+                return functionMethod;
+            }
+        }
+
+        return grain.Methods.FirstOrDefault(m =>
+            string.Equals(m.MethodInfo.Name, methodName, StringComparison.OrdinalIgnoreCase)
+        );
     }
 
     private static string NormalizeSourceType(string source)

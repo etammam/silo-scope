@@ -1,4 +1,5 @@
 using FluentResults;
+using Siloscope.Core.Components.Workspace;
 using StreamJsonRpc;
 
 namespace Siloscope.Core.Endpoints;
@@ -16,6 +17,17 @@ public interface ISiloScopeCommands
     Task<Result> SaveWorkspaceAsync(
         WorkspaceInfo workspace,
         string? path = null,
+        CancellationToken cancellationToken = default
+    );
+
+    [JsonRpcMethod("ListWorkspacesAsync")]
+    Task<Result<IReadOnlyList<WorkspaceInfo>>> ListWorkspacesAsync(
+        CancellationToken cancellationToken = default
+    );
+
+    [JsonRpcMethod("SetWorkspaceAsync")]
+    Task<Result<WorkspaceInfo>> SetWorkspaceAsync(
+        WorkspaceInfo workspace,
         CancellationToken cancellationToken = default
     );
 
@@ -44,6 +56,8 @@ public interface ISiloScopeCommands
         string methodName,
         string grainKey,
         string? payload,
+        string? sourceId = null,
+        string? functionId = null,
         CancellationToken cancellationToken = default
     );
 
@@ -78,6 +92,7 @@ public interface ISiloScopeCommands
     Task<Result<WorkspaceInfo>> AddNugetPackageSourceAsync(
         string packageId,
         string version,
+        string? gateway = null,
         string? sourceUrl = null,
         string? feedName = null,
         CancellationToken cancellationToken = default
@@ -93,7 +108,12 @@ public record WorkspaceInfo(
     Dictionary<string, string> EnvironmentVariables
 );
 
-public record ClusterOptions(string ClusterId, string ServiceId, List<string> GatewayEndpoints);
+public record ClusterOptions(
+    string ClusterId,
+    string ServiceId,
+    List<string> GatewayEndpoints,
+    ClusterType Type = ClusterType.Homogenous
+);
 
 public record SiloSource(
     string Reference,

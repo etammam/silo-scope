@@ -28,7 +28,7 @@ type NavigationSidebarProps = {
   onClearLogs?: () => void;
   onCreateNugetFeed?: (request: { name: string; url: string; username?: string; password?: string }) => Promise<void>;
   onSearchNugetPackages?: (request: { query: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
-  onAddNugetPackageSource?: (request: { packageId: string; version: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
+  onAddNugetPackageSource?: (request: { packageId: string; version: string; gateway?: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
   onConnectCluster?: () => Promise<void>;
   onDisconnectCluster?: () => Promise<void>;
   onDiscoverGrains?: () => Promise<void>;
@@ -44,12 +44,15 @@ type WorkspaceNavigatorProps = {
   selectedFunctionId?: string | null;
   selectedGrain: string | null;
   workspace: Workspace | null;
+  workspaces?: Workspace[];
   onConnectCluster?: () => Promise<void>;
   onDisconnectCluster?: () => Promise<void>;
   onDiscoverGrains?: () => Promise<void>;
   onLoadWorkspace?: () => Promise<void>;
   onNewWorkspace?: () => void;
   onSaveWorkspace?: () => Promise<void>;
+  onSelectWorkspace?: (workspaceId: string) => void;
+  onEditWorkspace?: () => void;
   onSelectFunction?: (functionId: string | null) => void;
   onSelectGrain: (grainId: string | null) => void;
 };
@@ -71,12 +74,15 @@ export function NavigationSidebar({
   onLoadWorkspace,
   onNewWorkspace,
   onSaveWorkspace,
+  onSelectWorkspace,
+  onEditWorkspace,
   onSelectFunction,
   selectedGrain,
   selectedFunctionId,
   sourceCatalog,
   theme,
   workspace,
+  workspaces,
   onSelectGrain,
   onThemeChange,
 }: NavigationSidebarProps) {
@@ -98,12 +104,15 @@ export function NavigationSidebar({
           onLoadWorkspace={onLoadWorkspace}
           onNewWorkspace={onNewWorkspace}
           onSaveWorkspace={onSaveWorkspace}
+          onSelectWorkspace={onSelectWorkspace}
+          onEditWorkspace={onEditWorkspace}
           onSelectFunction={onSelectFunction}
           onSelectGrain={onSelectGrain}
           selectedFunctionId={selectedFunctionId}
           selectedGrain={selectedGrain}
           sourceCatalog={sourceCatalog}
           workspace={workspace}
+          workspaces={workspaces}
         />
       )}
 
@@ -139,17 +148,21 @@ function WorkspaceNavigator({
   onLoadWorkspace,
   onNewWorkspace,
   onSaveWorkspace,
+  onSelectWorkspace,
+  onEditWorkspace,
   onSelectFunction,
   selectedGrain,
   selectedFunctionId,
   sourceCatalog,
   workspace,
+  workspaces = [],
   onSelectGrain,
 }: WorkspaceNavigatorProps) {
   const catalog = useMemo(
     () => sourceCatalog ?? buildSourceCatalogFromGrains(grains, workspace),
     [grains, sourceCatalog, workspace],
   );
+  const workspaceOptions = workspaces.length > 0 ? workspaces : workspace ? [workspace] : [];
   const [catalogQuery, setCatalogQuery] = useState("");
   const [collapsedSources, setCollapsedSources] = useState<Set<string>>(() => new Set());
   const [collapsedInterfaces, setCollapsedInterfaces] = useState<Set<string>>(() => new Set());
@@ -224,9 +237,17 @@ function WorkspaceNavigator({
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Active workspace</span>
-          <select value={workspace?.id ?? "none"} disabled={!workspace} onChange={() => undefined}>
+          <select
+            value={workspace?.id ?? "none"}
+            disabled={workspaceOptions.length === 0}
+            onChange={(event) => onSelectWorkspace?.(event.target.value)}
+          >
             <option value="none">No workspace loaded</option>
-            {workspace && <option value={workspace.id}>{workspace.name}</option>}
+            {workspaceOptions.map((workspaceOption) => (
+              <option key={workspaceOption.id} value={workspaceOption.id}>
+                {workspaceOption.name}
+              </option>
+            ))}
           </select>
         </label>
         <div className="navigation-sidebar__command-row">
@@ -247,6 +268,14 @@ function WorkspaceNavigator({
             Save
           </button>
         </div>
+        <button
+          className="navigation-sidebar__command"
+          disabled={!workspace || !onEditWorkspace}
+          onClick={onEditWorkspace}
+          type="button"
+        >
+          Edit Workspace
+        </button>
         <div className="navigation-sidebar__command-row">
           <button
             className="navigation-sidebar__command"
@@ -277,7 +306,7 @@ function WorkspaceNavigator({
 
       <section className="navigation-sidebar__section" aria-labelledby="source-catalog-title">
         <div className="navigation-sidebar__section-title" id="source-catalog-title">
-          Function Catalog
+          Sources
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Search catalog</span>
@@ -333,7 +362,11 @@ function WorkspaceNavigator({
           </ul>
         ) : (
           <div className="navigation-sidebar__empty">
-            {workspace ? "No functions discovered" : "No workspace loaded"}
+            {workspace
+              ? isConnected
+                ? "No functions discovered"
+                : "Connect to discover source functions"
+              : "No workspace loaded"}
           </div>
         )}
       </section>
@@ -437,7 +470,7 @@ function NuGetRegistryManager({
   workspace: Workspace | null;
   onCreateFeed?: (request: { name: string; url: string; username?: string; password?: string }) => Promise<void>;
   onSearchPackages?: (request: { query: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
-  onAddPackageSource?: (request: { packageId: string; version: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
+  onAddPackageSource?: (request: { packageId: string; version: string; gateway?: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
 }) {
   const [activeFeedName, setActiveFeedName] = useState("nuget.org");
   const [isFeedDialogOpen, setIsFeedDialogOpen] = useState(false);
@@ -742,6 +775,10 @@ function formatLogTime(timestamp: string): string {
 }
 
 function formatViewTitle(view: ActivityView): string {
+  if (view === "workspace") {
+    return "Collections";
+  }
+
   if (view === "nuget") {
     return "NuGet";
   }

@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Siloscope.Core.Cluster;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.Interfaces;
@@ -8,14 +9,19 @@ namespace Siloscope.Test.Core;
 
 public sealed class GrainInvocationServiceTests
 {
-    [Fact]
-    public async Task InvokeAsync_EmptyGrainKey_ReturnsFailure()
+    private static GrainInvocationService CreateService()
     {
+        var logger = NullLogger<GrainInvocationService>.Instance;
         var cluster = new ToolClusterOptions("dev", "svc", []);
         var pool = new OrleansClientConnectorPool(cluster, new InterfaceCatalog([], []), []);
         pool.Dispose();
+        return new GrainInvocationService(pool, logger);
+    }
 
-        var service = new GrainInvocationService(pool);
+    [Fact]
+    public async Task InvokeAsync_EmptyGrainKey_ReturnsFailure()
+    {
+        var service = CreateService();
 
         var methodInfo = typeof(ITestStringGrain).GetMethod(nameof(ITestStringGrain.Echo))!;
         var grain = new GrainInterfaceDescriptor(
@@ -40,11 +46,7 @@ public sealed class GrainInvocationServiceTests
     [Fact]
     public async Task InvokeAsync_WhenPoolHasNoConnectors_FailsWithNoConnectorMessage()
     {
-        var cluster = new ToolClusterOptions("dev", "svc", []);
-        var pool = new OrleansClientConnectorPool(cluster, new InterfaceCatalog([], []), []);
-        pool.Dispose();
-
-        var service = new GrainInvocationService(pool);
+        var service = CreateService();
 
         var methodInfo = typeof(ITestStringGrain).GetMethod(nameof(ITestStringGrain.Echo))!;
         var grain = new GrainInterfaceDescriptor(
@@ -71,11 +73,7 @@ public sealed class GrainInvocationServiceTests
     [Fact]
     public async Task InvokeWithTimingAsync_EmptyGrainKey_ReturnsFailure()
     {
-        var cluster = new ToolClusterOptions("dev", "svc", []);
-        var pool = new OrleansClientConnectorPool(cluster, new InterfaceCatalog([], []), []);
-        pool.Dispose();
-
-        var service = new GrainInvocationService(pool);
+        var service = CreateService();
 
         var methodInfo = typeof(ITestStringGrain).GetMethod(nameof(ITestStringGrain.Echo))!;
         var grain = new GrainInterfaceDescriptor(
@@ -100,11 +98,7 @@ public sealed class GrainInvocationServiceTests
     [Fact]
     public async Task InvokeWithTimingAsync_WhenPoolHasNoConnectors_ReturnsFailure()
     {
-        var cluster = new ToolClusterOptions("dev", "svc", []);
-        var pool = new OrleansClientConnectorPool(cluster, new InterfaceCatalog([], []), []);
-        pool.Dispose();
-
-        var service = new GrainInvocationService(pool);
+        var service = CreateService();
 
         var methodInfo = typeof(ITestStringGrain).GetMethod(nameof(ITestStringGrain.Echo))!;
         var grain = new GrainInterfaceDescriptor(

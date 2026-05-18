@@ -1,7 +1,7 @@
 import { ApplicationMenu, BrowserWindow, BrowserView, Utils } from "electrobun/bun";
 import Electrobun from "electrobun/bun";
 import type { SiloScopeRPC } from "../shared/rpc";
-import type { LogEntry, NugetFeed, NugetPackage, SourceOwnedCatalog, Workspace } from "../shared/types";
+import type { ClusterType, LogEntry, NugetFeed, NugetPackage, SourceOwnedCatalog, Workspace, WorkspaceSource } from "../shared/types";
 import { installApplicationMenu } from "./applicationMenu";
 import { SidecarJsonRpcClient } from "./jsonRpcClient";
 
@@ -52,6 +52,7 @@ type BackendWorkspaceInfo = {
   Cluster?: {
     ClusterId?: string;
     ServiceId?: string;
+    Type?: "Homogenous" | "Heterogeneous" | string;
     GatewayEndpoints?: string[];
   };
   Silos?: Array<{
@@ -109,6 +110,19 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
 
         if (!result.IsSuccess || !result.Value) {
           throw new Error(result.Errors?.[0]?.Message ?? "Failed to load workspace.");
+        }
+
+        return { workspace: mapWorkspace(result.Value) };
+      },
+      setActiveWorkspace: async ({ workspace }) => {
+        const result = await requestSidecar<FluentResult<BackendWorkspaceInfo>>(
+          "SetWorkspaceAsync",
+          [mapBackendWorkspace(workspace)],
+          "SetWorkspace",
+        );
+
+        if (!result.IsSuccess || !result.Value) {
+          throw new Error(result.Errors?.[0]?.Message ?? "Failed to set active workspace.");
         }
 
         return { workspace: mapWorkspace(result.Value) };
@@ -221,10 +235,10 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
 
         return { packages: (result.Value ?? []).map(mapNugetPackage) };
       },
-      addNugetPackageSource: async ({ packageId, version, sourceUrl, feedName }) => {
+      addNugetPackageSource: async ({ packageId, version, gateway, sourceUrl, feedName }) => {
         const result = await requestSidecar<FluentResult<BackendWorkspaceInfo>>(
           "AddNugetPackageSourceAsync",
-          [packageId, version, sourceUrl ?? null, feedName ?? null],
+          [packageId, version, gateway ?? null, sourceUrl ?? null, feedName ?? null],
           "AddNugetPackageSource",
         );
 
@@ -238,7 +252,7 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         console.log("invokeGrain", grainType, method, grainKey, payload, sourceId, functionId);
         const result = await requestSidecar<FluentResult<BackendInvocationResult>>(
           "InvokeGrainAsync",
-          [grainType, method, grainKey, payload],
+          [grainType, method, grainKey, payload, sourceId ?? null, functionId ?? null],
           "InvokeGrain",
         );
 
@@ -256,8 +270,18 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
           timing: mapInvocationTiming(result.Value),
         };
       },
-      getWorkspaces: () => {
-        return { workspaces: [] };
+      getWorkspaces: async () => {
+        const result = await requestSidecar<FluentResult<BackendWorkspaceInfo[]>>(
+          "ListWorkspacesAsync",
+          undefined,
+          "ListWorkspaces",
+        );
+
+        if (!result.IsSuccess) {
+          throw new Error(result.Errors?.[0]?.Message ?? "Failed to list workspaces.");
+        }
+
+        return { workspaces: (result.Value ?? []).map(mapWorkspace) };
       },
     },
     messages: {
@@ -325,11 +349,17 @@ function mapNugetPackage(packageInfo: BackendNugetPackage): NugetPackage {
 }
 
 function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
+  console.log("[mapWorkspace] input:", JSON.stringify(workspace, null, 2));
   const gateway = workspace.Cluster?.GatewayEndpoints?.[0] ?? "";
   const [siloAddress, gatewayPortRaw] = gateway.split(":");
   const gatewayPort = Number(gatewayPortRaw);
 
-  return {
+  // Backend sends Type as number: 0 = Homogenous, 1 = Heterogeneous
+  const clusterTypeNum = workspace.Cluster?.Type as number | undefined;
+  const isHeterogeneous = clusterTypeNum === 1 || workspace.Cluster?.Type === "Heterogeneous";
+  const clusterType: ClusterType = isHeterogeneous ? "Heterogeneous" : "Homogenous";
+
+  const result: Workspace = {
     id: workspace.Id,
     name: workspace.Name,
     description: workspace.Description ?? null,
@@ -337,10 +367,11 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
     gatewayPort: Number.isFinite(gatewayPort) ? gatewayPort : 30000,
     clusterId: workspace.Cluster?.ClusterId ?? "dev",
     serviceId: workspace.Cluster?.ServiceId ?? "SiloScope",
+    clusterType,
     gatewayEndpoints: workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
     orleansVersion: "10.0",
     environmentVariables: {},
-    sources: (workspace.Silos ?? []).map((source) => ({
+    sources: (workspace.Silos ?? []).map((source): WorkspaceSource => ({
       sourceId: `${source.Source}:${source.Reference}:${source.Version ?? ""}:${source.Gateway ?? ""}`,
       sourceType: source.Source.toLowerCase() === "nuget" ? "NuGet" : "DLL",
       reference: source.Reference,
@@ -350,6 +381,8 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
       enabled: source.Enabled,
     })),
   };
+  console.log("[mapWorkspace] output:", JSON.stringify(result, null, 2));
+  return result;
 }
 
 function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
@@ -379,6 +412,7 @@ function mapBackendCluster(workspace: Workspace) {
   return {
     ClusterId: workspace.clusterId ?? "dev",
     ServiceId: workspace.serviceId ?? "SiloScope",
+    Type: workspace.clusterType ?? "Homogenous",
     GatewayEndpoints: gatewayEndpoints,
   };
 }
@@ -408,13 +442,15 @@ function mapSourceCatalog(catalog: BackendSourceOwnedCatalog): SourceOwnedCatalo
           signature: method.Signature,
           returnType: method.ReturnType,
           keyType: isGrainKeyType(method.KeyType) ? method.KeyType : "String",
-          parameters: (method.Parameters ?? []).map((parameter) => ({
-            name: parameter.Name,
-            typeName: parameter.TypeName,
+          parameters: (method.Parameters ?? [])
+            .filter((parameter) => !isCancellationTokenParameter(parameter))
+            .map((parameter) => ({
+              name: parameter.Name,
+              typeName: parameter.TypeName,
+            })),
           })),
         })),
       })),
-    })),
   };
 }
 
@@ -452,6 +488,14 @@ function isDiscoveryStatus(value: string): value is "idle" | "discovering" | "re
 
 function isGrainKeyType(value: string): value is "Guid" | "String" | "Integer" {
   return value === "Guid" || value === "String" || value === "Integer";
+}
+
+function isCancellationTokenParameter(parameter: { Name?: string; TypeName?: string }): boolean {
+  return (
+    parameter.TypeName === "CancellationToken" ||
+    parameter.TypeName === "System.Threading.CancellationToken" ||
+    parameter.Name?.toLowerCase() === "cancellationtoken"
+  );
 }
 
 function mapLogEntry(params: unknown): LogEntry | null {

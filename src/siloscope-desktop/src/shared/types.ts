@@ -19,6 +19,7 @@ export interface ParameterInfo {
 
 export type GrainKeyType = "Guid" | "String" | "Integer";
 export type SourceType = "DLL" | "NuGet";
+export type ClusterType = "Homogenous" | "Heterogeneous";
 export type SourceDiscoveryStatus = "idle" | "discovering" | "ready" | "error";
 
 export interface WorkspaceSource {
@@ -40,6 +41,7 @@ export interface Workspace {
   description?: string | null;
   clusterId?: string;
   serviceId?: string;
+  clusterType?: ClusterType;
   gatewayEndpoints?: string[];
   environmentVariables?: Record<string, string>;
   sources?: WorkspaceSource[];

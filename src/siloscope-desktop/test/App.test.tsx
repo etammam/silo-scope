@@ -7,6 +7,7 @@ import { useAppStore } from "@/renderer/store";
 const electrobunMock = vi.hoisted(() => {
   const request = {
     loadWorkspace: vi.fn(),
+    setActiveWorkspace: vi.fn(),
     saveWorkspace: vi.fn(),
     connectCluster: vi.fn(),
     disconnectCluster: vi.fn(),
@@ -58,6 +59,7 @@ describe("App shell", () => {
   beforeEach(() => {
     window.localStorage.clear();
     electrobunMock.request.loadWorkspace.mockClear();
+    electrobunMock.request.setActiveWorkspace.mockClear();
     electrobunMock.request.saveWorkspace.mockClear();
     electrobunMock.request.connectCluster.mockClear();
     electrobunMock.request.disconnectCluster.mockClear();
@@ -85,6 +87,9 @@ describe("App shell", () => {
         sources: [],
       },
     });
+    electrobunMock.request.setActiveWorkspace.mockImplementation(async ({ workspace }) => ({
+      workspace,
+    }));
     electrobunMock.request.saveWorkspace.mockResolvedValue({ success: true });
     electrobunMock.request.connectCluster.mockResolvedValue({
       message: "Connected to 1 gateway(s).",
@@ -127,6 +132,7 @@ describe("App shell", () => {
         sources: [],
       },
     });
+    electrobunMock.request.getWorkspaces.mockResolvedValue({ workspaces: [] });
     electrobunMock.request.invokeGrain.mockResolvedValue({
       isSuccess: true,
       result: "{}",
@@ -206,6 +212,7 @@ describe("App shell", () => {
           orleansVersion: "10.0",
         },
       });
+      useAppStore.setState({ isConnected: true });
     });
     render(<App />);
 
@@ -251,6 +258,9 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 
     expect(electrobunMock.request.loadWorkspace).toHaveBeenCalledWith(undefined);
+    expect(electrobunMock.request.setActiveWorkspace).toHaveBeenCalledWith({
+      workspace: expect.objectContaining({ id: "workspace-1" }),
+    });
     expect(electrobunMock.request.saveWorkspace).toHaveBeenCalledWith({
       workspace: expect.objectContaining({ id: "workspace-1" }),
       path: undefined,
@@ -260,6 +270,31 @@ describe("App shell", () => {
     });
     expect(electrobunMock.request.discoverGrains).toHaveBeenCalledWith({ workspaceId: "workspace-1" });
     expect(electrobunMock.request.disconnectCluster).toHaveBeenCalledWith();
+  });
+
+  it("loads persisted workspaces into the workspace selector on startup", async () => {
+    electrobunMock.request.getWorkspaces.mockResolvedValue({
+      workspaces: [
+        {
+          id: "workspace-2",
+          name: "Persisted Workspace",
+          siloAddress: "127.0.0.1",
+          gatewayPort: 30000,
+          orleansVersion: "10.0",
+          clusterId: "dev",
+          serviceId: "SiloScope",
+          gatewayEndpoints: ["127.0.0.1:30000"],
+          sources: [],
+        },
+      ],
+    });
+
+    render(<App />);
+
+    expect(await screen.findByLabelText("Active workspace")).toHaveValue("workspace-2");
+    expect(electrobunMock.request.setActiveWorkspace).toHaveBeenCalledWith({
+      workspace: expect.objectContaining({ id: "workspace-2" }),
+    });
   });
 
   it("invokes the selected function through the desktop backend", async () => {
@@ -333,7 +368,7 @@ describe("App shell", () => {
     await screen.findByText(/"score": 42/);
 
     expect(electrobunMock.request.invokeGrain).toHaveBeenCalledWith({
-      grainType: "IPlayerGrain",
+      grainType: "grain-1",
       method: "GetScore",
       grainKey: "player-1",
       payload: "{\n}",
@@ -495,7 +530,7 @@ describe("App shell", () => {
     expect(screen.getAllByTestId("mock-editor")[0]).toHaveAttribute("data-theme", "light");
   });
 
-  it("clears workspace state when the File menu requests a new workspace", () => {
+  it("opens the workspace creation popup when the File menu requests a new workspace", () => {
     useAppStore.setState({
       workspace: {
         id: "workspace-1",
@@ -523,19 +558,16 @@ describe("App shell", () => {
     });
 
     const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
+    render(<App />);
 
-    rpcConfig.handlers.messages.applicationMenuAction({ action: "newWorkspace" });
+    act(() => {
+      rpcConfig.handlers.messages.applicationMenuAction({ action: "newWorkspace" });
+    });
 
-    expect(useAppStore.getState().workspace).toEqual(
-      expect.objectContaining({ name: "Untitled Workspace" }),
-    );
-    expect(useAppStore.getState().grains).toEqual([]);
-    expect(useAppStore.getState().sourceCatalog).toEqual({ sources: [] });
-    expect(useAppStore.getState().selectedFunctionId).toBeNull();
-    expect(useAppStore.getState().invocationResult).toBeNull();
+    expect(screen.getByRole("dialog", { name: "New workspace" })).toBeInTheDocument();
   });
 
-  it("clears workspace state from the navigation new workspace action", () => {
+  it("opens the workspace creation popup from the navigation new workspace action", () => {
     useAppStore.setState({
       workspace: {
         id: "workspace-1",
@@ -566,13 +598,113 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
 
+    expect(screen.getByRole("dialog", { name: "New workspace" })).toBeInTheDocument();
+  });
+
+  it("creates a workspace, configures cluster settings, references a DLL source, and connects", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
+    fireEvent.change(screen.getByLabelText("Workspace name"), {
+      target: { value: "Tenant Workspace" },
+    });
+    fireEvent.change(screen.getByLabelText("Cluster ID"), {
+      target: { value: "local-cluster" },
+    });
+    fireEvent.change(screen.getByLabelText("Service ID"), {
+      target: { value: "TenantService" },
+    });
+    fireEvent.change(screen.getByLabelText("Gateway endpoint"), {
+      target: { value: "localhost:11111" },
+    });
+    fireEvent.change(screen.getByLabelText("Source reference"), {
+      target: { value: "/tmp/Contracts.dll" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Source" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+
+    await screen.findByText("Connected");
+
+    expect(electrobunMock.request.setActiveWorkspace).toHaveBeenCalledWith({
+      workspace: expect.objectContaining({
+        clusterId: "local-cluster",
+        serviceId: "TenantService",
+        gatewayEndpoints: ["localhost:11111"],
+        sources: [
+          expect.objectContaining({
+            sourceType: "DLL",
+            reference: "/tmp/Contracts.dll",
+            enabled: true,
+          }),
+        ],
+      }),
+    });
+    expect(electrobunMock.request.saveWorkspace).toHaveBeenCalledWith({
+      workspace: expect.objectContaining({
+        name: "Tenant Workspace",
+        sources: [
+          expect.objectContaining({
+            sourceType: "DLL",
+            reference: "/tmp/Contracts.dll",
+          }),
+        ],
+      }),
+      path: undefined,
+    });
+    expect(electrobunMock.request.connectCluster).toHaveBeenCalledWith({
+      workspace: expect.objectContaining({
+        clusterId: "local-cluster",
+        serviceId: "TenantService",
+        gatewayEndpoints: ["localhost:11111"],
+      }),
+    });
+  });
+
+  it("edits a workspace and keeps multiple referenced sources", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
+    fireEvent.change(screen.getByLabelText("Workspace name"), {
+      target: { value: "Tenant Workspace" },
+    });
+    fireEvent.change(screen.getByLabelText("Source reference"), {
+      target: { value: "/tmp/Contracts.dll" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Source" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Workspace" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Workspace" }));
+    expect(screen.getByRole("dialog", { name: "Edit workspace" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Workspace name"), {
+      target: { value: "Tenant Workspace Edited" },
+    });
+    fireEvent.change(screen.getByLabelText("Source reference"), {
+      target: { value: "/tmp/MoreContracts.dll" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Source" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Workspace" }));
+
     expect(useAppStore.getState().workspace).toEqual(
-      expect.objectContaining({ name: "Untitled Workspace" }),
+      expect.objectContaining({
+        name: "Tenant Workspace Edited",
+        sources: [
+          expect.objectContaining({ reference: "/tmp/Contracts.dll" }),
+          expect.objectContaining({ reference: "/tmp/MoreContracts.dll" }),
+        ],
+      }),
     );
-    expect(useAppStore.getState().grains).toEqual([]);
-    expect(useAppStore.getState().sourceCatalog).toEqual({ sources: [] });
-    expect(useAppStore.getState().selectedFunctionId).toBeNull();
-    expect(useAppStore.getState().invocationResult).toBeNull();
+    expect(electrobunMock.request.saveWorkspace).toHaveBeenCalledWith({
+      workspace: expect.objectContaining({
+        name: "Tenant Workspace Edited",
+        sources: [
+          expect.objectContaining({ reference: "/tmp/Contracts.dll" }),
+          expect.objectContaining({ reference: "/tmp/MoreContracts.dll" }),
+        ],
+      }),
+      path: undefined,
+    });
   });
 
   it("toggles shell panels from the View menu actions", () => {
