@@ -1,4 +1,5 @@
 using FluentResults;
+using StreamJsonRpc;
 
 namespace Siloscope.Core.Endpoints;
 
@@ -41,13 +42,19 @@ public interface ISiloScopeCommands
         string? sourceUrl = null,
         CancellationToken cancellationToken = default
     );
+
+    [JsonRpcMethod("ListNugetFeedsAsync")]
     Task<Result<IReadOnlyList<NugetFeedInfo>>> ListNugetFeedsAsync(
         CancellationToken cancellationToken = default
     );
+
+    [JsonRpcMethod("CreateNugetFeedAsync")]
     Task<Result<NugetFeedInfo>> CreateNugetFeedAsync(
         CreateNugetFeedRequest request,
         CancellationToken cancellationToken = default
     );
+
+    [JsonRpcMethod("SearchNugetPackagesAsync")]
     Task<Result<IReadOnlyList<NugetPackageInfo>>> SearchNugetPackagesAsync(
         string query,
         string? sourceUrl = null,
@@ -55,6 +62,8 @@ public interface ISiloScopeCommands
         int take = 20,
         CancellationToken cancellationToken = default
     );
+
+    [JsonRpcMethod("AddNugetPackageSourceAsync")]
     Task<Result<WorkspaceInfo>> AddNugetPackageSourceAsync(
         string packageId,
         string version,

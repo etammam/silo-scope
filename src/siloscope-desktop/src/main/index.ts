@@ -127,8 +127,10 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         return { sourceCatalog: mapSourceCatalog(result.Value ?? {}) };
       },
       listNugetFeeds: async () => {
-        const result = await sidecar.request<FluentResult<BackendNugetFeed[]>>(
+        const result = await requestSidecar<FluentResult<BackendNugetFeed[]>>(
           "ListNugetFeedsAsync",
+          undefined,
+          "ListNugetFeeds",
         );
 
         if (!result.IsSuccess) {
@@ -138,7 +140,7 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         return { feeds: (result.Value ?? []).map(mapNugetFeed) };
       },
       createNugetFeed: async ({ name, url, username, password, isPasswordClearText }) => {
-        const result = await sidecar.request<FluentResult<BackendNugetFeed>>(
+        const result = await requestSidecar<FluentResult<BackendNugetFeed>>(
           "CreateNugetFeedAsync",
           [
             {
@@ -149,6 +151,7 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
               IsPasswordClearText: isPasswordClearText ?? true,
             },
           ],
+          "CreateNugetFeed",
         );
 
         if (!result.IsSuccess || !result.Value) {
@@ -158,9 +161,10 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         return { feed: mapNugetFeed(result.Value) };
       },
       searchNugetPackages: async ({ query, sourceUrl, feedName, take }) => {
-        const result = await sidecar.request<FluentResult<BackendNugetPackage[]>>(
+        const result = await requestSidecar<FluentResult<BackendNugetPackage[]>>(
           "SearchNugetPackagesAsync",
           [query, sourceUrl ?? null, feedName ?? null, take ?? 20],
+          "SearchNugetPackages",
         );
 
         if (!result.IsSuccess) {
@@ -170,9 +174,10 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         return { packages: (result.Value ?? []).map(mapNugetPackage) };
       },
       addNugetPackageSource: async ({ packageId, version, sourceUrl, feedName }) => {
-        const result = await sidecar.request<FluentResult<BackendWorkspaceInfo>>(
+        const result = await requestSidecar<FluentResult<BackendWorkspaceInfo>>(
           "AddNugetPackageSourceAsync",
           [packageId, version, sourceUrl ?? null, feedName ?? null],
+          "AddNugetPackageSource",
         );
 
         if (!result.IsSuccess || !result.Value) {
@@ -216,6 +221,26 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
     },
   },
 });
+
+async function requestSidecar<T>(
+  method: string,
+  params?: readonly unknown[] | Record<string, unknown>,
+  fallbackMethod?: string,
+): Promise<T> {
+  try {
+    return await sidecar.request<T>(method, params);
+  } catch (error) {
+    if (!fallbackMethod || !isMissingJsonRpcMethod(error)) {
+      throw error;
+    }
+
+    return sidecar.request<T>(fallbackMethod, params);
+  }
+}
+
+function isMissingJsonRpcMethod(error: unknown): boolean {
+  return error instanceof Error && /no method by the name/i.test(error.message);
+}
 
 function mapNugetFeed(feed: BackendNugetFeed): NugetFeed {
   return {

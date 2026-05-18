@@ -12,6 +12,13 @@ import type {
 } from "../../shared/types";
 import { buildSourceCatalogFromGrains } from "../catalog";
 
+const defaultNugetFeed: NugetFeed = {
+  name: "nuget.org",
+  url: "https://api.nuget.org/v3/index.json",
+  hasCredentials: false,
+  isDefault: true,
+};
+
 type NavigationSidebarProps = {
   activeView: ActivityView;
   theme: "dark" | "light";
@@ -372,18 +379,21 @@ function NuGetRegistryManager({
   onAddPackageSource?: (request: { packageId: string; version: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
 }) {
   const [activeFeedName, setActiveFeedName] = useState("nuget.org");
+  const [isFeedDialogOpen, setIsFeedDialogOpen] = useState(false);
   const [feedName, setFeedName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
   const [feedUsername, setFeedUsername] = useState("");
   const [feedPassword, setFeedPassword] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Ready");
-  const activeFeed = feeds.find((feed) => feed.name === activeFeedName) ?? feeds[0] ?? {
-    name: "nuget.org",
-    url: "https://api.nuget.org/v3/index.json",
-    hasCredentials: false,
-    isDefault: true,
-  };
+  const availableFeeds = useMemo(
+    () => [
+      defaultNugetFeed,
+      ...feeds.filter((feed) => feed.name !== defaultNugetFeed.name),
+    ],
+    [feeds],
+  );
+  const activeFeed = availableFeeds.find((feed) => feed.name === activeFeedName) ?? defaultNugetFeed;
 
   const handleCreateFeed = async () => {
     if (!feedName.trim() || !feedUrl.trim() || !onCreateFeed) {
@@ -403,6 +413,7 @@ function NuGetRegistryManager({
       setFeedUrl("");
       setFeedUsername("");
       setFeedPassword("");
+      setIsFeedDialogOpen(false);
       setStatus("Feed added");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Feed add failed");
@@ -455,8 +466,7 @@ function NuGetRegistryManager({
         <label className="navigation-sidebar__select-label">
           <span>Active source</span>
           <select value={activeFeed.name} onChange={(event) => setActiveFeedName(event.target.value)}>
-            {feeds.length === 0 && <option value="nuget.org">nuget.org</option>}
-            {feeds.map((feed) => (
+            {availableFeeds.map((feed) => (
               <option key={feed.name} value={feed.name}>
                 {feed.name}
               </option>
@@ -464,35 +474,52 @@ function NuGetRegistryManager({
           </select>
         </label>
         <div className="navigation-sidebar__row">
-          <span className="navigation-sidebar__file-icon" />
+          <span className="navigation-sidebar__feed-dot" />
           <span>{activeFeed.url}</span>
         </div>
-      </section>
-
-      <section className="navigation-sidebar__section" aria-labelledby="nuget-add-feed-title">
-        <div className="navigation-sidebar__section-title" id="nuget-add-feed-title">
-          Add Feed
-        </div>
-        <label className="navigation-sidebar__select-label">
-          <span>Name</span>
-          <input value={feedName} onChange={(event) => setFeedName(event.target.value)} placeholder="Feed name" />
-        </label>
-        <label className="navigation-sidebar__select-label">
-          <span>URL</span>
-          <input value={feedUrl} onChange={(event) => setFeedUrl(event.target.value)} placeholder="https://..." />
-        </label>
-        <label className="navigation-sidebar__select-label">
-          <span>Username</span>
-          <input value={feedUsername} onChange={(event) => setFeedUsername(event.target.value)} placeholder="Optional" />
-        </label>
-        <label className="navigation-sidebar__select-label">
-          <span>Token</span>
-          <input value={feedPassword} onChange={(event) => setFeedPassword(event.target.value)} placeholder="Optional" type="password" />
-        </label>
-        <button className="navigation-sidebar__command" disabled={!feedName.trim() || !feedUrl.trim()} onClick={handleCreateFeed} type="button">
+        <button className="navigation-sidebar__command" onClick={() => setIsFeedDialogOpen(true)} type="button">
           Add Feed
         </button>
       </section>
+
+      {isFeedDialogOpen && (
+        <div className="navigation-sidebar__dialog-backdrop" role="presentation">
+          <div aria-labelledby="nuget-add-feed-title" aria-modal="true" className="navigation-sidebar__dialog" role="dialog">
+            <div className="navigation-sidebar__dialog-header">
+              <div className="navigation-sidebar__section-title" id="nuget-add-feed-title">
+                Add Feed
+              </div>
+              <button
+                aria-label="Close add feed"
+                className="navigation-sidebar__mini-command"
+                onClick={() => setIsFeedDialogOpen(false)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+            <label className="navigation-sidebar__select-label">
+              <span>Name</span>
+              <input value={feedName} onChange={(event) => setFeedName(event.target.value)} placeholder="github" />
+            </label>
+            <label className="navigation-sidebar__select-label">
+              <span>URL</span>
+              <input value={feedUrl} onChange={(event) => setFeedUrl(event.target.value)} placeholder="https://..." />
+            </label>
+            <label className="navigation-sidebar__select-label">
+              <span>Username</span>
+              <input value={feedUsername} onChange={(event) => setFeedUsername(event.target.value)} placeholder="Optional" />
+            </label>
+            <label className="navigation-sidebar__select-label">
+              <span>Token</span>
+              <input value={feedPassword} onChange={(event) => setFeedPassword(event.target.value)} placeholder="Optional" type="password" />
+            </label>
+            <button className="navigation-sidebar__command" disabled={!feedName.trim() || !feedUrl.trim()} onClick={handleCreateFeed} type="button">
+              Save Feed
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="navigation-sidebar__section" aria-labelledby="nuget-search-title">
         <div className="navigation-sidebar__section-title" id="nuget-search-title">

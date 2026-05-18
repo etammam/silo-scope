@@ -625,6 +625,14 @@ textarea,
 	width: 11px;
 }
 
+.navigation-sidebar__feed-dot {
+	background: var(--ui-5);
+	border-radius: 50%;
+	flex: 0 0 auto;
+	height: 7px;
+	width: 7px;
+}
+
 .navigation-sidebar__check-row {
 	align-items: center;
 	color: var(--ui-6);
@@ -726,6 +734,38 @@ textarea,
 .navigation-sidebar__mini-command:disabled {
 	cursor: not-allowed;
 	opacity: 0.45;
+}
+
+.navigation-sidebar__dialog-backdrop {
+	align-items: center;
+	background: rgb(0 0 0 / 0.34);
+	display: flex;
+	inset: 0;
+	justify-content: center;
+	padding: 14px;
+	position: fixed;
+	z-index: 20;
+}
+
+.navigation-sidebar__dialog {
+	background: var(--ui-1);
+	border: 1px solid var(--ui-4);
+	border-radius: 6px;
+	box-shadow: 0 18px 48px rgb(0 0 0 / 0.28);
+	inline-size: min(320px, calc(100vw - 44px));
+	padding: 12px;
+}
+
+.navigation-sidebar__dialog-header {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+.navigation-sidebar__dialog .navigation-sidebar__command {
+	margin-top: 12px;
 }
 
 .navigation-sidebar__logs {
