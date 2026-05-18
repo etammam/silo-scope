@@ -5,7 +5,11 @@ export type ActivityView = "workspace" | "nuget" | "settings";
 type ActivityBarItem = {
   id: ActivityView;
   label: string;
-  Icon: React.ComponentType<{ width?: number; height?: number; className?: string }>;
+  Icon: React.ComponentType<{
+    width?: number;
+    height?: number;
+    className?: string;
+  }>;
 };
 
 const activityItems: ActivityBarItem[] = [
@@ -21,10 +25,6 @@ type ActivityBarProps = {
 export function ActivityBar({ activeView, onViewChange }: ActivityBarProps) {
   return (
     <nav className="activity-bar" aria-label="Primary views">
-      <div className="activity-bar__brand" aria-label="SiloScope">
-        Si
-      </div>
-
       <div className="activity-bar__items" role="list">
         {activityItems.map((item) => (
           <button
@@ -36,7 +36,12 @@ export function ActivityBar({ activeView, onViewChange }: ActivityBarProps) {
             title={item.label}
             type="button"
           >
-            <item.Icon aria-hidden="true" className="activity-icon" width={18} height={18} />
+            <item.Icon
+              aria-hidden="true"
+              className="activity-icon"
+              width={18}
+              height={18}
+            />
           </button>
         ))}
       </div>

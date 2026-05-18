@@ -1,8 +1,8 @@
 import { Electroview } from "electrobun/view";
 import {
+  LayoutTemplate,
   PanelLeftClose,
   PanelRightClose,
-  LayoutTemplate,
   Settings,
 } from "lucide-react";
 import {
@@ -14,7 +14,12 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { SiloScopeRPC } from "../shared/rpc";
-import type { ClusterType, GrainKeyType, Workspace, WorkspaceSource } from "../shared/types";
+import type {
+  ClusterType,
+  GrainKeyType,
+  Workspace,
+  WorkspaceSource,
+} from "../shared/types";
 import { buildSourceCatalogFromGrains, findCatalogFunction } from "./catalog";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import { NavigationSidebar } from "./components/NavigationSidebar";
@@ -131,11 +136,23 @@ function App() {
       setWorkspaces(loadedWorkspaces);
     };
 
-    window.addEventListener("siloscope:workspace-loaded", handleWorkspaceLoaded);
-    window.addEventListener("siloscope:workspaces-loaded", handleWorkspacesLoaded);
+    window.addEventListener(
+      "siloscope:workspace-loaded",
+      handleWorkspaceLoaded,
+    );
+    window.addEventListener(
+      "siloscope:workspaces-loaded",
+      handleWorkspacesLoaded,
+    );
     return () => {
-      window.removeEventListener("siloscope:workspace-loaded", handleWorkspaceLoaded);
-      window.removeEventListener("siloscope:workspaces-loaded", handleWorkspacesLoaded);
+      window.removeEventListener(
+        "siloscope:workspace-loaded",
+        handleWorkspaceLoaded,
+      );
+      window.removeEventListener(
+        "siloscope:workspaces-loaded",
+        handleWorkspacesLoaded,
+      );
     };
   }, []);
 
@@ -264,7 +281,9 @@ function App() {
 
   const handleSelectWorkspace = useCallback(
     (workspaceId: string) => {
-      const nextWorkspace = workspaces.find((candidate) => candidate.id === workspaceId);
+      const nextWorkspace = workspaces.find(
+        (candidate) => candidate.id === workspaceId,
+      );
       if (!nextWorkspace) {
         return;
       }
@@ -502,14 +521,29 @@ function NewWorkspaceDialog({
   onCreate: (workspace: Workspace) => void;
 }) {
   const isEditing = Boolean(initialWorkspace);
-  const [name, setName] = useState(initialWorkspace?.name ?? "Untitled Workspace");
-  const [description, setDescription] = useState(initialWorkspace?.description ?? "");
-  const [clusterType, setClusterType] = useState<ClusterType>(initialWorkspace?.clusterType ?? "Homogenous");
-  const [clusterId, setClusterId] = useState(initialWorkspace?.clusterId ?? "dev");
-  const [serviceId, setServiceId] = useState(initialWorkspace?.serviceId ?? "SiloScope");
-  const [gatewayEndpoint, setGatewayEndpoint] = useState(initialWorkspace?.gatewayEndpoints?.[0] ?? "127.0.0.1:30000");
-  const [sources, setSources] = useState<WorkspaceSource[]>(initialWorkspace?.sources ?? []);
-  const [sourceType, setSourceType] = useState<WorkspaceSource["sourceType"]>("DLL");
+  const [name, setName] = useState(
+    initialWorkspace?.name ?? "Untitled Workspace",
+  );
+  const [description, setDescription] = useState(
+    initialWorkspace?.description ?? "",
+  );
+  const [clusterType, setClusterType] = useState<ClusterType>(
+    initialWorkspace?.clusterType ?? "Homogenous",
+  );
+  const [clusterId, setClusterId] = useState(
+    initialWorkspace?.clusterId ?? "dev",
+  );
+  const [serviceId, setServiceId] = useState(
+    initialWorkspace?.serviceId ?? "SiloScope",
+  );
+  const [gatewayEndpoint, setGatewayEndpoint] = useState(
+    initialWorkspace?.gatewayEndpoints?.[0] ?? "127.0.0.1:30000",
+  );
+  const [sources, setSources] = useState<WorkspaceSource[]>(
+    initialWorkspace?.sources ?? [],
+  );
+  const [sourceType, setSourceType] =
+    useState<WorkspaceSource["sourceType"]>("DLL");
   const [sourceReference, setSourceReference] = useState("");
   const [sourceVersion, setSourceVersion] = useState("");
   const [sourceGateway, setSourceGateway] = useState("");
@@ -524,9 +558,13 @@ function NewWorkspaceDialog({
       sourceId: `${sourceType}:${reference}:${sourceVersion.trim()}:${sourceGateway.trim()}`,
       sourceType,
       reference,
-      label: sourceType === "DLL" ? reference.split(/[\\/]/).pop() || reference : reference,
+      label:
+        sourceType === "DLL"
+          ? reference.split(/[\\/]/).pop() || reference
+          : reference,
       version: sourceType === "NuGet" ? sourceVersion.trim() || null : null,
-      gateway: clusterType === "Heterogeneous" ? sourceGateway.trim() || null : null,
+      gateway:
+        clusterType === "Heterogeneous" ? sourceGateway.trim() || null : null,
       enabled: true,
     };
 
@@ -549,7 +587,10 @@ function NewWorkspaceDialog({
       clusterId: clusterId.trim() || "dev",
       serviceId: serviceId.trim() || "SiloScope",
       clusterType,
-      gatewayEndpoints: clusterType === "Homogenous" && gatewayEndpoint.trim() ? [gatewayEndpoint.trim()] : [],
+      gatewayEndpoints:
+        clusterType === "Homogenous" && gatewayEndpoint.trim()
+          ? [gatewayEndpoint.trim()]
+          : [],
       environmentVariables: {},
       sources,
     };
@@ -559,13 +600,27 @@ function NewWorkspaceDialog({
 
   return (
     <div className="workspace-dialog__backdrop" role="presentation">
-      <section aria-labelledby="new-workspace-title" aria-modal="true" className="workspace-dialog" role="dialog">
+      <section
+        aria-labelledby="new-workspace-title"
+        aria-modal="true"
+        className="workspace-dialog"
+        role="dialog"
+      >
         <header className="workspace-dialog__header">
           <div>
-            <h2 id="new-workspace-title">{isEditing ? "Edit workspace" : "New workspace"}</h2>
-            <p>Configure the workspace, cluster, and interface sources before connecting.</p>
+            <h2 id="new-workspace-title">
+              {isEditing ? "Edit workspace" : "New workspace"}
+            </h2>
+            <p>
+              Configure the workspace, cluster, and interface sources before
+              connecting.
+            </p>
           </div>
-          <button aria-label="Close new workspace" onClick={onCancel} type="button">
+          <button
+            aria-label="Close new workspace"
+            onClick={onCancel}
+            type="button"
+          >
             Close
           </button>
         </header>
@@ -575,11 +630,19 @@ function NewWorkspaceDialog({
             <h3>Workspace</h3>
             <label>
               <span>Name</span>
-              <input aria-label="Workspace name" value={name} onChange={(event) => setName(event.target.value)} />
+              <input
+                aria-label="Workspace name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
             </label>
             <label>
               <span>Description</span>
-              <input aria-label="Workspace description" value={description} onChange={(event) => setDescription(event.target.value)} />
+              <input
+                aria-label="Workspace description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
             </label>
           </section>
 
@@ -587,23 +650,41 @@ function NewWorkspaceDialog({
             <h3>Cluster</h3>
             <label>
               <span>Cluster type</span>
-              <select aria-label="Cluster type" value={clusterType} onChange={(event) => setClusterType(event.target.value as ClusterType)}>
+              <select
+                aria-label="Cluster type"
+                value={clusterType}
+                onChange={(event) =>
+                  setClusterType(event.target.value as ClusterType)
+                }
+              >
                 <option value="Homogenous">Homogeneous</option>
                 <option value="Heterogeneous">Heterogeneous</option>
               </select>
             </label>
             <label>
               <span>Cluster ID</span>
-              <input aria-label="Cluster ID" value={clusterId} onChange={(event) => setClusterId(event.target.value)} />
+              <input
+                aria-label="Cluster ID"
+                value={clusterId}
+                onChange={(event) => setClusterId(event.target.value)}
+              />
             </label>
             <label>
               <span>Service ID</span>
-              <input aria-label="Service ID" value={serviceId} onChange={(event) => setServiceId(event.target.value)} />
+              <input
+                aria-label="Service ID"
+                value={serviceId}
+                onChange={(event) => setServiceId(event.target.value)}
+              />
             </label>
             {clusterType === "Homogenous" && (
               <label>
                 <span>Gateway</span>
-                <input aria-label="Gateway endpoint" value={gatewayEndpoint} onChange={(event) => setGatewayEndpoint(event.target.value)} />
+                <input
+                  aria-label="Gateway endpoint"
+                  value={gatewayEndpoint}
+                  onChange={(event) => setGatewayEndpoint(event.target.value)}
+                />
               </label>
             )}
           </section>
@@ -613,7 +694,15 @@ function NewWorkspaceDialog({
             <div className="workspace-dialog__source-form">
               <label>
                 <span>Type</span>
-                <select aria-label="Source type" value={sourceType} onChange={(event) => setSourceType(event.target.value as WorkspaceSource["sourceType"])}>
+                <select
+                  aria-label="Source type"
+                  value={sourceType}
+                  onChange={(event) =>
+                    setSourceType(
+                      event.target.value as WorkspaceSource["sourceType"],
+                    )
+                  }
+                >
                   <option value="DLL">DLL</option>
                   <option value="NuGet">NuGet</option>
                 </select>
@@ -623,35 +712,65 @@ function NewWorkspaceDialog({
                 <input
                   aria-label="Source reference"
                   onChange={(event) => setSourceReference(event.target.value)}
-                  placeholder={sourceType === "DLL" ? "/path/to/contracts.dll" : "Company.Contracts"}
+                  placeholder={
+                    sourceType === "DLL"
+                      ? "/path/to/contracts.dll"
+                      : "Company.Contracts"
+                  }
                   value={sourceReference}
                 />
               </label>
               {sourceType === "NuGet" && (
                 <label>
                   <span>Version</span>
-                  <input aria-label="Package version" value={sourceVersion} onChange={(event) => setSourceVersion(event.target.value)} />
+                  <input
+                    aria-label="Package version"
+                    value={sourceVersion}
+                    onChange={(event) => setSourceVersion(event.target.value)}
+                  />
                 </label>
               )}
               {clusterType === "Heterogeneous" && (
                 <label>
                   <span>Gateway</span>
-                  <input aria-label="Source gateway" value={sourceGateway} onChange={(event) => setSourceGateway(event.target.value)} />
+                  <input
+                    aria-label="Source gateway"
+                    value={sourceGateway}
+                    onChange={(event) => setSourceGateway(event.target.value)}
+                  />
                 </label>
               )}
-              <button disabled={!sourceReference.trim()} onClick={addSource} type="button">
+              <button
+                disabled={!sourceReference.trim()}
+                onClick={addSource}
+                type="button"
+              >
                 Add Source
               </button>
             </div>
             {sources.length > 0 ? (
-              <ul className="workspace-dialog__sources" aria-label="Workspace sources">
+              <ul
+                className="workspace-dialog__sources"
+                aria-label="Workspace sources"
+              >
                 {sources.map((source) => (
                   <li key={source.sourceId}>
                     <strong>{source.label}</strong>
-                    <span>{source.sourceType}{source.version ? ` ${source.version}` : ""}{source.gateway ? ` · ${source.gateway}` : ""}</span>
+                    <span>
+                      {source.sourceType}
+                      {source.version ? ` ${source.version}` : ""}
+                      {source.gateway ? ` · ${source.gateway}` : ""}
+                    </span>
                     <button
                       aria-label={`Remove ${source.label}`}
-                      onClick={() => setSources((current) => current.filter((candidate) => candidate.sourceId !== source.sourceId))}
+                      onClick={() =>
+                        setSources((current) =>
+                          current.filter(
+                            (candidate) =>
+                              candidate.sourceId !== source.sourceId,
+                          ),
+                        )
+                      }
                       type="button"
                     >
                       Remove
@@ -660,14 +779,20 @@ function NewWorkspaceDialog({
                 ))}
               </ul>
             ) : (
-              <div className="workspace-dialog__empty">No sources added yet</div>
+              <div className="workspace-dialog__empty">
+                No sources added yet
+              </div>
             )}
           </section>
         </div>
 
         <footer className="workspace-dialog__footer">
-          <button onClick={onCancel} type="button">Cancel</button>
-          <button disabled={!name.trim()} onClick={saveWorkspace} type="button">{isEditing ? "Save Workspace" : "Create Workspace"}</button>
+          <button onClick={onCancel} type="button">
+            Cancel
+          </button>
+          <button disabled={!name.trim()} onClick={saveWorkspace} type="button">
+            {isEditing ? "Save Workspace" : "Create Workspace"}
+          </button>
         </footer>
       </section>
     </div>
@@ -687,7 +812,9 @@ function readStoredTheme(): WorkbenchTheme {
 
 async function setActiveWorkspace(workspace: Workspace): Promise<boolean> {
   try {
-    const response = await electroview.rpc!.request.setActiveWorkspace({ workspace });
+    const response = await electroview.rpc!.request.setActiveWorkspace({
+      workspace,
+    });
     useAppStore.getState().setWorkspace(response.workspace);
     return true;
   } catch (error) {
@@ -703,13 +830,20 @@ async function setActiveWorkspace(workspace: Workspace): Promise<boolean> {
   }
 }
 
-function upsertWorkspace(workspaces: Workspace[], workspace: Workspace): Workspace[] {
-  const existingIndex = workspaces.findIndex((candidate) => candidate.id === workspace.id);
+function upsertWorkspace(
+  workspaces: Workspace[],
+  workspace: Workspace,
+): Workspace[] {
+  const existingIndex = workspaces.findIndex(
+    (candidate) => candidate.id === workspace.id,
+  );
   if (existingIndex === -1) {
     return [...workspaces, workspace];
   }
 
-  return workspaces.map((candidate, index) => (index === existingIndex ? workspace : candidate));
+  return workspaces.map((candidate, index) =>
+    index === existingIndex ? workspace : candidate,
+  );
 }
 
 async function refreshPersistedWorkspaces() {
@@ -718,7 +852,11 @@ async function refreshPersistedWorkspaces() {
     const store = useAppStore.getState();
     const workspaces = response.workspaces;
 
-    window.dispatchEvent(new CustomEvent<Workspace[]>("siloscope:workspaces-loaded", { detail: workspaces }));
+    window.dispatchEvent(
+      new CustomEvent<Workspace[]>("siloscope:workspaces-loaded", {
+        detail: workspaces,
+      }),
+    );
     if (!store.workspace && workspaces.length > 0) {
       store.setWorkspace(workspaces[0]);
       await setActiveWorkspace(workspaces[0]);
@@ -728,14 +866,19 @@ async function refreshPersistedWorkspaces() {
       timestamp: new Date().toISOString(),
       level: "error",
       message:
-        error instanceof Error ? error.message : "Failed to load persisted workspaces.",
+        error instanceof Error
+          ? error.message
+          : "Failed to load persisted workspaces.",
     });
   }
 }
 
 async function persistWorkspace(workspace: Workspace) {
   try {
-    await electroview.rpc!.request.saveWorkspace({ workspace, path: undefined });
+    await electroview.rpc!.request.saveWorkspace({
+      workspace,
+      path: undefined,
+    });
     await setActiveWorkspace(workspace);
     addWorkspaceToSession(workspace);
   } catch (error) {
@@ -776,7 +919,11 @@ async function loadWorkspace(path?: string) {
 }
 
 function addWorkspaceToSession(workspace: Workspace) {
-  window.dispatchEvent(new CustomEvent<Workspace>("siloscope:workspace-loaded", { detail: workspace }));
+  window.dispatchEvent(
+    new CustomEvent<Workspace>("siloscope:workspace-loaded", {
+      detail: workspace,
+    }),
+  );
 }
 
 async function saveCurrentWorkspace(path?: string) {
@@ -824,7 +971,9 @@ async function connectCluster() {
       return;
     }
 
-    const response = await electroview.rpc!.request.connectCluster({ workspace });
+    const response = await electroview.rpc!.request.connectCluster({
+      workspace,
+    });
     const store = useAppStore.getState();
     store.setIsConnected(true);
     store.addLog({
@@ -860,7 +1009,9 @@ async function disconnectCluster() {
       timestamp: new Date().toISOString(),
       level: "error",
       message:
-        error instanceof Error ? error.message : "Failed to disconnect cluster.",
+        error instanceof Error
+          ? error.message
+          : "Failed to disconnect cluster.",
     });
   }
 }
@@ -874,7 +1025,9 @@ async function refreshWorkspaceCatalog(workspaceId: string) {
       }
     }
 
-    const response = await electroview.rpc!.request.discoverGrains({ workspaceId });
+    const response = await electroview.rpc!.request.discoverGrains({
+      workspaceId,
+    });
     const store = useAppStore.getState();
 
     store.setGrains(response.grains);
@@ -968,7 +1121,10 @@ async function addNugetPackageSource(request: {
   addWorkspaceToSession(response.workspace);
   store.setSourceCatalog({ sources: [] });
   store.setGrains([]);
-  await electroview.rpc!.request.saveWorkspace({ workspace: response.workspace, path: undefined });
+  await electroview.rpc!.request.saveWorkspace({
+    workspace: response.workspace,
+    path: undefined,
+  });
   await refreshWorkspaceCatalog(response.workspace.id);
 }
 
