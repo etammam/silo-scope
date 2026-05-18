@@ -1,11 +1,12 @@
 {
-    "words": [
-        "Avalonia",
-        "electrobun",
-        "NOLOGO",
-        "OPTOUT",
-        "Serilog",
-        "siloscope",
-        "xunit"
-    ]
+  "words": [
+    "Avalonia",
+    "electrobun",
+    "electroview",
+    "NOLOGO",
+    "OPTOUT",
+    "Serilog",
+    "siloscope",
+    "xunit"
+  ]
 }
