@@ -40,6 +40,29 @@ export interface Workspace {
   sources?: WorkspaceSource[];
 }
 
+export interface NugetFeed {
+  name: string;
+  url: string;
+  hasCredentials: boolean;
+  isDefault: boolean;
+}
+
+export interface CreateNugetFeedRequest {
+  name: string;
+  url: string;
+  username?: string;
+  password?: string;
+  isPasswordClearText?: boolean;
+}
+
+export interface NugetPackage {
+  packageId: string;
+  version: string;
+  description?: string | null;
+  authors?: string | null;
+  downloadCount?: number | null;
+}
+
 export interface InvocationResult {
   isSuccess: boolean;
   result?: string;

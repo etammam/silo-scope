@@ -3,6 +3,8 @@ import type { ActivityView } from "./ActivityBar";
 import type {
   GrainInterfaceDescriptor,
   LogEntry,
+  NugetFeed,
+  NugetPackage,
   SourceCatalogInterface,
   SourceCatalogSource,
   SourceOwnedCatalog,
@@ -14,7 +16,12 @@ type NavigationSidebarProps = {
   activeView: ActivityView;
   theme: "dark" | "light";
   logs?: LogEntry[];
+  nugetFeeds?: NugetFeed[];
+  nugetPackages?: NugetPackage[];
   onClearLogs?: () => void;
+  onCreateNugetFeed?: (request: { name: string; url: string; username?: string; password?: string }) => Promise<void>;
+  onSearchNugetPackages?: (request: { query: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
+  onAddNugetPackageSource?: (request: { packageId: string; version: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
   onThemeChange: (theme: "dark" | "light") => void;
 } & WorkspaceNavigatorProps;
 
@@ -35,7 +42,12 @@ export function NavigationSidebar({
   grains,
   isConnected,
   logs = [],
+  nugetFeeds = [],
+  nugetPackages = [],
   onClearLogs,
+  onCreateNugetFeed,
+  onSearchNugetPackages,
+  onAddNugetPackageSource,
   onNewWorkspace,
   onSelectFunction,
   selectedGrain,
@@ -68,7 +80,16 @@ export function NavigationSidebar({
         />
       )}
 
-      {activeView === "nuget" && <NuGetRegistryManager />}
+      {activeView === "nuget" && (
+        <NuGetRegistryManager
+          feeds={nugetFeeds}
+          packages={nugetPackages}
+          onAddPackageSource={onAddNugetPackageSource}
+          onCreateFeed={onCreateNugetFeed}
+          onSearchPackages={onSearchNugetPackages}
+          workspace={workspace}
+        />
+      )}
 
       {activeView === "settings" && (
         <SystemSettings
@@ -335,7 +356,96 @@ function SourceInterfaceTree({
   );
 }
 
-function NuGetRegistryManager() {
+function NuGetRegistryManager({
+  feeds,
+  packages,
+  onAddPackageSource,
+  onCreateFeed,
+  onSearchPackages,
+  workspace,
+}: {
+  feeds: NugetFeed[];
+  packages: NugetPackage[];
+  workspace: Workspace | null;
+  onCreateFeed?: (request: { name: string; url: string; username?: string; password?: string }) => Promise<void>;
+  onSearchPackages?: (request: { query: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
+  onAddPackageSource?: (request: { packageId: string; version: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
+}) {
+  const [activeFeedName, setActiveFeedName] = useState("nuget.org");
+  const [feedName, setFeedName] = useState("");
+  const [feedUrl, setFeedUrl] = useState("");
+  const [feedUsername, setFeedUsername] = useState("");
+  const [feedPassword, setFeedPassword] = useState("");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("Ready");
+  const activeFeed = feeds.find((feed) => feed.name === activeFeedName) ?? feeds[0] ?? {
+    name: "nuget.org",
+    url: "https://api.nuget.org/v3/index.json",
+    hasCredentials: false,
+    isDefault: true,
+  };
+
+  const handleCreateFeed = async () => {
+    if (!feedName.trim() || !feedUrl.trim() || !onCreateFeed) {
+      return;
+    }
+
+    setStatus("Adding feed");
+    try {
+      await onCreateFeed({
+        name: feedName.trim(),
+        url: feedUrl.trim(),
+        username: feedUsername.trim() || undefined,
+        password: feedPassword || undefined,
+      });
+      setActiveFeedName(feedName.trim());
+      setFeedName("");
+      setFeedUrl("");
+      setFeedUsername("");
+      setFeedPassword("");
+      setStatus("Feed added");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Feed add failed");
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!query.trim() || !onSearchPackages) {
+      return;
+    }
+
+    setStatus("Searching");
+    try {
+      await onSearchPackages({
+        query: query.trim(),
+        sourceUrl: activeFeed.url,
+        feedName: activeFeed.isDefault ? undefined : activeFeed.name,
+      });
+      setStatus("Search complete");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Search failed");
+    }
+  };
+
+  const handleAddPackage = async (packageInfo: NugetPackage) => {
+    if (!workspace || !onAddPackageSource) {
+      return;
+    }
+
+    setStatus("Restoring package");
+    try {
+      await onAddPackageSource({
+        packageId: packageInfo.packageId,
+        version: packageInfo.version,
+        sourceUrl: activeFeed.url,
+        feedName: activeFeed.isDefault ? undefined : activeFeed.name,
+      });
+      setStatus("Package source added");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Package restore failed");
+    }
+  };
+
   return (
     <>
       <section className="navigation-sidebar__section" aria-labelledby="nuget-sources-title">
@@ -344,10 +454,44 @@ function NuGetRegistryManager() {
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Active source</span>
-          <select defaultValue="nuget">
-            <option value="nuget">nuget.org</option>
+          <select value={activeFeed.name} onChange={(event) => setActiveFeedName(event.target.value)}>
+            {feeds.length === 0 && <option value="nuget.org">nuget.org</option>}
+            {feeds.map((feed) => (
+              <option key={feed.name} value={feed.name}>
+                {feed.name}
+              </option>
+            ))}
           </select>
         </label>
+        <div className="navigation-sidebar__row">
+          <span className="navigation-sidebar__file-icon" />
+          <span>{activeFeed.url}</span>
+        </div>
+      </section>
+
+      <section className="navigation-sidebar__section" aria-labelledby="nuget-add-feed-title">
+        <div className="navigation-sidebar__section-title" id="nuget-add-feed-title">
+          Add Feed
+        </div>
+        <label className="navigation-sidebar__select-label">
+          <span>Name</span>
+          <input value={feedName} onChange={(event) => setFeedName(event.target.value)} placeholder="Feed name" />
+        </label>
+        <label className="navigation-sidebar__select-label">
+          <span>URL</span>
+          <input value={feedUrl} onChange={(event) => setFeedUrl(event.target.value)} placeholder="https://..." />
+        </label>
+        <label className="navigation-sidebar__select-label">
+          <span>Username</span>
+          <input value={feedUsername} onChange={(event) => setFeedUsername(event.target.value)} placeholder="Optional" />
+        </label>
+        <label className="navigation-sidebar__select-label">
+          <span>Token</span>
+          <input value={feedPassword} onChange={(event) => setFeedPassword(event.target.value)} placeholder="Optional" type="password" />
+        </label>
+        <button className="navigation-sidebar__command" disabled={!feedName.trim() || !feedUrl.trim()} onClick={handleCreateFeed} type="button">
+          Add Feed
+        </button>
       </section>
 
       <section className="navigation-sidebar__section" aria-labelledby="nuget-search-title">
@@ -356,9 +500,9 @@ function NuGetRegistryManager() {
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Package ID</span>
-          <input placeholder="Orleans package" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Orleans package" />
         </label>
-        <button className="navigation-sidebar__command" type="button">
+        <button className="navigation-sidebar__command" disabled={!query.trim()} onClick={handleSearch} type="button">
           Search Packages
         </button>
       </section>
@@ -367,7 +511,35 @@ function NuGetRegistryManager() {
         <div className="navigation-sidebar__section-title" id="nuget-results-title">
           Results
         </div>
-        <div className="navigation-sidebar__empty">No packages loaded</div>
+        {packages.length === 0 ? (
+          <div className="navigation-sidebar__empty">No packages loaded</div>
+        ) : (
+          <ul className="navigation-sidebar__list" aria-label="NuGet packages">
+            {packages.map((packageInfo) => (
+              <li key={`${packageInfo.packageId}:${packageInfo.version}`} className="navigation-sidebar__package">
+                <button
+                  className="navigation-sidebar__function"
+                  disabled={!workspace}
+                  onClick={() => void handleAddPackage(packageInfo)}
+                  type="button"
+                >
+                  <span className="navigation-sidebar__grain-icon" aria-hidden="true" />
+                  <span>
+                    {packageInfo.packageId} {packageInfo.version}
+                  </span>
+                </button>
+                {packageInfo.description && (
+                  <div className="navigation-sidebar__package-description">
+                    {packageInfo.description}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="navigation-sidebar__empty" role="status">
+          {status}
+        </div>
       </section>
     </>
   );

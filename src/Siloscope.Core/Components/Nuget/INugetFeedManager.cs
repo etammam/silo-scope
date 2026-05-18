@@ -22,6 +22,7 @@ public interface INugetConnectionManager
     );
 
     Result<Feed> Get(string name);
+    Result<IReadOnlyList<Feed>> List();
     ValueTask<Result<Feed>> UpdateAsync(Feed feed, CancellationToken cancellationToken = default);
     ValueTask<Result> DeleteAsync(Feed feed, CancellationToken cancellationToken = default);
 
@@ -39,6 +40,14 @@ public interface INugetConnectionManager
         IEnumerable<(string Id, string Version)> packages,
         string? sourceUrl = null,
         string? feedName = null,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<Result<IReadOnlyList<NugetPackageSearchResult>>> SearchPackagesAsync(
+        string query,
+        string? sourceUrl = null,
+        string? feedName = null,
+        int take = 20,
         CancellationToken cancellationToken = default
     );
 }
@@ -180,6 +189,29 @@ public class NugetConnectionManager : INugetConnectionManager
         catch (Exception e)
         {
             return Result.Fail(new Error(e.Message));
+        }
+    }
+
+    public Result<IReadOnlyList<Feed>> List()
+    {
+        try
+        {
+            return Result.Ok<IReadOnlyList<Feed>>(
+                _feeds
+                    .Select(feed => new Feed
+                    {
+                        Name = feed.Name,
+                        Url = feed.Url,
+                        Username = feed.Username,
+                        Password = feed.Password,
+                        IsPasswordClearText = feed.IsPasswordClearText,
+                    })
+                    .ToList()
+            );
+        }
+        catch (Exception e)
+        {
+            return Result.Fail<IReadOnlyList<Feed>>(e.Message);
         }
     }
 
@@ -367,6 +399,56 @@ public class NugetConnectionManager : INugetConnectionManager
         }
 
         return Result.Ok($"Restored {results.Count} packages");
+    }
+
+    public async Task<Result<IReadOnlyList<NugetPackageSearchResult>>> SearchPackagesAsync(
+        string query,
+        string? sourceUrl = null,
+        string? feedName = null,
+        int take = 20,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Result.Ok<IReadOnlyList<NugetPackageSearchResult>>([]);
+        }
+
+        try
+        {
+            var credentials = !string.IsNullOrEmpty(feedName) ? GetCredentials(feedName) : null;
+            var source = CreatePackageSource(sourceUrl, credentials);
+            var repository = Repository.Factory.GetCoreV3(source);
+            var searchResource = await repository.GetResourceAsync<PackageSearchResource>(
+                cancellationToken
+            );
+            var filter = new SearchFilter(includePrerelease: false);
+            var metadata = await searchResource.SearchAsync(
+                query,
+                filter,
+                skip: 0,
+                take: Math.Clamp(take, 1, 50),
+                log: NullLogger.Instance,
+                cancellationToken
+            );
+
+            var results = metadata
+                .Select(package => new NugetPackageSearchResult(
+                    package.Identity.Id,
+                    package.Identity.Version?.ToNormalizedString() ?? "",
+                    package.Description,
+                    package.Authors,
+                    package.DownloadCount
+                ))
+                .ToList();
+
+            return Result.Ok<IReadOnlyList<NugetPackageSearchResult>>(results);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to search NuGet packages for {Query}", query);
+            return Result.Fail<IReadOnlyList<NugetPackageSearchResult>>(e.Message);
+        }
     }
 
     private async Task<Result> RestorePackageGraphAsync(
@@ -565,3 +647,11 @@ public class NugetConnectionManager : INugetConnectionManager
                 .Any();
     }
 }
+
+public record NugetPackageSearchResult(
+    string PackageId,
+    string Version,
+    string? Description,
+    string? Authors,
+    long? DownloadCount
+);

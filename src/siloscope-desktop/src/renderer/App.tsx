@@ -64,6 +64,8 @@ function App() {
     selectedFunctionId,
     selectedMethod,
     logs,
+    nugetFeeds,
+    nugetPackages,
     clearLogs,
     setSelectedGrain,
     setSelectedFunction,
@@ -85,6 +87,10 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
+
+  useEffect(() => {
+    void refreshNugetFeeds();
+  }, []);
 
   useEffect(() => {
     const handleApplicationMenuAction = (event: Event) => {
@@ -246,7 +252,12 @@ function App() {
           grains={grains}
           isConnected={isConnected}
           logs={logs}
+          nugetFeeds={nugetFeeds}
+          nugetPackages={nugetPackages}
           onClearLogs={clearLogs}
+          onCreateNugetFeed={createNugetFeed}
+          onSearchNugetPackages={searchNugetPackages}
+          onAddNugetPackageSource={addNugetPackageSource}
           onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
           onNewWorkspace={handleNewWorkspace}
@@ -330,6 +341,59 @@ async function refreshWorkspaceCatalog(workspaceId: string) {
       message: error instanceof Error ? error.message : "Failed to refresh workspace catalog.",
     });
   }
+}
+
+async function refreshNugetFeeds() {
+  try {
+    const response = await electroview.rpc!.request.listNugetFeeds();
+    useAppStore.getState().setNugetFeeds(response.feeds);
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message: error instanceof Error ? error.message : "Failed to load NuGet feeds.",
+    });
+  }
+}
+
+async function createNugetFeed(request: {
+  name: string;
+  url: string;
+  username?: string;
+  password?: string;
+}) {
+  const response = await electroview.rpc!.request.createNugetFeed({
+    ...request,
+    isPasswordClearText: true,
+  });
+  const store = useAppStore.getState();
+  store.setNugetFeeds([...store.nugetFeeds.filter((feed) => feed.name !== response.feed.name), response.feed]);
+}
+
+async function searchNugetPackages(request: {
+  query: string;
+  sourceUrl?: string;
+  feedName?: string;
+}) {
+  const response = await electroview.rpc!.request.searchNugetPackages({
+    ...request,
+    take: 20,
+  });
+  useAppStore.getState().setNugetPackages(response.packages);
+}
+
+async function addNugetPackageSource(request: {
+  packageId: string;
+  version: string;
+  sourceUrl?: string;
+  feedName?: string;
+}) {
+  const response = await electroview.rpc!.request.addNugetPackageSource(request);
+  const store = useAppStore.getState();
+  store.setWorkspace(response.workspace);
+  store.setSourceCatalog({ sources: [] });
+  store.setGrains([]);
+  await refreshWorkspaceCatalog(response.workspace.id);
 }
 
 async function invokeGrain(request: GrainInvocationRequest) {

@@ -8,6 +8,8 @@ using Siloscope.Core.Components.Workspace;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.Endpoints;
 using Siloscope.Core.Interfaces;
+using Siloscope.Core.Nuget.Models;
+using Siloscope.Core.Nuget.Store;
 using Xunit;
 
 namespace Siloscope.Test.Core;
@@ -429,6 +431,123 @@ public sealed class SiloScopeCommandsTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.RestoredCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ListNugetFeedsAsync_IncludesDefaultAndStoredFeeds()
+    {
+        _nugetManagerMock
+            .Setup(m => m.List())
+            .Returns(
+                Result.Ok<IReadOnlyList<Feed>>([
+                    new Feed
+                    {
+                        Name = "private",
+                        Url = "https://nuget.example/v3/index.json",
+                        Username = "user",
+                    },
+                ])
+            );
+
+        var result = await _commands.ListNugetFeedsAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().HaveCount(2);
+        result.Value[0].Name.Should().Be("nuget.org");
+        result.Value[0].IsDefault.Should().BeTrue();
+        result.Value[1].HasCredentials.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreateNugetFeedAsync_CreatesFeedWithCredentials()
+    {
+        _nugetManagerMock
+            .Setup(m =>
+                m.CreateAsync(
+                    It.Is<NugetFeedSource>(feed =>
+                        feed.Name == "private"
+                        && feed.SourceUrl == "https://nuget.example/v3/index.json"
+                        && feed.Credentials != null
+                    ),
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .ReturnsAsync(Result.Ok());
+
+        var result = await _commands.CreateNugetFeedAsync(
+            new CreateNugetFeedRequest(
+                "private",
+                "https://nuget.example/v3/index.json",
+                "user",
+                "token"
+            )
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Name.Should().Be("private");
+        result.Value.HasCredentials.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SearchNugetPackagesAsync_ReturnsPackagesFromManager()
+    {
+        _nugetManagerMock
+            .Setup(m =>
+                m.SearchPackagesAsync(
+                    "orleans",
+                    "https://api.nuget.org/v3/index.json",
+                    null,
+                    20,
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .ReturnsAsync(
+                Result.Ok<IReadOnlyList<NugetPackageSearchResult>>([
+                    new("Microsoft.Orleans.Core", "10.0.0", "Orleans core", "Microsoft", 42),
+                ])
+            );
+
+        var result = await _commands.SearchNugetPackagesAsync(
+            "orleans",
+            "https://api.nuget.org/v3/index.json"
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle();
+        result.Value[0].PackageId.Should().Be("Microsoft.Orleans.Core");
+    }
+
+    [Fact]
+    public async Task AddNugetPackageSourceAsync_RestoresAndAddsSourceToWorkspace()
+    {
+        SetWorkspace(CreateTestWorkspace());
+        _nugetManagerMock
+            .Setup(m =>
+                m.RestorePackagesAsync(
+                    It.Is<IEnumerable<(string Id, string Version)>>(packages =>
+                        packages.Single().Id == "Contracts" && packages.Single().Version == "1.2.3"
+                    ),
+                    "https://api.nuget.org/v3/index.json",
+                    null,
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .ReturnsAsync(Result.Ok("Restored 1 packages"));
+
+        var result = await _commands.AddNugetPackageSourceAsync(
+            "Contracts",
+            "1.2.3",
+            "https://api.nuget.org/v3/index.json"
+        );
+
+        result.IsSuccess.Should().BeTrue();
+        result
+            .Value.Silos.Should()
+            .ContainSingle(source =>
+                source.Reference == "Contracts"
+                && source.Source == "nuget"
+                && source.Version == "1.2.3"
+            );
     }
 
     [Fact]

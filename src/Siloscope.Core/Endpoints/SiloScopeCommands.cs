@@ -5,6 +5,7 @@ using Siloscope.Core.Components.Nuget;
 using Siloscope.Core.Components.Workspace;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.Interfaces;
+using Siloscope.Core.Nuget.Models;
 
 namespace Siloscope.Core.Endpoints;
 
@@ -420,6 +421,178 @@ public class SiloScopeCommands : ISiloScopeCommands
         );
     }
 
+    public Task<Result<IReadOnlyList<NugetFeedInfo>>> ListNugetFeedsAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        var feedsResult = _nugetManager.List();
+        if (feedsResult.IsFailed)
+        {
+            return Task.FromResult(
+                Result.Fail<IReadOnlyList<NugetFeedInfo>>(feedsResult.Errors.Select(e => e.Message))
+            );
+        }
+
+        var feeds = new List<NugetFeedInfo>
+        {
+            new("nuget.org", "https://api.nuget.org/v3/index.json", false, true),
+        };
+        feeds.AddRange(
+            feedsResult.Value.Select(feed => new NugetFeedInfo(
+                feed.Name,
+                feed.Url,
+                !string.IsNullOrWhiteSpace(feed.Username),
+                false
+            ))
+        );
+
+        return Task.FromResult(Result.Ok<IReadOnlyList<NugetFeedInfo>>(feeds));
+    }
+
+    public async Task<Result<NugetFeedInfo>> CreateNugetFeedAsync(
+        CreateNugetFeedRequest request,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return Result.Fail<NugetFeedInfo>("Feed name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Url))
+        {
+            return Result.Fail<NugetFeedInfo>("Feed URL is required.");
+        }
+
+        var credentials =
+            !string.IsNullOrWhiteSpace(request.Username)
+            && !string.IsNullOrWhiteSpace(request.Password)
+                ? new NugetFeedSourceAuthentication(
+                    request.Username,
+                    request.Password,
+                    request.IsPasswordClearText
+                )
+                : null;
+        var result = await _nugetManager.CreateAsync(
+            new NugetFeedSource(request.Url, request.Name, true, credentials),
+            cancellationToken
+        );
+
+        if (result.IsFailed)
+        {
+            return Result.Fail<NugetFeedInfo>(result.Errors.Select(e => e.Message));
+        }
+
+        return Result.Ok(
+            new NugetFeedInfo(request.Name, request.Url, credentials is not null, false)
+        );
+    }
+
+    public async Task<Result<IReadOnlyList<NugetPackageInfo>>> SearchNugetPackagesAsync(
+        string query,
+        string? sourceUrl = null,
+        string? feedName = null,
+        int take = 20,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var result = await _nugetManager.SearchPackagesAsync(
+            query,
+            sourceUrl,
+            feedName,
+            take,
+            cancellationToken
+        );
+        if (result.IsFailed)
+        {
+            return Result.Fail<IReadOnlyList<NugetPackageInfo>>(
+                result.Errors.Select(e => e.Message)
+            );
+        }
+
+        return Result.Ok<IReadOnlyList<NugetPackageInfo>>(
+            result
+                .Value.Select(package => new NugetPackageInfo(
+                    package.PackageId,
+                    package.Version,
+                    package.Description,
+                    package.Authors,
+                    package.DownloadCount
+                ))
+                .ToList()
+        );
+    }
+
+    public async Task<Result<WorkspaceInfo>> AddNugetPackageSourceAsync(
+        string packageId,
+        string version,
+        string? sourceUrl = null,
+        string? feedName = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (_currentWorkspace is null)
+        {
+            var loadResult = await LoadWorkspaceAsync(null, cancellationToken);
+            if (loadResult.IsFailed)
+            {
+                return Result.Fail<WorkspaceInfo>("No workspace loaded and none specified");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(packageId))
+        {
+            return Result.Fail<WorkspaceInfo>("Package ID is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return Result.Fail<WorkspaceInfo>("Package version is required.");
+        }
+
+        var restoreResult = await _nugetManager.RestorePackagesAsync(
+            [(packageId, version)],
+            sourceUrl,
+            feedName,
+            cancellationToken
+        );
+        if (restoreResult.IsFailed)
+        {
+            return Result.Fail<WorkspaceInfo>(restoreResult.Errors.Select(e => e.Message));
+        }
+
+        var existing = _currentWorkspace!.Silos.FirstOrDefault(source =>
+            source.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase)
+            && source.Reference.Equals(packageId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(source.Version, version, StringComparison.OrdinalIgnoreCase)
+        );
+
+        if (existing is null)
+        {
+            _currentWorkspace.Silos.Add(
+                new Components.Workspace.SiloSource
+                {
+                    Reference = packageId,
+                    Source = "nuget",
+                    Version = version,
+                    Enabled = true,
+                }
+            );
+        }
+        else
+        {
+            existing.Enabled = true;
+        }
+
+        _logger.LogInformation(
+            "Added NuGet package source {PackageId} {Version}",
+            packageId,
+            version
+        );
+
+        return Result.Ok(ToWorkspaceInfo(_currentWorkspace));
+    }
+
     private static SourceOwnedGrainCatalog BuildSourceOwnedCatalog(
         Components.Workspace.Workspace workspace,
         InterfaceCatalog catalog
@@ -490,6 +663,40 @@ public class SiloScopeCommands : ISiloScopeCommands
             .ToList();
 
         return new SourceOwnedGrainCatalog(sources);
+    }
+
+    private static WorkspaceInfo ToWorkspaceInfo(Components.Workspace.Workspace workspace)
+    {
+        var clusterOptions = new ClusterOptions(
+            workspace.Cluster.ClusterId,
+            workspace.Cluster.ServiceId,
+            string.IsNullOrEmpty(workspace.Cluster.DefaultGateway)
+                ? []
+                : [workspace.Cluster.DefaultGateway]
+        );
+
+        var siloSources = workspace
+            .Silos.Select(s => new SiloSource(
+                s.Reference,
+                s.Source,
+                s.Version,
+                s.Gateway,
+                s.Enabled
+            ))
+            .ToList();
+
+        var activeEnv = workspace.Environments.FirstOrDefault(e =>
+            e.Name == workspace.Session.ActiveEnvironment
+        );
+
+        return new WorkspaceInfo(
+            workspace.Id,
+            workspace.WorkspaceInfo.Name,
+            workspace.WorkspaceInfo.Description,
+            clusterOptions,
+            siloSources,
+            activeEnv?.Variables ?? new Dictionary<string, string>()
+        );
     }
 
     private static string BuildSourceId(Components.Workspace.SiloSource silo)

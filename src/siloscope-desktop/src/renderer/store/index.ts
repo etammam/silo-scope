@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Workspace, GrainInterfaceDescriptor, InvocationResult, LogEntry, SourceOwnedCatalog } from "../../shared/types";
+import type { Workspace, GrainInterfaceDescriptor, InvocationResult, LogEntry, NugetFeed, NugetPackage, SourceOwnedCatalog } from "../../shared/types";
 
 interface AppState {
   workspace: Workspace | null;
@@ -10,6 +10,8 @@ interface AppState {
   selectedFunctionId: string | null;
   invocationResult: InvocationResult | null;
   logs: LogEntry[];
+  nugetFeeds: NugetFeed[];
+  nugetPackages: NugetPackage[];
   isConnected: boolean;
 
   setWorkspace: (workspace: Workspace | null) => void;
@@ -21,6 +23,8 @@ interface AppState {
   setInvocationResult: (result: InvocationResult | null) => void;
   addLog: (entry: LogEntry) => void;
   clearLogs: () => void;
+  setNugetFeeds: (feeds: NugetFeed[]) => void;
+  setNugetPackages: (packages: NugetPackage[]) => void;
   setIsConnected: (connected: boolean) => void;
 }
 
@@ -33,6 +37,8 @@ export const useAppStore = create<AppState>((set) => ({
   selectedFunctionId: null,
   invocationResult: null,
   logs: [],
+  nugetFeeds: [],
+  nugetPackages: [],
   isConnected: false,
 
   setWorkspace: (workspace) => set({ workspace, selectedFunctionId: null, selectedGrain: null, selectedMethod: null }),
@@ -44,5 +50,7 @@ export const useAppStore = create<AppState>((set) => ({
   setInvocationResult: (invocationResult) => set({ invocationResult }),
   addLog: (entry) => set((state) => ({ logs: [...state.logs, entry] })),
   clearLogs: () => set({ logs: [] }),
+  setNugetFeeds: (nugetFeeds) => set({ nugetFeeds }),
+  setNugetPackages: (nugetPackages) => set({ nugetPackages }),
   setIsConnected: (isConnected) => set({ isConnected }),
 }));

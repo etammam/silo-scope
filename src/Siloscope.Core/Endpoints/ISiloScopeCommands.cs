@@ -41,6 +41,27 @@ public interface ISiloScopeCommands
         string? sourceUrl = null,
         CancellationToken cancellationToken = default
     );
+    Task<Result<IReadOnlyList<NugetFeedInfo>>> ListNugetFeedsAsync(
+        CancellationToken cancellationToken = default
+    );
+    Task<Result<NugetFeedInfo>> CreateNugetFeedAsync(
+        CreateNugetFeedRequest request,
+        CancellationToken cancellationToken = default
+    );
+    Task<Result<IReadOnlyList<NugetPackageInfo>>> SearchNugetPackagesAsync(
+        string query,
+        string? sourceUrl = null,
+        string? feedName = null,
+        int take = 20,
+        CancellationToken cancellationToken = default
+    );
+    Task<Result<WorkspaceInfo>> AddNugetPackageSourceAsync(
+        string packageId,
+        string version,
+        string? sourceUrl = null,
+        string? feedName = null,
+        CancellationToken cancellationToken = default
+    );
 }
 
 public record WorkspaceInfo(
@@ -124,4 +145,22 @@ public record RestoreResult(
     int FailedCount,
     IReadOnlyList<string> RestoredPackages,
     IReadOnlyList<string> FailedPackages
+);
+
+public record NugetFeedInfo(string Name, string Url, bool HasCredentials, bool IsDefault = false);
+
+public record CreateNugetFeedRequest(
+    string Name,
+    string Url,
+    string? Username,
+    string? Password,
+    bool IsPasswordClearText = true
+);
+
+public record NugetPackageInfo(
+    string PackageId,
+    string Version,
+    string? Description,
+    string? Authors,
+    long? DownloadCount
 );

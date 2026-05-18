@@ -8,6 +8,10 @@ const electrobunMock = vi.hoisted(() => {
   const request = {
     getGrains: vi.fn(),
     getSourceCatalog: vi.fn(),
+    listNugetFeeds: vi.fn(),
+    createNugetFeed: vi.fn(),
+    searchNugetPackages: vi.fn(),
+    addNugetPackageSource: vi.fn(),
     invokeGrain: vi.fn(),
     getWorkspaces: vi.fn(),
   };
@@ -50,6 +54,10 @@ describe("App shell", () => {
     window.localStorage.clear();
     electrobunMock.request.getGrains.mockClear();
     electrobunMock.request.getSourceCatalog.mockClear();
+    electrobunMock.request.listNugetFeeds.mockClear();
+    electrobunMock.request.createNugetFeed.mockClear();
+    electrobunMock.request.searchNugetPackages.mockClear();
+    electrobunMock.request.addNugetPackageSource.mockClear();
     electrobunMock.request.invokeGrain.mockClear();
     electrobunMock.request.getWorkspaces.mockClear();
     electrobunMock.send.connectionChanged.mockClear();
@@ -57,6 +65,35 @@ describe("App shell", () => {
     electrobunMock.request.getGrains.mockResolvedValue({
       grains: [],
       sourceCatalog: { sources: [] },
+    });
+    electrobunMock.request.listNugetFeeds.mockResolvedValue({
+      feeds: [
+        {
+          name: "nuget.org",
+          url: "https://api.nuget.org/v3/index.json",
+          hasCredentials: false,
+          isDefault: true,
+        },
+      ],
+    });
+    electrobunMock.request.searchNugetPackages.mockResolvedValue({ packages: [] });
+    electrobunMock.request.createNugetFeed.mockResolvedValue({
+      feed: {
+        name: "private",
+        url: "https://nuget.example/v3/index.json",
+        hasCredentials: true,
+        isDefault: false,
+      },
+    });
+    electrobunMock.request.addNugetPackageSource.mockResolvedValue({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+        sources: [],
+      },
     });
     electrobunMock.request.invokeGrain.mockResolvedValue({
       isSuccess: true,
@@ -76,6 +113,8 @@ describe("App shell", () => {
       selectedFunctionId: null,
       invocationResult: null,
       logs: [],
+      nugetFeeds: [],
+      nugetPackages: [],
       isConnected: false,
     });
   });
@@ -223,6 +262,50 @@ describe("App shell", () => {
       functionId: "function-1",
     });
     expect(useAppStore.getState().invocationResult?.timing?.totalMs).toBe(8.6);
+  });
+
+  it("wires NuGet feed search and package restore through the desktop backend", async () => {
+    electrobunMock.request.searchNugetPackages.mockResolvedValue({
+      packages: [
+        {
+          packageId: "SiloScope.Contracts",
+          version: "1.0.0",
+          description: "Contracts",
+        },
+      ],
+    });
+    useAppStore.setState({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "NuGet" }));
+    await screen.findByLabelText("Active source");
+    fireEvent.change(screen.getByLabelText("Package ID"), {
+      target: { value: "SiloScope" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search Packages" }));
+    fireEvent.click(await screen.findByRole("button", { name: "SiloScope.Contracts 1.0.0" }));
+
+    expect(electrobunMock.request.searchNugetPackages).toHaveBeenCalledWith({
+      query: "SiloScope",
+      sourceUrl: "https://api.nuget.org/v3/index.json",
+      feedName: undefined,
+      take: 20,
+    });
+    expect(electrobunMock.request.addNugetPackageSource).toHaveBeenCalledWith({
+      packageId: "SiloScope.Contracts",
+      version: "1.0.0",
+      sourceUrl: "https://api.nuget.org/v3/index.json",
+      feedName: undefined,
+    });
   });
 
   it("collapses the response pane from the titlebar", () => {

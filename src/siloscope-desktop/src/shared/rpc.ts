@@ -4,6 +4,9 @@ import type {
   GrainInterfaceDescriptor,
   InvocationResult,
   LogEntry,
+  CreateNugetFeedRequest,
+  NugetFeed,
+  NugetPackage,
   SourceOwnedCatalog,
 } from "./types";
 
@@ -20,6 +23,16 @@ export type SiloScopeRPC = {
     requests: {
       getGrains: { params: { workspaceId: string }; response: { grains: GrainInterfaceDescriptor[]; sourceCatalog?: SourceOwnedCatalog } };
       getSourceCatalog: { params: { workspaceId: string }; response: { sourceCatalog: SourceOwnedCatalog } };
+      listNugetFeeds: { params: void; response: { feeds: NugetFeed[] } };
+      createNugetFeed: { params: CreateNugetFeedRequest; response: { feed: NugetFeed } };
+      searchNugetPackages: {
+        params: { query: string; sourceUrl?: string; feedName?: string; take?: number };
+        response: { packages: NugetPackage[] };
+      };
+      addNugetPackageSource: {
+        params: { packageId: string; version: string; sourceUrl?: string; feedName?: string };
+        response: { workspace: Workspace };
+      };
       invokeGrain: {
         params: {
           grainType: string;
