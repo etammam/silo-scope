@@ -1,5 +1,8 @@
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SidecarJsonRpcClient } from "@/main/jsonRpcClient";
+import { resolveDefaultCoreCommand, SidecarJsonRpcClient } from "@/main/jsonRpcClient";
 
 type FakeProcess = {
   stdin: {
@@ -21,6 +24,30 @@ describe("SidecarJsonRpcClient", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("prefers a bundled production sidecar over dev discovery", () => {
+    const previousCwd = process.cwd();
+    const tempRoot = mkdtempSync(join(tmpdir(), "siloscope-packaged-"));
+    const bunDirectory = join(tempRoot, "Resources", "app", "bun");
+    const coreDirectory = join(tempRoot, "Resources", "app", "core");
+    const executableName = process.platform === "win32" ? "Siloscope.Core.exe" : "Siloscope.Core";
+    mkdirSync(bunDirectory, { recursive: true });
+    mkdirSync(coreDirectory, { recursive: true });
+    writeFileSync(join(coreDirectory, executableName), "");
+
+    try {
+      process.chdir(bunDirectory);
+      const resolvedCoreDirectory = realpathSync(coreDirectory);
+
+      expect(resolveDefaultCoreCommand()).toEqual({
+        command: [join(resolvedCoreDirectory, executableName)],
+        cwd: resolvedCoreDirectory,
+      });
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(tempRoot, { force: true, recursive: true });
+    }
   });
 
   it("sends header-delimited requests and resolves matching responses", async () => {

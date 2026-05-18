@@ -18,6 +18,7 @@ export default {
 		copy: {
 			"src/renderer/index.html": "views/renderer/index.html",
 			"src/renderer/index.css": "views/renderer/index.css",
+			"resources/core": "core",
 		},
 		mac: {
 			bundleCEF: false,
@@ -28,5 +29,8 @@ export default {
 		win: {
 			bundleCEF: false,
 		},
+	},
+	scripts: {
+		preBuild: "./scripts/prepare-core-sidecar.ts",
 	},
 } satisfies ElectrobunConfig;

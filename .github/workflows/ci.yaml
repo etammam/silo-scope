@@ -147,3 +147,45 @@ jobs:
           name: siloscope-core-${{ matrix.runtime }}
           path: artifacts/core/${{ matrix.runtime }}
           retention-days: 30
+
+  build-desktop:
+    name: Build Electrobun Desktop
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install desktop dependencies
+        working-directory: src/siloscope-desktop
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck desktop
+        working-directory: src/siloscope-desktop
+        run: bun run typecheck
+
+      - name: Test desktop
+        working-directory: src/siloscope-desktop
+        run: bun run test:run
+
+      - name: Build stable desktop app
+        working-directory: src/siloscope-desktop
+        run: bun run build:stable
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: siloscope-desktop-linux-x64
+          path: src/siloscope-desktop/artifacts
+          retention-days: 30

@@ -368,6 +368,11 @@ export function resolveDefaultCoreCommand(): SidecarCommand {
     };
   }
 
+  const packagedCommand = resolvePackagedCoreCommand();
+  if (packagedCommand) {
+    return packagedCommand;
+  }
+
   const repoRoot = findRepoRoot();
   if (!repoRoot) {
     throw new Error(
@@ -402,6 +407,27 @@ export function resolveDefaultCoreCommand(): SidecarCommand {
   }
 
   throw new Error(`Could not locate SiloScope Core project under ${repoRoot}.`);
+}
+
+function resolvePackagedCoreCommand(): SidecarCommand | null {
+  const executableName = process.platform === "win32" ? "Siloscope.Core.exe" : "Siloscope.Core";
+  const searchStarts = [
+    process.cwd(),
+    dirname(fileURLToPath(import.meta.url)),
+  ];
+
+  for (const searchStart of searchStarts) {
+    const coreDirectory = normalize(join(searchStart, "..", "core"));
+    const executablePath = join(coreDirectory, executableName);
+    if (existsSync(executablePath)) {
+      return {
+        command: [executablePath],
+        cwd: coreDirectory,
+      };
+    }
+  }
+
+  return null;
 }
 
 function findRepoRoot(): string | null {
