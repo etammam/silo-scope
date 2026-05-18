@@ -131,30 +131,22 @@ function TimingBars({ timing }: { timing: InvocationTiming | null }) {
 
 function formatResult(result: InvocationResult | null): string {
   if (!result) {
-    return JSON.stringify({ status: "idle" }, null, 2);
+    return "No invocation result yet";
   }
 
-  return JSON.stringify(
-    {
-      status: result.isSuccess ? "success" : "error",
-      output: coerceOutput(result.result),
-      error: result.error ?? null,
-    },
-    null,
-    2,
-  );
-}
-
-function coerceOutput(value: string | undefined): unknown {
-  if (!value) {
-    return null;
+  if (result.isSuccess && result.result) {
+    try {
+      return JSON.stringify(JSON.parse(result.result), null, 2);
+    } catch {
+      return result.result;
+    }
   }
 
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
+  if (!result.isSuccess && result.error) {
+    return result.error;
   }
+
+  return "Empty result";
 }
 
 function formatTotal(timing: InvocationTiming | undefined): string {
