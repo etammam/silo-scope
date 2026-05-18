@@ -2,12 +2,21 @@ import Editor, { type BeforeMount, type OnMount } from "@monaco-editor/react";
 import { useRef } from "react";
 import type * as Monaco from "monaco-editor";
 
+type AppTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
+
+function mapToMonacoTheme(theme: AppTheme): "dark" | "light" {
+  if (theme.startsWith("vscode")) {
+    return theme === "vscode-light" ? "light" : "dark";
+  }
+  return theme as "dark" | "light";
+}
+
 interface MonacoEditorProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
-  language?: string;
-  theme?: "dark" | "light";
+  language?: "json" | "csharp" | "text" | string;
+  theme?: AppTheme;
 }
 
 export function MonacoEditor({
@@ -78,7 +87,7 @@ export function MonacoEditor({
     <Editor
       height="100%"
       language={language}
-      theme={theme === "light" ? "siloscope-light" : "siloscope-dark"}
+      theme={mapToMonacoTheme(theme) === "light" ? "siloscope-light" : "siloscope-dark"}
       value={value}
       onChange={handleChange}
       beforeMount={handleBeforeMount}

@@ -21,14 +21,13 @@ const defaultNugetFeed: NugetFeed = {
 
 type NavigationSidebarProps = {
   activeView: ActivityView;
-  theme: "dark" | "light";
+  theme: "dark" | "light" | "vscode-dark" | "vscode-light";
   logs?: LogEntry[];
   nugetFeeds?: NugetFeed[];
   nugetPackages?: NugetPackage[];
   onClearLogs?: () => void;
   onCreateNugetFeed?: (request: {
     name: string;
-    url: string;
     username?: string;
     password?: string;
   }) => Promise<void>;
@@ -49,7 +48,7 @@ type NavigationSidebarProps = {
   onDiscoverGrains?: () => Promise<void>;
   onLoadWorkspace?: () => Promise<void>;
   onSaveWorkspace?: () => Promise<void>;
-  onThemeChange: (theme: "dark" | "light") => void;
+  onThemeChange: (theme: "dark" | "light" | "vscode-dark" | "vscode-light") => void;
 } & WorkspaceNavigatorProps;
 
 type WorkspaceNavigatorProps = {
@@ -843,8 +842,8 @@ function SystemSettings({
 }: {
   logs: LogEntry[];
   onClearLogs?: () => void;
-  onThemeChange: (theme: "dark" | "light") => void;
-  theme: "dark" | "light";
+  onThemeChange: (theme: "dark" | "light" | "vscode-dark" | "vscode-light") => void;
+  theme: "dark" | "light" | "vscode-dark" | "vscode-light";
 }) {
   return (
     <>
@@ -898,16 +897,24 @@ function SystemSettings({
           Theme
         </div>
         <label className="navigation-sidebar__select-label">
-          <span>Workbench theme</span>
-          <select
-            value={theme}
-            onChange={(event) =>
-              onThemeChange(event.target.value as "dark" | "light")
-            }
-          >
-            <option value="dark">Codex Dark</option>
-            <option value="light">Codex Light</option>
-          </select>
+<span>Workbench theme</span>
+            <select
+              value={theme}
+              onChange={(event) =>
+                onThemeChange(
+                  event.target.value as
+                    | "dark"
+                    | "light"
+                    | "vscode-dark"
+                    | "vscode-light",
+                )
+              }
+            >
+              <option value="dark">Codex Dark</option>
+              <option value="light">Codex Light</option>
+              <option value="vscode-dark">VSCode Dark</option>
+              <option value="vscode-light">VSCode Light</option>
+            </select>
         </label>
       </section>
 

@@ -8,7 +8,7 @@ type ResponseTelemetryPaneProps = {
   activeTab: ResponsePaneTab;
   onTabChange: (tab: ResponsePaneTab) => void;
   result: InvocationResult | null;
-  theme: "dark" | "light";
+  theme: "dark" | "light" | "vscode-dark" | "vscode-light";
 };
 
 export function ResponseTelemetryPane({

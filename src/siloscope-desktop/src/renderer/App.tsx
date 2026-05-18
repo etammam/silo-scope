@@ -20,7 +20,7 @@ import {
 import { useAppStore } from "./store";
 
 type PaneLayout = "horizontal" | "vertical";
-type WorkbenchTheme = "dark" | "light";
+type WorkbenchTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
 
 const themeStorageKey = "siloscope.theme";
 const applicationMenuEventName = "siloscope:application-menu-action";

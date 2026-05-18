@@ -15,7 +15,7 @@ type RequestWorkbenchProps = {
   selectedFunctionId?: string | null;
   selectedGrain: string | null;
   selectedMethod: string | null;
-  theme: "dark" | "light";
+  theme: "dark" | "light" | "vscode-dark" | "vscode-light";
   onSelectGrain: (grainId: string | null) => void;
   onSelectFunction?: (functionId: string | null) => void;
   onSelectMethod: (methodName: string | null) => void;
