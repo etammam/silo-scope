@@ -1,5 +1,11 @@
 import { Electroview } from "electrobun/view";
 import {
+  PanelLeftClose,
+  PanelRightClose,
+  LayoutTemplate,
+  Settings,
+} from "lucide-react";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -331,7 +337,12 @@ function App() {
             }
             type="button"
           >
-            <span aria-hidden="true" className="titlebar-navigation__icon" />
+            <PanelLeftClose
+              aria-hidden="true"
+              className="titlebar-navigation__icon"
+              width={16}
+              height={16}
+            />
           </button>
           <button
             aria-label={
@@ -353,7 +364,12 @@ function App() {
             }
             type="button"
           >
-            <span aria-hidden="true" className="titlebar-layout__icon" />
+            <LayoutTemplate
+              aria-hidden="true"
+              className="titlebar-layout__icon"
+              width={16}
+              height={16}
+            />
           </button>
           <button
             aria-label={
@@ -371,7 +387,12 @@ function App() {
             }
             type="button"
           >
-            <span aria-hidden="true" className="titlebar-response__icon" />
+            <PanelRightClose
+              aria-hidden="true"
+              className="titlebar-response__icon"
+              width={16}
+              height={16}
+            />
           </button>
           <button
             aria-label="Settings"
@@ -381,7 +402,12 @@ function App() {
             title="Settings"
             type="button"
           >
-            <span aria-hidden="true" className="titlebar-settings__icon" />
+            <Settings
+              aria-hidden="true"
+              className="titlebar-settings__icon"
+              width={16}
+              height={16}
+            />
           </button>
         </div>
       </header>

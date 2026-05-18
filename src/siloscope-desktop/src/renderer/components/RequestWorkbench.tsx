@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { Play } from "lucide-react";
 import type {
   GrainInterfaceDescriptor,
   GrainKeyType,
@@ -235,6 +236,7 @@ export function RequestWorkbench({
         </label>
 
         <button className="request-workbench__invoke-button" disabled={!canInvoke} onClick={handleInvoke} type="button">
+          <Play aria-hidden="true" width={12} height={12} />
           Invoke Grain
         </button>
       </div>

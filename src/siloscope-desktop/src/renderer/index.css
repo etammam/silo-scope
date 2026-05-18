@@ -216,115 +216,11 @@ textarea,
 	box-shadow: inset 0 0 0 1px var(--focus-ring);
 }
 
-.titlebar-response__icon {
-	border: 1.5px solid currentcolor;
-	border-radius: 2px;
-	display: block;
-	height: 15px;
-	position: relative;
-	width: 17px;
-}
-
-.titlebar-response__icon::after {
-	background: currentcolor;
-	content: "";
-	height: 100%;
-	position: absolute;
-	right: 4px;
-	top: 0;
-	width: 1.5px;
-}
-
-.titlebar-navigation__icon {
-	border: 1.5px solid currentcolor;
-	border-radius: 2px;
-	display: block;
-	height: 15px;
-	position: relative;
-	width: 17px;
-}
-
-.titlebar-navigation__icon::after {
-	background: currentcolor;
-	content: "";
-	height: 100%;
-	left: 4px;
-	position: absolute;
-	top: 0;
-	width: 1.5px;
-}
-
-.titlebar-layout__icon {
-	border: 1.5px solid currentcolor;
-	border-radius: 2px;
-	display: block;
-	height: 15px;
-	position: relative;
-	width: 17px;
-}
-
-.titlebar-layout__icon::before,
-.titlebar-layout__icon::after {
-	background: currentcolor;
-	content: "";
-	position: absolute;
-}
-
-.titlebar-layout__icon::before {
-	height: 100%;
-	left: 50%;
-	top: 0;
-	width: 1.5px;
-}
-
-.titlebar-layout__icon::after {
-	display: none;
-	height: 1.5px;
-	left: 0;
-	top: 50%;
-	width: 100%;
-}
-
-.app-shell[data-pane-layout="vertical"] .titlebar-layout__icon::before {
-	display: none;
-}
-
-.app-shell[data-pane-layout="vertical"] .titlebar-layout__icon::after {
-	display: block;
-}
-
+.titlebar-response__icon,
+.titlebar-navigation__icon,
+.titlebar-layout__icon,
 .titlebar-settings__icon {
-	display: block;
-	height: 16px;
-	position: relative;
-	width: 16px;
-}
-
-.titlebar-settings__icon::before {
-	content: "";
-	background:
-		linear-gradient(currentcolor 0 0) 1px 3px / 14px 1.5px no-repeat,
-		linear-gradient(currentcolor 0 0) 1px 7px / 14px 1.5px no-repeat,
-		linear-gradient(currentcolor 0 0) 1px 11px / 14px 1.5px no-repeat;
-	inset: 0;
-	position: absolute;
-}
-
-.titlebar-settings__icon::after {
-	background: var(--ui-0);
-	border: 1.5px solid currentcolor;
-	border-radius: 50%;
-	box-shadow:
-		6px 4px 0 -1.5px var(--ui-0),
-		6px 4px 0 0 currentcolor,
-		-2px 8px 0 -1.5px var(--ui-0),
-		-2px 8px 0 0 currentcolor;
-	content: "";
-	height: 4px;
-	left: 4px;
-	position: absolute;
-	top: 1px;
-	width: 4px;
+	color: var(--ui-5);
 }
 
 .activity-bar {
@@ -417,64 +313,9 @@ textarea,
 	width: 20px;
 }
 
-.activity-icon::before,
-.activity-icon::after {
-	content: "";
-	position: absolute;
+.activity-icon {
+	color: var(--ui-5);
 }
-
-.activity-icon--workspace::before {
-	border: 1.7px solid currentcolor;
-	border-radius: 2px;
-	height: 14px;
-	left: 3px;
-	top: 3px;
-	width: 14px;
-}
-
-.activity-icon--workspace::after {
-	background:
-		linear-gradient(currentcolor 0 0) 7px 3px / 1.7px 14px no-repeat,
-		linear-gradient(currentcolor 0 0) 3px 7px / 14px 1.7px no-repeat;
-	inset: 0;
-}
-
-.activity-icon--nuget::before {
-	border: 1.7px solid currentcolor;
-	border-radius: 50%;
-	height: 13px;
-	left: 2px;
-	top: 2px;
-	width: 13px;
-}
-
-.activity-icon--nuget::after {
-	background: currentcolor;
-	border-radius: 50%;
-	box-shadow:
-		7px 7px 0 currentcolor,
-		12px 1px 0 currentcolor;
-	height: 4px;
-	left: 5px;
-	top: 5px;
-	width: 4px;
-}
-
-.activity-icon--settings::before {
-	border: 1.7px solid currentcolor;
-	border-radius: 50%;
-	height: 14px;
-	left: 3px;
-	top: 3px;
-	width: 14px;
-}
-
-.activity-icon--settings::after {
-	background:
-		linear-gradient(currentcolor 0 0) 9px 0 / 1.7px 20px no-repeat,
-		linear-gradient(90deg, currentcolor 0 0) 0 9px / 20px 1.7px no-repeat;
-	inset: 0;
-	transform: rotate(45deg);
 }
 
 .navigation-sidebar {
@@ -593,36 +434,7 @@ textarea,
 }
 
 .navigation-sidebar__new-workspace-icon {
-	border: 1.5px solid currentColor;
-	border-radius: 2px;
-	height: 12px;
-	position: relative;
-	width: 14px;
-}
-
-.navigation-sidebar__new-workspace-icon::before {
-	background: var(--ui-1);
-	border: 1.5px solid currentColor;
-	border-bottom: 0;
-	border-radius: 2px 2px 0 0;
-	content: "";
-	height: 3px;
-	left: 2px;
-	position: absolute;
-	top: -5px;
-	width: 7px;
-}
-
-.navigation-sidebar__new-workspace-icon::after {
-	background:
-		linear-gradient(currentColor, currentColor) 50% 50% / 7px 1.5px no-repeat,
-		linear-gradient(currentColor, currentColor) 50% 50% / 1.5px 7px no-repeat;
-	content: "";
-	height: 9px;
-	position: absolute;
-	right: -7px;
-	top: 2px;
-	width: 9px;
+	color: var(--ui-5);
 }
 
 .navigation-sidebar__select-label {
@@ -1217,22 +1029,8 @@ textarea,
 }
 
 .navigation-sidebar__disclosure {
-	border-bottom: 1.5px solid currentcolor;
-	border-right: 1.5px solid currentcolor;
+	color: var(--ui-5);
 	flex: 0 0 auto;
-	height: 6px;
-	transform: rotate(45deg);
-	transition: transform 120ms ease;
-	width: 6px;
-}
-
-.navigation-sidebar__namespace[aria-expanded="false"] .navigation-sidebar__disclosure {
-	transform: rotate(-45deg);
-}
-
-.navigation-sidebar__source[aria-expanded="false"] .navigation-sidebar__disclosure,
-.navigation-sidebar__interface[aria-expanded="false"] .navigation-sidebar__disclosure {
-	transform: rotate(-45deg);
 }
 
 .app-shell__content {
@@ -1529,6 +1327,10 @@ textarea,
 	cursor: not-allowed;
 	filter: grayscale(1);
 	opacity: 0.45;
+}
+
+.request-workbench__invoke-button svg {
+	margin-right: 6px;
 }
 
 .request-workbench__tabs {

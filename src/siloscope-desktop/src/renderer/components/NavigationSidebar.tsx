@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ChevronRight, ChevronDown, Plus } from "lucide-react";
 import type {
   GrainInterfaceDescriptor,
   LogEntry,
@@ -262,9 +263,11 @@ function WorkspaceNavigator({
             title="New workspace"
             type="button"
           >
-            <span
-              className="navigation-sidebar__new-workspace-icon"
+            <Plus
               aria-hidden="true"
+              className="navigation-sidebar__new-workspace-icon"
+              width={14}
+              height={14}
             />
           </button>
         </div>
@@ -375,10 +378,21 @@ function WorkspaceNavigator({
                     onClick={() => toggleSource(source.sourceId)}
                     type="button"
                   >
-                    <span
-                      className="navigation-sidebar__disclosure"
-                      aria-hidden="true"
-                    />
+                    {collapsedSources.has(source.sourceId) ? (
+                      <ChevronRight
+                        aria-hidden="true"
+                        className="navigation-sidebar__disclosure"
+                        width={14}
+                        height={14}
+                      />
+                    ) : (
+                      <ChevronDown
+                        aria-hidden="true"
+                        className="navigation-sidebar__disclosure"
+                        width={14}
+                        height={14}
+                      />
+                    )}
                     <span className="navigation-sidebar__source-main">
                       <span className="navigation-sidebar__source-name">
                         {source.label}
@@ -482,10 +496,21 @@ function SourceInterfaceTree({
               }
               type="button"
             >
-              <span
-                className="navigation-sidebar__disclosure"
-                aria-hidden="true"
-              />
+              {isCollapsed ? (
+                <ChevronRight
+                  aria-hidden="true"
+                  className="navigation-sidebar__disclosure"
+                  width={14}
+                  height={14}
+                />
+              ) : (
+                <ChevronDown
+                  aria-hidden="true"
+                  className="navigation-sidebar__disclosure"
+                  width={14}
+                  height={14}
+                />
+              )}
               <span>
                 <span>{catalogInterface.interfaceName}</span>
                 <small>{catalogInterface.namespace}</small>

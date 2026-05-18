@@ -1,14 +1,16 @@
+import { Folder, Package } from "lucide-react";
+
 export type ActivityView = "workspace" | "nuget" | "settings";
 
 type ActivityBarItem = {
   id: ActivityView;
   label: string;
-  iconClass: string;
+  Icon: React.ComponentType<{ width?: number; height?: number; className?: string }>;
 };
 
 const activityItems: ActivityBarItem[] = [
-  { id: "workspace", label: "Workspace", iconClass: "activity-icon--workspace" },
-  { id: "nuget", label: "NuGet", iconClass: "activity-icon--nuget" },
+  { id: "workspace", label: "Workspace", Icon: Folder },
+  { id: "nuget", label: "NuGet", Icon: Package },
 ];
 
 type ActivityBarProps = {
@@ -34,7 +36,7 @@ export function ActivityBar({ activeView, onViewChange }: ActivityBarProps) {
             title={item.label}
             type="button"
           >
-            <span aria-hidden="true" className={`activity-icon ${item.iconClass}`} />
+            <item.Icon aria-hidden="true" className="activity-icon" width={18} height={18} />
           </button>
         ))}
       </div>
