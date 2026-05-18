@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { ActivityView } from "./ActivityBar";
 import type {
   GrainInterfaceDescriptor,
+  LogEntry,
   SourceCatalogInterface,
   SourceCatalogSource,
   SourceOwnedCatalog,
@@ -12,6 +13,8 @@ import { buildSourceCatalogFromGrains } from "../catalog";
 type NavigationSidebarProps = {
   activeView: ActivityView;
   theme: "dark" | "light";
+  logs?: LogEntry[];
+  onClearLogs?: () => void;
   onThemeChange: (theme: "dark" | "light") => void;
 } & WorkspaceNavigatorProps;
 
@@ -31,6 +34,8 @@ export function NavigationSidebar({
   activeView,
   grains,
   isConnected,
+  logs = [],
+  onClearLogs,
   onNewWorkspace,
   onSelectFunction,
   selectedGrain,
@@ -65,7 +70,14 @@ export function NavigationSidebar({
 
       {activeView === "nuget" && <NuGetRegistryManager />}
 
-      {activeView === "settings" && <SystemSettings onThemeChange={onThemeChange} theme={theme} />}
+      {activeView === "settings" && (
+        <SystemSettings
+          logs={logs}
+          onClearLogs={onClearLogs}
+          onThemeChange={onThemeChange}
+          theme={theme}
+        />
+      )}
     </aside>
   );
 }
@@ -362,9 +374,13 @@ function NuGetRegistryManager() {
 }
 
 function SystemSettings({
+  logs,
+  onClearLogs,
   onThemeChange,
   theme,
 }: {
+  logs: LogEntry[];
+  onClearLogs?: () => void;
   onThemeChange: (theme: "dark" | "light") => void;
   theme: "dark" | "light";
 }) {
@@ -412,8 +428,54 @@ function SystemSettings({
           </select>
         </label>
       </section>
+
+      <section className="navigation-sidebar__section" aria-labelledby="settings-logs-title">
+        <div className="navigation-sidebar__section-heading">
+          <div className="navigation-sidebar__section-title" id="settings-logs-title">
+            Logs
+          </div>
+          <button
+            className="navigation-sidebar__mini-command"
+            disabled={logs.length === 0 || !onClearLogs}
+            onClick={onClearLogs}
+            type="button"
+          >
+            Clear
+          </button>
+        </div>
+        {logs.length > 0 ? (
+          <ol className="navigation-sidebar__logs" aria-label="Core logs">
+            {logs.slice(-8).map((entry, index) => (
+              <li
+                className="navigation-sidebar__log-entry"
+                data-level={entry.level}
+                key={`${entry.timestamp}-${index}`}
+              >
+                <span className="navigation-sidebar__log-level">{entry.level}</span>
+                <span className="navigation-sidebar__log-message">{entry.message}</span>
+                <time>{formatLogTime(entry.timestamp)}</time>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <div className="navigation-sidebar__empty">No logs captured</div>
+        )}
+      </section>
     </>
   );
+}
+
+function formatLogTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "--:--:--";
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function formatViewTitle(view: ActivityView): string {

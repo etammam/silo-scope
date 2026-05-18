@@ -209,12 +209,31 @@ describe("NavigationSidebar", () => {
 
   it("renders system settings when settings view is active", () => {
     const onThemeChange = vi.fn();
+    const onClearLogs = vi.fn();
 
     render(
       <NavigationSidebar
         activeView="settings"
         grains={[]}
         isConnected={false}
+        logs={[
+          {
+            timestamp: "2026-05-18T10:00:00.000Z",
+            level: "info",
+            message: "Workspace loaded",
+          },
+          {
+            timestamp: "2026-05-18T10:00:01.000Z",
+            level: "warn",
+            message: "No silo sources",
+          },
+          {
+            timestamp: "2026-05-18T10:00:02.000Z",
+            level: "error",
+            message: "Connection failed",
+          },
+        ]}
+        onClearLogs={onClearLogs}
         onSelectGrain={vi.fn()}
         onThemeChange={onThemeChange}
         selectedGrain={null}
@@ -227,11 +246,17 @@ describe("NavigationSidebar", () => {
     expect(screen.getByLabelText("Use native titlebar")).toBeChecked();
     expect(screen.getByLabelText("Disable text selection")).toBeChecked();
     expect(screen.getByLabelText("Workbench theme")).toHaveValue("dark");
+    expect(screen.getByLabelText("Core logs")).toBeInTheDocument();
+    expect(screen.getByText("Workspace loaded")).toBeInTheDocument();
+    expect(screen.getByText("No silo sources")).toBeInTheDocument();
+    expect(screen.getByText("Connection failed")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Workbench theme"), {
       target: { value: "light" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 
     expect(onThemeChange).toHaveBeenCalledWith("light");
+    expect(onClearLogs).toHaveBeenCalledOnce();
   });
 });

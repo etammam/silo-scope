@@ -50,6 +50,8 @@ function App() {
     selectedGrain,
     selectedFunctionId,
     selectedMethod,
+    logs,
+    clearLogs,
     setInvocationResult,
     setSelectedGrain,
     setSelectedFunction,
@@ -215,6 +217,8 @@ function App() {
           activeView={activeView}
           grains={grains}
           isConnected={isConnected}
+          logs={logs}
+          onClearLogs={clearLogs}
           onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
           onNewWorkspace={handleNewWorkspace}

@@ -268,4 +268,36 @@ describe("App shell", () => {
       },
     ]);
   });
+
+  it("shows session logs in settings and clears them on demand", () => {
+    render(<App />);
+    const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
+
+    act(() => {
+      rpcConfig.handlers.messages.logEntry({
+        entry: {
+          timestamp: "2026-05-18T10:00:00.000Z",
+          level: "warn",
+          message: "No silo sources",
+        },
+      });
+      rpcConfig.handlers.messages.logEntry({
+        entry: {
+          timestamp: "2026-05-18T10:00:01.000Z",
+          level: "error",
+          message: "Connection failed",
+        },
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.getByText("No silo sources")).toBeInTheDocument();
+    expect(screen.getByText("Connection failed")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(useAppStore.getState().logs).toEqual([]);
+    expect(screen.getByText("No logs captured")).toBeInTheDocument();
+  });
 });
