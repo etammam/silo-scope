@@ -242,7 +242,7 @@ function WorkspaceNavigator({
   };
 
   return (
-    <>
+    <div className="navigation-sidebar__workspace-content">
       <section
         className="navigation-sidebar__section"
         aria-labelledby="workspace-select-title"
@@ -338,7 +338,7 @@ function WorkspaceNavigator({
       </section>
 
       <section
-        className="navigation-sidebar__section"
+        className="navigation-sidebar__section navigation-sidebar__section--sources"
         aria-labelledby="source-catalog-title"
       >
         <div
@@ -356,10 +356,11 @@ function WorkspaceNavigator({
             onChange={(event) => setCatalogQuery(event.target.value)}
           />
         </label>
-        {filteredSources.length > 0 ? (
-          <ul className="navigation-sidebar__tree navigation-sidebar__catalog">
+        <div className="navigation-sidebar__sources-container">
+          {filteredSources.length > 0 ? (
+            <ul className="navigation-sidebar__tree navigation-sidebar__catalog">
             {filteredSources.map((source) => (
-              <li key={source.sourceId}>
+              <li key={source.sourceId} className="navigation-sidebar__source-item">
                 <div className="navigation-sidebar__source-row">
                   <input
                     aria-label={`${source.label} enabled`}
@@ -392,29 +393,32 @@ function WorkspaceNavigator({
                     <small>{source.discoveryStatus}</small>
                   </button>
                 </div>
-                {!collapsedSources.has(source.sourceId) && (
-                  <SourceInterfaceTree
-                    collapsedInterfaces={collapsedInterfaces}
-                    onSelectFunction={onSelectFunction}
-                    onSelectGrain={onSelectGrain}
-                    onToggleInterface={toggleInterface}
-                    selectedFunctionId={selectedFunctionId}
-                    selectedGrain={selectedGrain}
-                    source={source}
-                  />
+                {source.interfaces.length > 0 && !collapsedSources.has(source.sourceId) && (
+                  <div className="navigation-sidebar__source-children">
+                    <SourceInterfaceTree
+                      collapsedInterfaces={collapsedInterfaces}
+                      onSelectFunction={onSelectFunction}
+                      onSelectGrain={onSelectGrain}
+                      onToggleInterface={toggleInterface}
+                      selectedFunctionId={selectedFunctionId}
+                      selectedGrain={selectedGrain}
+                      source={source}
+                    />
+                  </div>
                 )}
               </li>
             ))}
           </ul>
         ) : (
-          <div className="navigation-sidebar__empty">
-            {workspace
-              ? isConnected
-                ? "No functions discovered"
-                : "Connect to discover source functions"
-              : "No workspace loaded"}
-          </div>
-        )}
+            <div className="navigation-sidebar__empty">
+              {workspace
+                ? isConnected
+                  ? "No functions discovered"
+                  : "Connect to discover source functions"
+                : "No workspace loaded"}
+            </div>
+          )}
+        </div>
       </section>
 
       <section
@@ -432,7 +436,7 @@ function WorkspaceNavigator({
           <span>{isConnected ? "Connected" : "Disconnected"}</span>
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
@@ -637,7 +641,7 @@ function NuGetRegistryManager({
   };
 
   return (
-    <>
+    <div className="navigation-sidebar__workspace-content">
       <section
         className="navigation-sidebar__section"
         aria-labelledby="nuget-sources-title"
@@ -830,7 +834,7 @@ function NuGetRegistryManager({
           {status}
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
@@ -846,7 +850,7 @@ function SystemSettings({
   theme: "dark" | "light" | "vscode-dark" | "vscode-light";
 }) {
   return (
-    <>
+    <div className="navigation-sidebar__workspace-content">
       <section
         className="navigation-sidebar__section"
         aria-labelledby="settings-app-title"
@@ -960,7 +964,7 @@ function SystemSettings({
           <div className="navigation-sidebar__empty">No logs captured</div>
         )}
       </section>
-    </>
+    </div>
   );
 }
 

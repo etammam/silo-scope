@@ -487,6 +487,16 @@ textarea,
 	min-width: 0;
 	overflow: hidden;
 	padding: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.navigation-sidebar__workspace-content {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
 }
 
 .app-shell[data-activity-visible="false"] .navigation-sidebar {
@@ -496,6 +506,7 @@ textarea,
 .navigation-sidebar__header {
 	align-items: center;
 	display: flex;
+	flex-shrink: 0;
 	font-size: 12px;
 	font-weight: 700;
 	background: var(--ui-1);
@@ -510,6 +521,22 @@ textarea,
 	border-top: 1px solid var(--ui-3);
 	margin-top: 0;
 	padding: 10px 8px 0;
+}
+
+.navigation-sidebar__section--sources {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	flex: 1;
+}
+
+.navigation-sidebar__sources-container {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	display: flex;
+	flex-direction: column;
 }
 
 .navigation-sidebar__header + .navigation-sidebar__section {
@@ -1004,7 +1031,22 @@ textarea,
 }
 
 .navigation-sidebar__tree--methods {
-	padding-left: 20px;
+	padding-left: 12px;
+	border-left: 1px solid var(--ui-3);
+	margin-left: 9px;
+}
+
+.navigation-sidebar__tree--methods li {
+	position: relative;
+}
+
+.navigation-sidebar__tree--methods li::before {
+	content: "";
+	position: absolute;
+	left: -12px;
+	top: 50%;
+	width: 8px;
+	border-top: 1px solid var(--ui-3);
 }
 
 .navigation-sidebar__tree button {
@@ -1027,7 +1069,23 @@ textarea,
 }
 
 .navigation-sidebar__catalog {
+	flex: 1;
 	margin-top: 8px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	min-height: 0;
+	max-height: 100%;
+}
+
+.navigation-sidebar__source-item {
+	display: flex;
+	flex-direction: column;
+}
+
+.navigation-sidebar__source-children {
+	margin-left: 16px;
+	padding-left: 8px;
+	border-left: 1px solid var(--ui-3);
 }
 
 .navigation-sidebar__source-row {
@@ -1049,6 +1107,13 @@ textarea,
 .navigation-sidebar__interface {
 	height: auto !important;
 	min-height: 28px;
+	border-radius: 4px;
+	margin: 1px 0;
+}
+
+.navigation-sidebar__source:hover,
+.navigation-sidebar__interface:hover {
+	background: var(--ui-2);
 }
 
 .navigation-sidebar__source-main {
