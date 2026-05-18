@@ -166,7 +166,7 @@ textarea,
 .app-titlebar__command {
 	align-items: center;
 	background: var(--ui-1);
-	border: 1px solid var(--ui-4);
+	border: 1px dashed var(--ui-4);
 	border-radius: 6px;
 	color: var(--ui-6);
 	display: flex;
@@ -175,6 +175,7 @@ textarea,
 	min-width: 0;
 	padding: 0 16px;
 	width: min(430px, calc(100vw - 360px));
+	font-weight: 200;
 }
 
 .app-titlebar__actions {
