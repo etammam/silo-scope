@@ -1,7 +1,10 @@
-name: Continues Integration
+name: Continuous Integration
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches:
+      - main
 
 env:
   DOTNET_VERSION: "10.0.x"
@@ -18,9 +21,14 @@ jobs:
       cache-key: ${{ steps.cache-keys.outputs.cache-key }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Generate cache keys
         id: cache-keys
@@ -29,7 +37,7 @@ jobs:
           echo "tools-cache-key=${{ runner.os }}-dotnet-tools-${{ hashFiles('**/.config/dotnet-tools.json', '**/*.csproj') }}" >> $GITHUB_OUTPUT
 
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.nuget/packages
@@ -39,7 +47,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Cache dotnet tools
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             /home/runner/.dotnet/tools
@@ -54,7 +62,7 @@ jobs:
           echo ".NET tools restored successfully"
       - name: Restore dependencies
         run: |
-          dotnet restore --locked-mode --verbosity minimal
+          dotnet restore --verbosity minimal
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -72,7 +80,7 @@ jobs:
           dotnet list package --outdated --format json > outdated-packages.json || echo '{"projects":[]}' > outdated-packages.json
 
       - name: Upload outdated package list
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4
         with:
           name: outdated-packages
           path: outdated-packages.json
@@ -90,9 +98,52 @@ jobs:
 
       - name: Upload test and coverage results
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4
         with:
           name: test-coverage-results-${{ github.run_number }}
           path: |
             ./TestResults/coverage
+          retention-days: 30
+
+  publish-core:
+    name: Publish Core (${{ matrix.runtime }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-and-test
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          - linux-x64
+          - osx-x64
+          - osx-arm64
+          - win-x64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore src/Siloscope.Core/Siloscope.Core.csproj --runtime ${{ matrix.runtime }} --verbosity minimal
+
+      - name: Publish self-contained sidecar
+        run: >
+          dotnet publish src/Siloscope.Core/Siloscope.Core.csproj
+          --configuration Release
+          --runtime ${{ matrix.runtime }}
+          --self-contained true
+          --no-restore
+          --output artifacts/core/${{ matrix.runtime }}
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Upload Core sidecar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: siloscope-core-${{ matrix.runtime }}
+          path: artifacts/core/${{ matrix.runtime }}
           retention-days: 30
