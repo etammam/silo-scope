@@ -432,7 +432,7 @@ function WorkspaceNavigator({
           Connection
         </div>
         <div className="navigation-sidebar__row">
-          <span className="navigation-sidebar__dot" />
+          <span className={`navigation-sidebar__dot ${isConnected ? "navigation-sidebar__dot--connected" : ""}`} />
           <span>{isConnected ? "Connected" : "Disconnected"}</span>
         </div>
       </section>

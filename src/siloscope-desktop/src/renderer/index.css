@@ -699,6 +699,11 @@ textarea,
 	width: 10px;
 }
 
+.navigation-sidebar__dot--connected {
+	background: #4ec9b0;
+	border-color: #4ec9b0;
+}
+
 .navigation-sidebar__file-icon {
 	border: 1.5px solid var(--ui-5);
 	border-radius: 2px;
