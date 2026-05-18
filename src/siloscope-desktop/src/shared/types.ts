@@ -37,6 +37,11 @@ export interface Workspace {
   siloAddress: string;
   gatewayPort: number;
   orleansVersion: string;
+  description?: string | null;
+  clusterId?: string;
+  serviceId?: string;
+  gatewayEndpoints?: string[];
+  environmentVariables?: Record<string, string>;
   sources?: WorkspaceSource[];
 }
 

@@ -21,6 +21,11 @@ export type ApplicationMenuAction =
 export type SiloScopeRPC = {
   bun: RPCSchema<{
     requests: {
+      loadWorkspace: { params: { path?: string } | void; response: { workspace: Workspace } };
+      saveWorkspace: { params: { workspace: Workspace; path?: string }; response: { success: boolean } };
+      connectCluster: { params: { workspace: Workspace }; response: { message: string } };
+      disconnectCluster: { params: void; response: { success: boolean } };
+      discoverGrains: { params: { workspaceId: string }; response: { grains: GrainInterfaceDescriptor[]; sourceCatalog?: SourceOwnedCatalog } };
       getGrains: { params: { workspaceId: string }; response: { grains: GrainInterfaceDescriptor[]; sourceCatalog?: SourceOwnedCatalog } };
       getSourceCatalog: { params: { workspaceId: string }; response: { sourceCatalog: SourceOwnedCatalog } };
       listNugetFeeds: { params: void; response: { feeds: NugetFeed[] } };

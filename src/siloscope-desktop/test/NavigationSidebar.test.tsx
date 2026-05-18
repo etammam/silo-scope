@@ -74,6 +74,11 @@ describe("NavigationSidebar", () => {
         activeView="workspace"
         grains={grains}
         isConnected
+        onConnectCluster={vi.fn()}
+        onDisconnectCluster={vi.fn()}
+        onDiscoverGrains={vi.fn()}
+        onLoadWorkspace={vi.fn()}
+        onSaveWorkspace={vi.fn()}
         onSelectFunction={onSelectFunction}
         onSelectGrain={onSelectGrain}
         onThemeChange={vi.fn()}
@@ -85,8 +90,10 @@ describe("NavigationSidebar", () => {
     );
 
     expect(screen.getByLabelText("Active workspace")).toHaveValue("workspace-1");
-    expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Export" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Load" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Discover Grains" })).toBeEnabled();
     expect(screen.getByText("DLL")).toBeInTheDocument();
     expect(screen.getByText("127.0.0.1:30000")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "127.0.0.1:30000 2" })).toHaveAttribute(

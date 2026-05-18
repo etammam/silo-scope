@@ -6,6 +6,11 @@ import { useAppStore } from "@/renderer/store";
 
 const electrobunMock = vi.hoisted(() => {
   const request = {
+    loadWorkspace: vi.fn(),
+    saveWorkspace: vi.fn(),
+    connectCluster: vi.fn(),
+    disconnectCluster: vi.fn(),
+    discoverGrains: vi.fn(),
     getGrains: vi.fn(),
     getSourceCatalog: vi.fn(),
     listNugetFeeds: vi.fn(),
@@ -52,6 +57,11 @@ vi.mock("@/renderer/components/MonacoEditor", () => ({
 describe("App shell", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    electrobunMock.request.loadWorkspace.mockClear();
+    electrobunMock.request.saveWorkspace.mockClear();
+    electrobunMock.request.connectCluster.mockClear();
+    electrobunMock.request.disconnectCluster.mockClear();
+    electrobunMock.request.discoverGrains.mockClear();
     electrobunMock.request.getGrains.mockClear();
     electrobunMock.request.getSourceCatalog.mockClear();
     electrobunMock.request.listNugetFeeds.mockClear();
@@ -62,7 +72,29 @@ describe("App shell", () => {
     electrobunMock.request.getWorkspaces.mockClear();
     electrobunMock.send.connectionChanged.mockClear();
     electrobunMock.send.logEntry.mockClear();
-    electrobunMock.request.getGrains.mockResolvedValue({
+    electrobunMock.request.loadWorkspace.mockResolvedValue({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+        clusterId: "dev",
+        serviceId: "SiloScope",
+        gatewayEndpoints: ["127.0.0.1:30000"],
+        sources: [],
+      },
+    });
+    electrobunMock.request.saveWorkspace.mockResolvedValue({ success: true });
+    electrobunMock.request.connectCluster.mockResolvedValue({
+      message: "Connected to 1 gateway(s).",
+    });
+    electrobunMock.request.disconnectCluster.mockResolvedValue({ success: true });
+    electrobunMock.request.discoverGrains.mockResolvedValue({
+      grains: [],
+      sourceCatalog: { sources: [] },
+    });
+    electrobunMock.request.discoverGrains.mockResolvedValue({
       grains: [],
       sourceCatalog: { sources: [] },
     });
@@ -120,7 +152,7 @@ describe("App shell", () => {
   });
 
   it("loads the source catalog through the desktop backend when a workspace is set", async () => {
-    electrobunMock.request.getGrains.mockResolvedValue({
+    electrobunMock.request.discoverGrains.mockResolvedValue({
       grains: [
         {
           interfaceId: "grain-1",
@@ -179,8 +211,55 @@ describe("App shell", () => {
 
     expect(await screen.findAllByText("Game.Grains.dll")).not.toHaveLength(0);
 
-    expect(electrobunMock.request.getGrains).toHaveBeenCalledWith({ workspaceId: "workspace-1" });
+    expect(electrobunMock.request.discoverGrains).toHaveBeenCalledWith({ workspaceId: "workspace-1" });
     expect(useAppStore.getState().sourceCatalog.sources[0]?.interfaces[0]?.methods[0]?.functionId).toBe("function-1");
+  });
+
+  it("loads, saves, connects, disconnects, and discovers from the workspace panel", async () => {
+    electrobunMock.request.discoverGrains.mockResolvedValue({
+      grains: [
+        {
+          interfaceId: "grain-1",
+          interfaceName: "IPlayerGrain",
+          methods: [],
+        },
+      ],
+      sourceCatalog: {
+        sources: [
+          {
+            sourceId: "source-1",
+            sourceType: "DLL",
+            reference: "Game.Grains.dll",
+            label: "Game.Grains.dll",
+            enabled: true,
+            discoveryStatus: "ready",
+            interfaces: [],
+          },
+        ],
+      },
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+    expect(await screen.findByLabelText("Active workspace")).toHaveValue("workspace-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await screen.findByText("Connected");
+    fireEvent.click(screen.getByRole("button", { name: "Discover Grains" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+
+    expect(electrobunMock.request.loadWorkspace).toHaveBeenCalledWith(undefined);
+    expect(electrobunMock.request.saveWorkspace).toHaveBeenCalledWith({
+      workspace: expect.objectContaining({ id: "workspace-1" }),
+      path: undefined,
+    });
+    expect(electrobunMock.request.connectCluster).toHaveBeenCalledWith({
+      workspace: expect.objectContaining({ id: "workspace-1" }),
+    });
+    expect(electrobunMock.request.discoverGrains).toHaveBeenCalledWith({ workspaceId: "workspace-1" });
+    expect(electrobunMock.request.disconnectCluster).toHaveBeenCalledWith();
   });
 
   it("invokes the selected function through the desktop backend", async () => {
@@ -447,7 +526,9 @@ describe("App shell", () => {
 
     rpcConfig.handlers.messages.applicationMenuAction({ action: "newWorkspace" });
 
-    expect(useAppStore.getState().workspace).toBeNull();
+    expect(useAppStore.getState().workspace).toEqual(
+      expect.objectContaining({ name: "Untitled Workspace" }),
+    );
     expect(useAppStore.getState().grains).toEqual([]);
     expect(useAppStore.getState().sourceCatalog).toEqual({ sources: [] });
     expect(useAppStore.getState().selectedFunctionId).toBeNull();
@@ -485,7 +566,9 @@ describe("App shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
 
-    expect(useAppStore.getState().workspace).toBeNull();
+    expect(useAppStore.getState().workspace).toEqual(
+      expect.objectContaining({ name: "Untitled Workspace" }),
+    );
     expect(useAppStore.getState().grains).toEqual([]);
     expect(useAppStore.getState().sourceCatalog).toEqual({ sources: [] });
     expect(useAppStore.getState().selectedFunctionId).toBeNull();

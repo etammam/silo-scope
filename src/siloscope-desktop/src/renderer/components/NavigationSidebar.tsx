@@ -29,6 +29,11 @@ type NavigationSidebarProps = {
   onCreateNugetFeed?: (request: { name: string; url: string; username?: string; password?: string }) => Promise<void>;
   onSearchNugetPackages?: (request: { query: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
   onAddNugetPackageSource?: (request: { packageId: string; version: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
+  onConnectCluster?: () => Promise<void>;
+  onDisconnectCluster?: () => Promise<void>;
+  onDiscoverGrains?: () => Promise<void>;
+  onLoadWorkspace?: () => Promise<void>;
+  onSaveWorkspace?: () => Promise<void>;
   onThemeChange: (theme: "dark" | "light") => void;
 } & WorkspaceNavigatorProps;
 
@@ -39,7 +44,12 @@ type WorkspaceNavigatorProps = {
   selectedFunctionId?: string | null;
   selectedGrain: string | null;
   workspace: Workspace | null;
+  onConnectCluster?: () => Promise<void>;
+  onDisconnectCluster?: () => Promise<void>;
+  onDiscoverGrains?: () => Promise<void>;
+  onLoadWorkspace?: () => Promise<void>;
   onNewWorkspace?: () => void;
+  onSaveWorkspace?: () => Promise<void>;
   onSelectFunction?: (functionId: string | null) => void;
   onSelectGrain: (grainId: string | null) => void;
 };
@@ -55,7 +65,12 @@ export function NavigationSidebar({
   onCreateNugetFeed,
   onSearchNugetPackages,
   onAddNugetPackageSource,
+  onConnectCluster,
+  onDisconnectCluster,
+  onDiscoverGrains,
+  onLoadWorkspace,
   onNewWorkspace,
+  onSaveWorkspace,
   onSelectFunction,
   selectedGrain,
   selectedFunctionId,
@@ -77,7 +92,12 @@ export function NavigationSidebar({
         <WorkspaceNavigator
           grains={grains}
           isConnected={isConnected}
+          onConnectCluster={onConnectCluster}
+          onDisconnectCluster={onDisconnectCluster}
+          onDiscoverGrains={onDiscoverGrains}
+          onLoadWorkspace={onLoadWorkspace}
           onNewWorkspace={onNewWorkspace}
+          onSaveWorkspace={onSaveWorkspace}
           onSelectFunction={onSelectFunction}
           onSelectGrain={onSelectGrain}
           selectedFunctionId={selectedFunctionId}
@@ -113,7 +133,12 @@ export function NavigationSidebar({
 function WorkspaceNavigator({
   grains,
   isConnected,
+  onConnectCluster,
+  onDisconnectCluster,
+  onDiscoverGrains,
+  onLoadWorkspace,
   onNewWorkspace,
+  onSaveWorkspace,
   onSelectFunction,
   selectedGrain,
   selectedFunctionId,
@@ -205,13 +230,49 @@ function WorkspaceNavigator({
           </select>
         </label>
         <div className="navigation-sidebar__command-row">
-          <button className="navigation-sidebar__command" type="button">
-            Import
+          <button
+            className="navigation-sidebar__command"
+            disabled={!onLoadWorkspace}
+            onClick={() => void onLoadWorkspace?.()}
+            type="button"
+          >
+            Load
           </button>
-          <button className="navigation-sidebar__command" type="button" disabled={!workspace}>
-            Export
+          <button
+            className="navigation-sidebar__command"
+            type="button"
+            disabled={!workspace || !onSaveWorkspace}
+            onClick={() => void onSaveWorkspace?.()}
+          >
+            Save
           </button>
         </div>
+        <div className="navigation-sidebar__command-row">
+          <button
+            className="navigation-sidebar__command"
+            disabled={!workspace || isConnected || !onConnectCluster}
+            onClick={() => void onConnectCluster?.()}
+            type="button"
+          >
+            Connect
+          </button>
+          <button
+            className="navigation-sidebar__command"
+            disabled={!isConnected || !onDisconnectCluster}
+            onClick={() => void onDisconnectCluster?.()}
+            type="button"
+          >
+            Disconnect
+          </button>
+        </div>
+        <button
+          className="navigation-sidebar__command"
+          disabled={!workspace || !onDiscoverGrains}
+          onClick={() => void onDiscoverGrains?.()}
+          type="button"
+        >
+          Discover Grains
+        </button>
       </section>
 
       <section className="navigation-sidebar__section" aria-labelledby="source-catalog-title">

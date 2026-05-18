@@ -6,10 +6,13 @@ namespace Siloscope.Core.Endpoints;
 public interface ISiloScopeCommands
 {
     // Workspace
+    [JsonRpcMethod("LoadWorkspaceAsync")]
     Task<Result<WorkspaceInfo>> LoadWorkspaceAsync(
         string? path = null,
         CancellationToken cancellationToken = default
     );
+
+    [JsonRpcMethod("SaveWorkspaceAsync")]
     Task<Result> SaveWorkspaceAsync(
         WorkspaceInfo workspace,
         string? path = null,
@@ -17,17 +20,25 @@ public interface ISiloScopeCommands
     );
 
     // Cluster
+    [JsonRpcMethod("ConnectClusterAsync")]
     Task<Result<string>> ConnectClusterAsync(
         ClusterOptions options,
         CancellationToken cancellationToken = default
     );
+
+    [JsonRpcMethod("DisconnectClusterAsync")]
     Task<Result> DisconnectClusterAsync(CancellationToken cancellationToken = default);
 
     // Grains
+    [JsonRpcMethod("DiscoverGrainsAsync")]
     Task<Result<GrainCatalog>> DiscoverGrainsAsync(CancellationToken cancellationToken = default);
+
+    [JsonRpcMethod("DiscoverSourceCatalogAsync")]
     Task<Result<SourceOwnedGrainCatalog>> DiscoverSourceCatalogAsync(
         CancellationToken cancellationToken = default
     );
+
+    [JsonRpcMethod("InvokeGrainAsync")]
     Task<Result<InvocationResult>> InvokeGrainAsync(
         string grainType,
         string methodName,

@@ -1,12 +1,22 @@
 import { Electroview } from "electrobun/view";
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import type { SiloScopeRPC } from "../shared/rpc";
-import type { GrainKeyType } from "../shared/types";
+import type { GrainKeyType, Workspace } from "../shared/types";
+import { buildSourceCatalogFromGrains, findCatalogFunction } from "./catalog";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { RequestWorkbench } from "./components/RequestWorkbench";
-import { ResponseTelemetryPane, type ResponsePaneTab } from "./components/ResponseTelemetryPane";
-import { buildSourceCatalogFromGrains, findCatalogFunction } from "./catalog";
+import {
+  ResponseTelemetryPane,
+  type ResponsePaneTab,
+} from "./components/ResponseTelemetryPane";
 import { useAppStore } from "./store";
 
 type PaneLayout = "horizontal" | "vertical";
@@ -41,13 +51,23 @@ const rendererRpc = Electroview.defineRPC<SiloScopeRPC>({
         useAppStore.getState().addLog(entry);
       },
       applicationMenuAction: ({ action }) => {
-        window.dispatchEvent(new CustomEvent(applicationMenuEventName, { detail: action }));
+        window.dispatchEvent(
+          new CustomEvent(applicationMenuEventName, { detail: action }),
+        );
         if (action === "newWorkspace") {
-          resetWorkspaceState();
+          createNewWorkspaceState();
           return;
         }
 
-        console.log("applicationMenuAction", action);
+        if (action === "openWorkspace") {
+          void loadWorkspace();
+          return;
+        }
+
+        if (action === "saveWorkspace") {
+          void saveCurrentWorkspace();
+          return;
+        }
       },
     },
   },
@@ -82,7 +102,7 @@ function App() {
   const [paneLayout, setPaneLayout] = useState<PaneLayout>("horizontal");
   const [horizontalResponseSize, setHorizontalResponseSize] = useState(320);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
-  const handleNewWorkspace = useCallback(() => resetWorkspaceState(), []);
+  const handleNewWorkspace = useCallback(() => createNewWorkspaceState(), []);
 
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, theme);
@@ -108,13 +128,23 @@ function App() {
       }
     };
 
-    window.addEventListener(applicationMenuEventName, handleApplicationMenuAction);
-    return () => window.removeEventListener(applicationMenuEventName, handleApplicationMenuAction);
+    window.addEventListener(
+      applicationMenuEventName,
+      handleApplicationMenuAction,
+    );
+    return () =>
+      window.removeEventListener(
+        applicationMenuEventName,
+        handleApplicationMenuAction,
+      );
   }, []);
 
-  const responseSize = paneLayout === "horizontal" ? horizontalResponseSize : verticalResponseSize;
+  const responseSize =
+    paneLayout === "horizontal" ? horizontalResponseSize : verticalResponseSize;
   const effectiveSourceCatalog = useMemo(() => {
-    return sourceCatalog.sources.length > 0 ? sourceCatalog : buildSourceCatalogFromGrains(grains, workspace);
+    return sourceCatalog.sources.length > 0
+      ? sourceCatalog
+      : buildSourceCatalogFromGrains(grains, workspace);
   }, [grains, sourceCatalog, workspace]);
 
   useEffect(() => {
@@ -127,7 +157,10 @@ function App() {
 
   const handleSelectFunction = useCallback(
     (functionId: string | null) => {
-      const selectedFunction = findCatalogFunction(effectiveSourceCatalog, functionId);
+      const selectedFunction = findCatalogFunction(
+        effectiveSourceCatalog,
+        functionId,
+      );
 
       if (!selectedFunction) {
         setSelectedFunction(null);
@@ -140,7 +173,12 @@ function App() {
       setSelectedMethod(selectedFunction.methodName);
       setSelectedFunction(selectedFunction.functionId);
     },
-    [effectiveSourceCatalog, setSelectedFunction, setSelectedGrain, setSelectedMethod],
+    [
+      effectiveSourceCatalog,
+      setSelectedFunction,
+      setSelectedGrain,
+      setSelectedMethod,
+    ],
   );
 
   const shellStyle = {
@@ -159,12 +197,20 @@ function App() {
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (paneLayout === "horizontal") {
-          const nextSize = clamp(bounds.right - moveEvent.clientX, 180, bounds.width * 0.65);
+          const nextSize = clamp(
+            bounds.right - moveEvent.clientX,
+            180,
+            bounds.width * 0.65,
+          );
           setHorizontalResponseSize(nextSize);
           return;
         }
 
-        const nextSize = clamp(bounds.bottom - moveEvent.clientY, 180, bounds.height * 0.7);
+        const nextSize = clamp(
+          bounds.bottom - moveEvent.clientY,
+          180,
+          bounds.height * 0.7,
+        );
         setVerticalResponseSize(nextSize);
       };
 
@@ -179,13 +225,10 @@ function App() {
     [paneLayout],
   );
 
-  const handleInvoke = useCallback(
-    (request: GrainInvocationRequest) => {
-      setResponseTab("response");
-      void invokeGrain(request);
-    },
-    [],
-  );
+  const handleInvoke = useCallback((request: GrainInvocationRequest) => {
+    setResponseTab("response");
+    void invokeGrain(request);
+  }, []);
 
   return (
     <div
@@ -197,38 +240,68 @@ function App() {
       data-theme={theme}
       style={shellStyle}
     >
-      {isActivityBarVisible && <ActivityBar activeView={activeView} onViewChange={setActiveView} />}
+      {isActivityBarVisible && (
+        <ActivityBar activeView={activeView} onViewChange={setActiveView} />
+      )}
 
       <header className="app-titlebar electrobun-webkit-app-region-drag">
         <div className="app-titlebar__spacer" />
-        <div className="app-titlebar__command">SiloScope</div>
+        <div className="app-titlebar__command">Siloscope Workbench</div>
         <div className="app-titlebar__actions">
           <button
-            aria-label={isNavigationVisible ? "Collapse navigation panel" : "Expand navigation panel"}
+            aria-label={
+              isNavigationVisible
+                ? "Collapse navigation panel"
+                : "Expand navigation panel"
+            }
             aria-pressed={!isNavigationVisible}
             className="titlebar-action titlebar-action--navigation electrobun-webkit-app-region-no-drag"
             onClick={() => setIsNavigationVisible((visible) => !visible)}
-            title={isNavigationVisible ? "Collapse navigation panel" : "Expand navigation panel"}
+            title={
+              isNavigationVisible
+                ? "Collapse navigation panel"
+                : "Expand navigation panel"
+            }
             type="button"
           >
             <span aria-hidden="true" className="titlebar-navigation__icon" />
           </button>
           <button
-            aria-label={paneLayout === "horizontal" ? "Stack request and response panels" : "Place request and response panels side by side"}
+            aria-label={
+              paneLayout === "horizontal"
+                ? "Stack request and response panels"
+                : "Place request and response panels side by side"
+            }
             aria-pressed={paneLayout === "vertical"}
             className="titlebar-action titlebar-action--layout electrobun-webkit-app-region-no-drag"
-            onClick={() => setPaneLayout((layout) => (layout === "horizontal" ? "vertical" : "horizontal"))}
-            title={paneLayout === "horizontal" ? "Stack request and response panels" : "Place request and response panels side by side"}
+            onClick={() =>
+              setPaneLayout((layout) =>
+                layout === "horizontal" ? "vertical" : "horizontal",
+              )
+            }
+            title={
+              paneLayout === "horizontal"
+                ? "Stack request and response panels"
+                : "Place request and response panels side by side"
+            }
             type="button"
           >
             <span aria-hidden="true" className="titlebar-layout__icon" />
           </button>
           <button
-            aria-label={isResponseVisible ? "Collapse response panel" : "Expand response panel"}
+            aria-label={
+              isResponseVisible
+                ? "Collapse response panel"
+                : "Expand response panel"
+            }
             aria-pressed={!isResponseVisible}
             className="titlebar-action titlebar-action--response electrobun-webkit-app-region-no-drag"
             onClick={() => setIsResponseVisible((visible) => !visible)}
-            title={isResponseVisible ? "Collapse response panel" : "Expand response panel"}
+            title={
+              isResponseVisible
+                ? "Collapse response panel"
+                : "Expand response panel"
+            }
             type="button"
           >
             <span aria-hidden="true" className="titlebar-response__icon" />
@@ -258,6 +331,11 @@ function App() {
           onCreateNugetFeed={createNugetFeed}
           onSearchNugetPackages={searchNugetPackages}
           onAddNugetPackageSource={addNugetPackageSource}
+          onConnectCluster={connectCluster}
+          onDisconnectCluster={disconnectCluster}
+          onDiscoverGrains={discoverWorkspaceGrains}
+          onLoadWorkspace={loadWorkspace}
+          onSaveWorkspace={saveCurrentWorkspace}
           onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
           onNewWorkspace={handleNewWorkspace}
@@ -286,7 +364,9 @@ function App() {
         {isResponseVisible && (
           <div
             aria-label="Resize request and response panels"
-            aria-orientation={paneLayout === "horizontal" ? "vertical" : "horizontal"}
+            aria-orientation={
+              paneLayout === "horizontal" ? "vertical" : "horizontal"
+            }
             className="workbench-resizer"
             onMouseDown={handleResizeStart}
             role="separator"
@@ -312,25 +392,151 @@ function readStoredTheme(): WorkbenchTheme {
   }
 
   const storedTheme = window.localStorage.getItem(themeStorageKey);
-  return storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
+  return storedTheme === "light" || storedTheme === "dark"
+    ? storedTheme
+    : "dark";
 }
 
-function resetWorkspaceState() {
+function createNewWorkspaceState() {
+  const workspace: Workspace = {
+    id: `workspace-${Date.now()}`,
+    name: "Untitled Workspace",
+    description: null,
+    siloAddress: "127.0.0.1",
+    gatewayPort: 30000,
+    orleansVersion: "10.0",
+    clusterId: "dev",
+    serviceId: "SiloScope",
+    gatewayEndpoints: ["127.0.0.1:30000"],
+    environmentVariables: {},
+    sources: [],
+  };
   const store = useAppStore.getState();
-  store.setWorkspace(null);
+
+  store.setWorkspace(workspace);
   store.setGrains([]);
   store.setSourceCatalog({ sources: [] });
   store.setSelectedFunction(null);
   store.setInvocationResult(null);
+  store.setIsConnected(false);
+}
+
+async function loadWorkspace(path?: string) {
+  try {
+    const response = await electroview.rpc!.request.loadWorkspace(
+      path ? { path } : undefined,
+    );
+    const store = useAppStore.getState();
+
+    store.setWorkspace(response.workspace);
+    store.setIsConnected(false);
+    store.setInvocationResult(null);
+    await refreshWorkspaceCatalog(response.workspace.id);
+    store.addLog({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      message: `Workspace loaded: ${response.workspace.name}`,
+    });
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error ? error.message : "Failed to load workspace.",
+    });
+  }
+}
+
+async function saveCurrentWorkspace(path?: string) {
+  const workspace = useAppStore.getState().workspace;
+  if (!workspace) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "warn",
+      message: "No workspace loaded to save.",
+    });
+    return;
+  }
+
+  try {
+    await electroview.rpc!.request.saveWorkspace({ workspace, path });
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      message: `Workspace saved: ${workspace.name}`,
+    });
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error ? error.message : "Failed to save workspace.",
+    });
+  }
+}
+
+async function connectCluster() {
+  const workspace = useAppStore.getState().workspace;
+  if (!workspace) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "warn",
+      message: "Load a workspace before connecting.",
+    });
+    return;
+  }
+
+  try {
+    const response = await electroview.rpc!.request.connectCluster({ workspace });
+    const store = useAppStore.getState();
+    store.setIsConnected(true);
+    store.addLog({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      message: response.message,
+    });
+  } catch (error) {
+    const store = useAppStore.getState();
+    store.setIsConnected(false);
+    store.addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error ? error.message : "Failed to connect cluster.",
+    });
+  }
+}
+
+async function disconnectCluster() {
+  try {
+    await electroview.rpc!.request.disconnectCluster();
+    const store = useAppStore.getState();
+    store.setIsConnected(false);
+    store.addLog({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      message: "Cluster disconnected.",
+    });
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error ? error.message : "Failed to disconnect cluster.",
+    });
+  }
 }
 
 async function refreshWorkspaceCatalog(workspaceId: string) {
   try {
-    const response = await electroview.rpc!.request.getGrains({ workspaceId });
+    const response = await electroview.rpc!.request.discoverGrains({ workspaceId });
     const store = useAppStore.getState();
 
     store.setGrains(response.grains);
-    store.setSourceCatalog(response.sourceCatalog ?? buildSourceCatalogFromGrains(response.grains, store.workspace));
+    store.setSourceCatalog(
+      response.sourceCatalog ??
+        buildSourceCatalogFromGrains(response.grains, store.workspace),
+    );
   } catch (error) {
     const store = useAppStore.getState();
     store.setGrains([]);
@@ -338,9 +544,26 @@ async function refreshWorkspaceCatalog(workspaceId: string) {
     store.addLog({
       timestamp: new Date().toISOString(),
       level: "error",
-      message: error instanceof Error ? error.message : "Failed to refresh workspace catalog.",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to refresh workspace catalog.",
     });
   }
+}
+
+async function discoverWorkspaceGrains() {
+  const workspace = useAppStore.getState().workspace;
+  if (!workspace) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "warn",
+      message: "Load a workspace before discovering grains.",
+    });
+    return;
+  }
+
+  await refreshWorkspaceCatalog(workspace.id);
 }
 
 async function refreshNugetFeeds() {
@@ -351,7 +574,8 @@ async function refreshNugetFeeds() {
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "error",
-      message: error instanceof Error ? error.message : "Failed to load NuGet feeds.",
+      message:
+        error instanceof Error ? error.message : "Failed to load NuGet feeds.",
     });
   }
 }
@@ -367,7 +591,10 @@ async function createNugetFeed(request: {
     isPasswordClearText: true,
   });
   const store = useAppStore.getState();
-  store.setNugetFeeds([...store.nugetFeeds.filter((feed) => feed.name !== response.feed.name), response.feed]);
+  store.setNugetFeeds([
+    ...store.nugetFeeds.filter((feed) => feed.name !== response.feed.name),
+    response.feed,
+  ]);
 }
 
 async function searchNugetPackages(request: {
@@ -388,7 +615,8 @@ async function addNugetPackageSource(request: {
   sourceUrl?: string;
   feedName?: string;
 }) {
-  const response = await electroview.rpc!.request.addNugetPackageSource(request);
+  const response =
+    await electroview.rpc!.request.addNugetPackageSource(request);
   const store = useAppStore.getState();
   store.setWorkspace(response.workspace);
   store.setSourceCatalog({ sources: [] });

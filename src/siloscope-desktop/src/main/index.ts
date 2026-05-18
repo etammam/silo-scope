@@ -48,7 +48,10 @@ type BackendSourceOwnedCatalog = {
 type BackendWorkspaceInfo = {
   Id: string;
   Name: string;
+  Description?: string | null;
   Cluster?: {
+    ClusterId?: string;
+    ServiceId?: string;
     GatewayEndpoints?: string[];
   };
   Silos?: Array<{
@@ -97,17 +100,70 @@ type BackendInvocationResult = {
 const rpc = BrowserView.defineRPC<SiloScopeRPC>({
   handlers: {
     requests: {
-      getGrains: async ({ workspaceId: _workspaceId }) => {
-        console.log("getGrains", _workspaceId);
-        const result = await sidecar.request<FluentResult<BackendSourceOwnedCatalog>>(
-          "DiscoverSourceCatalogAsync",
+      loadWorkspace: async (params) => {
+        const result = await requestSidecar<FluentResult<BackendWorkspaceInfo>>(
+          "LoadWorkspaceAsync",
+          [params?.path ?? null],
+          "LoadWorkspace",
+        );
+
+        if (!result.IsSuccess || !result.Value) {
+          throw new Error(result.Errors?.[0]?.Message ?? "Failed to load workspace.");
+        }
+
+        return { workspace: mapWorkspace(result.Value) };
+      },
+      saveWorkspace: async ({ workspace, path }) => {
+        const result = await requestSidecar<FluentResult<unknown>>(
+          "SaveWorkspaceAsync",
+          [mapBackendWorkspace(workspace), path ?? null],
+          "SaveWorkspace",
         );
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to discover grains.");
+          throw new Error(result.Errors?.[0]?.Message ?? "Failed to save workspace.");
         }
 
-        const sourceCatalog = mapSourceCatalog(result.Value ?? {});
+        return { success: true };
+      },
+      connectCluster: async ({ workspace }) => {
+        const result = await requestSidecar<FluentResult<string>>(
+          "ConnectClusterAsync",
+          [mapBackendCluster(workspace)],
+          "ConnectCluster",
+        );
+
+        if (!result.IsSuccess) {
+          throw new Error(result.Errors?.[0]?.Message ?? "Failed to connect cluster.");
+        }
+
+        return { message: result.Value ?? "Connected" };
+      },
+      disconnectCluster: async () => {
+        const result = await requestSidecar<FluentResult<unknown>>(
+          "DisconnectClusterAsync",
+          undefined,
+          "DisconnectCluster",
+        );
+
+        if (!result.IsSuccess) {
+          throw new Error(result.Errors?.[0]?.Message ?? "Failed to disconnect cluster.");
+        }
+
+        return { success: true };
+      },
+      discoverGrains: async ({ workspaceId: _workspaceId }) => {
+        console.log("discoverGrains", _workspaceId);
+        const sourceCatalog = await discoverSourceCatalog();
+
+        return {
+          grains: flattenSourceCatalog(sourceCatalog),
+          sourceCatalog,
+        };
+      },
+      getGrains: async ({ workspaceId: _workspaceId }) => {
+        console.log("getGrains", _workspaceId);
+        const sourceCatalog = await discoverSourceCatalog();
 
         return {
           grains: flattenSourceCatalog(sourceCatalog),
@@ -116,15 +172,7 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
       },
       getSourceCatalog: async ({ workspaceId: _workspaceId }) => {
         console.log("getSourceCatalog", _workspaceId);
-        const result = await sidecar.request<FluentResult<BackendSourceOwnedCatalog>>(
-          "DiscoverSourceCatalogAsync",
-        );
-
-        if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to discover source catalog.");
-        }
-
-        return { sourceCatalog: mapSourceCatalog(result.Value ?? {}) };
+        return { sourceCatalog: await discoverSourceCatalog() };
       },
       listNugetFeeds: async () => {
         const result = await requestSidecar<FluentResult<BackendNugetFeed[]>>(
@@ -188,9 +236,10 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
       },
       invokeGrain: async ({ grainType, method, grainKey, payload, sourceId, functionId }) => {
         console.log("invokeGrain", grainType, method, grainKey, payload, sourceId, functionId);
-        const result = await sidecar.request<FluentResult<BackendInvocationResult>>(
+        const result = await requestSidecar<FluentResult<BackendInvocationResult>>(
           "InvokeGrainAsync",
           [grainType, method, grainKey, payload],
+          "InvokeGrain",
         );
 
         if (!result.IsSuccess) {
@@ -242,6 +291,20 @@ function isMissingJsonRpcMethod(error: unknown): boolean {
   return error instanceof Error && /no method by the name/i.test(error.message);
 }
 
+async function discoverSourceCatalog(): Promise<SourceOwnedCatalog> {
+  const result = await requestSidecar<FluentResult<BackendSourceOwnedCatalog>>(
+    "DiscoverSourceCatalogAsync",
+    undefined,
+    "DiscoverSourceCatalog",
+  );
+
+  if (!result.IsSuccess) {
+    throw new Error(result.Errors?.[0]?.Message ?? "Failed to discover source catalog.");
+  }
+
+  return mapSourceCatalog(result.Value ?? {});
+}
+
 function mapNugetFeed(feed: BackendNugetFeed): NugetFeed {
   return {
     name: feed.Name,
@@ -269,9 +332,14 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
   return {
     id: workspace.Id,
     name: workspace.Name,
+    description: workspace.Description ?? null,
     siloAddress: siloAddress || "127.0.0.1",
     gatewayPort: Number.isFinite(gatewayPort) ? gatewayPort : 30000,
+    clusterId: workspace.Cluster?.ClusterId ?? "dev",
+    serviceId: workspace.Cluster?.ServiceId ?? "SiloScope",
+    gatewayEndpoints: workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
     orleansVersion: "10.0",
+    environmentVariables: {},
     sources: (workspace.Silos ?? []).map((source) => ({
       sourceId: `${source.Source}:${source.Reference}:${source.Version ?? ""}:${source.Gateway ?? ""}`,
       sourceType: source.Source.toLowerCase() === "nuget" ? "NuGet" : "DLL",
@@ -281,6 +349,37 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
       gateway: source.Gateway ?? null,
       enabled: source.Enabled,
     })),
+  };
+}
+
+function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
+  EnvironmentVariables: Record<string, string>;
+} {
+  return {
+    Id: workspace.id,
+    Name: workspace.name,
+    Description: workspace.description ?? null,
+    Cluster: mapBackendCluster(workspace),
+    Silos: (workspace.sources ?? []).map((source) => ({
+      Reference: source.reference,
+      Source: source.sourceType === "NuGet" ? "nuget" : "DLL",
+      Version: source.version ?? null,
+      Gateway: source.gateway ?? null,
+      Enabled: source.enabled,
+    })),
+    EnvironmentVariables: workspace.environmentVariables ?? {},
+  };
+}
+
+function mapBackendCluster(workspace: Workspace) {
+  const gatewayEndpoints = workspace.gatewayEndpoints?.length
+    ? workspace.gatewayEndpoints
+    : [`${workspace.siloAddress}:${workspace.gatewayPort}`];
+
+  return {
+    ClusterId: workspace.clusterId ?? "dev",
+    ServiceId: workspace.serviceId ?? "SiloScope",
+    GatewayEndpoints: gatewayEndpoints,
   };
 }
 
