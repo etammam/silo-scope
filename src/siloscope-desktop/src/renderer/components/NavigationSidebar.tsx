@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import type { ActivityView } from "./ActivityBar";
 import type {
   GrainInterfaceDescriptor,
   LogEntry,
@@ -11,6 +10,7 @@ import type {
   Workspace,
 } from "../../shared/types";
 import { buildSourceCatalogFromGrains } from "../catalog";
+import type { ActivityView } from "./ActivityBar";
 
 const defaultNugetFeed: NugetFeed = {
   name: "nuget.org",
@@ -26,9 +26,24 @@ type NavigationSidebarProps = {
   nugetFeeds?: NugetFeed[];
   nugetPackages?: NugetPackage[];
   onClearLogs?: () => void;
-  onCreateNugetFeed?: (request: { name: string; url: string; username?: string; password?: string }) => Promise<void>;
-  onSearchNugetPackages?: (request: { query: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
-  onAddNugetPackageSource?: (request: { packageId: string; version: string; gateway?: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
+  onCreateNugetFeed?: (request: {
+    name: string;
+    url: string;
+    username?: string;
+    password?: string;
+  }) => Promise<void>;
+  onSearchNugetPackages?: (request: {
+    query: string;
+    sourceUrl?: string;
+    feedName?: string;
+  }) => Promise<void>;
+  onAddNugetPackageSource?: (request: {
+    packageId: string;
+    version: string;
+    gateway?: string;
+    sourceUrl?: string;
+    feedName?: string;
+  }) => Promise<void>;
   onConnectCluster?: () => Promise<void>;
   onDisconnectCluster?: () => Promise<void>;
   onDiscoverGrains?: () => Promise<void>;
@@ -89,7 +104,10 @@ export function NavigationSidebar({
   const title = formatViewTitle(activeView);
 
   return (
-    <aside className="navigation-sidebar" aria-label={`${activeView} navigation`}>
+    <aside
+      className="navigation-sidebar"
+      aria-label={`${activeView} navigation`}
+    >
       <div className="navigation-sidebar__header">
         <span>{title}</span>
       </div>
@@ -162,11 +180,18 @@ function WorkspaceNavigator({
     () => sourceCatalog ?? buildSourceCatalogFromGrains(grains, workspace),
     [grains, sourceCatalog, workspace],
   );
-  const workspaceOptions = workspaces.length > 0 ? workspaces : workspace ? [workspace] : [];
+  const workspaceOptions =
+    workspaces.length > 0 ? workspaces : workspace ? [workspace] : [];
   const [catalogQuery, setCatalogQuery] = useState("");
-  const [collapsedSources, setCollapsedSources] = useState<Set<string>>(() => new Set());
-  const [collapsedInterfaces, setCollapsedInterfaces] = useState<Set<string>>(() => new Set());
-  const [disabledSourceIds, setDisabledSourceIds] = useState<Set<string>>(() => new Set());
+  const [collapsedSources, setCollapsedSources] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [collapsedInterfaces, setCollapsedInterfaces] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [disabledSourceIds, setDisabledSourceIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const filteredSources = useMemo(
     () =>
@@ -219,9 +244,15 @@ function WorkspaceNavigator({
 
   return (
     <>
-      <section className="navigation-sidebar__section" aria-labelledby="workspace-select-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="workspace-select-title"
+      >
         <div className="navigation-sidebar__section-heading">
-          <div className="navigation-sidebar__section-title" id="workspace-select-title">
+          <div
+            className="navigation-sidebar__section-title"
+            id="workspace-select-title"
+          >
             Workspace
           </div>
           <button
@@ -232,7 +263,10 @@ function WorkspaceNavigator({
             title="New workspace"
             type="button"
           >
-            <span className="navigation-sidebar__new-workspace-icon" aria-hidden="true" />
+            <span
+              className="navigation-sidebar__new-workspace-icon"
+              aria-hidden="true"
+            />
           </button>
         </div>
         <label className="navigation-sidebar__select-label">
@@ -294,18 +328,24 @@ function WorkspaceNavigator({
             Disconnect
           </button>
         </div>
-        <button
+        {/* <button
           className="navigation-sidebar__command"
           disabled={!workspace || !onDiscoverGrains}
           onClick={() => void onDiscoverGrains?.()}
           type="button"
         >
           Discover Grains
-        </button>
+        </button> */}
       </section>
 
-      <section className="navigation-sidebar__section" aria-labelledby="source-catalog-title">
-        <div className="navigation-sidebar__section-title" id="source-catalog-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="source-catalog-title"
+      >
+        <div
+          className="navigation-sidebar__section-title"
+          id="source-catalog-title"
+        >
           Sources
         </div>
         <label className="navigation-sidebar__select-label">
@@ -335,11 +375,18 @@ function WorkspaceNavigator({
                     onClick={() => toggleSource(source.sourceId)}
                     type="button"
                   >
-                    <span className="navigation-sidebar__disclosure" aria-hidden="true" />
+                    <span
+                      className="navigation-sidebar__disclosure"
+                      aria-hidden="true"
+                    />
                     <span className="navigation-sidebar__source-main">
-                      <span className="navigation-sidebar__source-name">{source.label}</span>
+                      <span className="navigation-sidebar__source-name">
+                        {source.label}
+                      </span>
                       <span className="navigation-sidebar__source-meta">
-                        <span className="navigation-sidebar__source-type">{source.sourceType}</span>
+                        <span className="navigation-sidebar__source-type">
+                          {source.sourceType}
+                        </span>
                         <span>{formatSourceDetail(source)}</span>
                       </span>
                     </span>
@@ -371,8 +418,14 @@ function WorkspaceNavigator({
         )}
       </section>
 
-      <section className="navigation-sidebar__section" aria-labelledby="connection-title">
-        <div className="navigation-sidebar__section-title" id="connection-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="connection-title"
+      >
+        <div
+          className="navigation-sidebar__section-title"
+          id="connection-title"
+        >
           Connection
         </div>
         <div className="navigation-sidebar__row">
@@ -402,7 +455,11 @@ function SourceInterfaceTree({
   source: SourceCatalogSource;
 }) {
   if (source.interfaces.length === 0) {
-    return <div className="navigation-sidebar__empty navigation-sidebar__empty--nested">No functions discovered</div>;
+    return (
+      <div className="navigation-sidebar__empty navigation-sidebar__empty--nested">
+        No functions discovered
+      </div>
+    );
   }
 
   return (
@@ -417,10 +474,15 @@ function SourceInterfaceTree({
               aria-label={`${catalogInterface.interfaceName} ${catalogInterface.methods.length}`}
               aria-expanded={!isCollapsed}
               className="navigation-sidebar__interface"
-              onClick={() => onToggleInterface(source.sourceId, catalogInterface.interfaceId)}
+              onClick={() =>
+                onToggleInterface(source.sourceId, catalogInterface.interfaceId)
+              }
               type="button"
             >
-              <span className="navigation-sidebar__disclosure" aria-hidden="true" />
+              <span
+                className="navigation-sidebar__disclosure"
+                aria-hidden="true"
+              />
               <span>
                 <span>{catalogInterface.interfaceName}</span>
                 <small>{catalogInterface.namespace}</small>
@@ -433,7 +495,9 @@ function SourceInterfaceTree({
                   <li key={method.functionId}>
                     <button
                       aria-pressed={
-                        selectedFunctionId ? selectedFunctionId === method.functionId : selectedGrain === method.interfaceId
+                        selectedFunctionId
+                          ? selectedFunctionId === method.functionId
+                          : selectedGrain === method.interfaceId
                       }
                       onClick={() => {
                         onSelectFunction?.(method.functionId);
@@ -443,7 +507,10 @@ function SourceInterfaceTree({
                       }}
                       type="button"
                     >
-                      <span className="navigation-sidebar__grain-icon" aria-hidden="true" />
+                      <span
+                        className="navigation-sidebar__grain-icon"
+                        aria-hidden="true"
+                      />
                       <span>{method.signature}</span>
                     </button>
                   </li>
@@ -468,9 +535,24 @@ function NuGetRegistryManager({
   feeds: NugetFeed[];
   packages: NugetPackage[];
   workspace: Workspace | null;
-  onCreateFeed?: (request: { name: string; url: string; username?: string; password?: string }) => Promise<void>;
-  onSearchPackages?: (request: { query: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
-  onAddPackageSource?: (request: { packageId: string; version: string; gateway?: string; sourceUrl?: string; feedName?: string }) => Promise<void>;
+  onCreateFeed?: (request: {
+    name: string;
+    url: string;
+    username?: string;
+    password?: string;
+  }) => Promise<void>;
+  onSearchPackages?: (request: {
+    query: string;
+    sourceUrl?: string;
+    feedName?: string;
+  }) => Promise<void>;
+  onAddPackageSource?: (request: {
+    packageId: string;
+    version: string;
+    gateway?: string;
+    sourceUrl?: string;
+    feedName?: string;
+  }) => Promise<void>;
 }) {
   const [activeFeedName, setActiveFeedName] = useState("nuget.org");
   const [isFeedDialogOpen, setIsFeedDialogOpen] = useState(false);
@@ -487,7 +569,9 @@ function NuGetRegistryManager({
     ],
     [feeds],
   );
-  const activeFeed = availableFeeds.find((feed) => feed.name === activeFeedName) ?? defaultNugetFeed;
+  const activeFeed =
+    availableFeeds.find((feed) => feed.name === activeFeedName) ??
+    defaultNugetFeed;
 
   const handleCreateFeed = async () => {
     if (!feedName.trim() || !feedUrl.trim() || !onCreateFeed) {
@@ -547,19 +631,30 @@ function NuGetRegistryManager({
       });
       setStatus("Package source added");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Package restore failed");
+      setStatus(
+        error instanceof Error ? error.message : "Package restore failed",
+      );
     }
   };
 
   return (
     <>
-      <section className="navigation-sidebar__section" aria-labelledby="nuget-sources-title">
-        <div className="navigation-sidebar__section-title" id="nuget-sources-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="nuget-sources-title"
+      >
+        <div
+          className="navigation-sidebar__section-title"
+          id="nuget-sources-title"
+        >
           Package Sources
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Active source</span>
-          <select value={activeFeed.name} onChange={(event) => setActiveFeedName(event.target.value)}>
+          <select
+            value={activeFeed.name}
+            onChange={(event) => setActiveFeedName(event.target.value)}
+          >
             {availableFeeds.map((feed) => (
               <option key={feed.name} value={feed.name}>
                 {feed.name}
@@ -571,16 +666,31 @@ function NuGetRegistryManager({
           <span className="navigation-sidebar__feed-dot" />
           <span>{activeFeed.url}</span>
         </div>
-        <button className="navigation-sidebar__command" onClick={() => setIsFeedDialogOpen(true)} type="button">
+        <button
+          className="navigation-sidebar__command"
+          onClick={() => setIsFeedDialogOpen(true)}
+          type="button"
+        >
           Add Feed
         </button>
       </section>
 
       {isFeedDialogOpen && (
-        <div className="navigation-sidebar__dialog-backdrop" role="presentation">
-          <div aria-labelledby="nuget-add-feed-title" aria-modal="true" className="navigation-sidebar__dialog" role="dialog">
+        <div
+          className="navigation-sidebar__dialog-backdrop"
+          role="presentation"
+        >
+          <div
+            aria-labelledby="nuget-add-feed-title"
+            aria-modal="true"
+            className="navigation-sidebar__dialog"
+            role="dialog"
+          >
             <div className="navigation-sidebar__dialog-header">
-              <div className="navigation-sidebar__section-title" id="nuget-add-feed-title">
+              <div
+                className="navigation-sidebar__section-title"
+                id="nuget-add-feed-title"
+              >
                 Add Feed
               </div>
               <button
@@ -594,50 +704,99 @@ function NuGetRegistryManager({
             </div>
             <label className="navigation-sidebar__select-label">
               <span>Name</span>
-              <input value={feedName} onChange={(event) => setFeedName(event.target.value)} placeholder="github" />
+              <input
+                value={feedName}
+                onChange={(event) => setFeedName(event.target.value)}
+                placeholder="github"
+              />
             </label>
             <label className="navigation-sidebar__select-label">
               <span>URL</span>
-              <input value={feedUrl} onChange={(event) => setFeedUrl(event.target.value)} placeholder="https://..." />
+              <input
+                value={feedUrl}
+                onChange={(event) => setFeedUrl(event.target.value)}
+                placeholder="https://..."
+              />
             </label>
             <label className="navigation-sidebar__select-label">
               <span>Username</span>
-              <input value={feedUsername} onChange={(event) => setFeedUsername(event.target.value)} placeholder="Optional" />
+              <input
+                value={feedUsername}
+                onChange={(event) => setFeedUsername(event.target.value)}
+                placeholder="Optional"
+              />
             </label>
             <label className="navigation-sidebar__select-label">
               <span>Token</span>
-              <input value={feedPassword} onChange={(event) => setFeedPassword(event.target.value)} placeholder="Optional" type="password" />
+              <input
+                value={feedPassword}
+                onChange={(event) => setFeedPassword(event.target.value)}
+                placeholder="Optional"
+                type="password"
+              />
             </label>
-            <button className="navigation-sidebar__command" disabled={!feedName.trim() || !feedUrl.trim()} onClick={handleCreateFeed} type="button">
+            <button
+              className="navigation-sidebar__command"
+              disabled={!feedName.trim() || !feedUrl.trim()}
+              onClick={handleCreateFeed}
+              type="button"
+            >
               Save Feed
             </button>
           </div>
         </div>
       )}
 
-      <section className="navigation-sidebar__section" aria-labelledby="nuget-search-title">
-        <div className="navigation-sidebar__section-title" id="nuget-search-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="nuget-search-title"
+      >
+        <div
+          className="navigation-sidebar__section-title"
+          id="nuget-search-title"
+        >
           Registry Search
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Package ID</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Orleans package" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Orleans package"
+          />
         </label>
-        <button className="navigation-sidebar__command" disabled={!query.trim()} onClick={handleSearch} type="button">
+        <button
+          className="navigation-sidebar__command"
+          disabled={!query.trim()}
+          onClick={handleSearch}
+          type="button"
+        >
           Search Packages
         </button>
       </section>
 
-      <section className="navigation-sidebar__section" aria-labelledby="nuget-results-title">
-        <div className="navigation-sidebar__section-title" id="nuget-results-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="nuget-results-title"
+      >
+        <div
+          className="navigation-sidebar__section-title"
+          id="nuget-results-title"
+        >
           Results
         </div>
         {packages.length === 0 ? (
           <div className="navigation-sidebar__empty">No packages loaded</div>
         ) : (
-          <ul className="navigation-sidebar__packages" aria-label="NuGet packages">
+          <ul
+            className="navigation-sidebar__packages"
+            aria-label="NuGet packages"
+          >
             {packages.map((packageInfo) => (
-              <li key={`${packageInfo.packageId}:${packageInfo.version}`} className="navigation-sidebar__package">
+              <li
+                key={`${packageInfo.packageId}:${packageInfo.version}`}
+                className="navigation-sidebar__package"
+              >
                 <button
                   aria-label={`${packageInfo.packageId} ${packageInfo.version}`}
                   className="navigation-sidebar__package-button"
@@ -646,10 +805,17 @@ function NuGetRegistryManager({
                   title={`Add ${packageInfo.packageId} ${packageInfo.version}`}
                   type="button"
                 >
-                  <span className="navigation-sidebar__package-icon" aria-hidden="true" />
+                  <span
+                    className="navigation-sidebar__package-icon"
+                    aria-hidden="true"
+                  />
                   <span className="navigation-sidebar__package-main">
-                    <span className="navigation-sidebar__package-name">{packageInfo.packageId}</span>
-                    <span className="navigation-sidebar__package-version">{packageInfo.version}</span>
+                    <span className="navigation-sidebar__package-name">
+                      {packageInfo.packageId}
+                    </span>
+                    <span className="navigation-sidebar__package-version">
+                      {packageInfo.version}
+                    </span>
                   </span>
                 </button>
                 {packageInfo.description && (
@@ -682,8 +848,14 @@ function SystemSettings({
 }) {
   return (
     <>
-      <section className="navigation-sidebar__section" aria-labelledby="settings-app-title">
-        <div className="navigation-sidebar__section-title" id="settings-app-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="settings-app-title"
+      >
+        <div
+          className="navigation-sidebar__section-title"
+          id="settings-app-title"
+        >
           Application
         </div>
         <label className="navigation-sidebar__check-row">
@@ -696,8 +868,14 @@ function SystemSettings({
         </label>
       </section>
 
-      <section className="navigation-sidebar__section" aria-labelledby="settings-core-title">
-        <div className="navigation-sidebar__section-title" id="settings-core-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="settings-core-title"
+      >
+        <div
+          className="navigation-sidebar__section-title"
+          id="settings-core-title"
+        >
           Core Sidecar
         </div>
         <div className="navigation-sidebar__row">
@@ -709,15 +887,23 @@ function SystemSettings({
         </button>
       </section>
 
-      <section className="navigation-sidebar__section" aria-labelledby="settings-theme-title">
-        <div className="navigation-sidebar__section-title" id="settings-theme-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="settings-theme-title"
+      >
+        <div
+          className="navigation-sidebar__section-title"
+          id="settings-theme-title"
+        >
           Theme
         </div>
         <label className="navigation-sidebar__select-label">
           <span>Workbench theme</span>
           <select
             value={theme}
-            onChange={(event) => onThemeChange(event.target.value as "dark" | "light")}
+            onChange={(event) =>
+              onThemeChange(event.target.value as "dark" | "light")
+            }
           >
             <option value="dark">Codex Dark</option>
             <option value="light">Codex Light</option>
@@ -725,9 +911,15 @@ function SystemSettings({
         </label>
       </section>
 
-      <section className="navigation-sidebar__section" aria-labelledby="settings-logs-title">
+      <section
+        className="navigation-sidebar__section"
+        aria-labelledby="settings-logs-title"
+      >
         <div className="navigation-sidebar__section-heading">
-          <div className="navigation-sidebar__section-title" id="settings-logs-title">
+          <div
+            className="navigation-sidebar__section-title"
+            id="settings-logs-title"
+          >
             Logs
           </div>
           <button
@@ -747,8 +939,12 @@ function SystemSettings({
                 data-level={entry.level}
                 key={`${entry.timestamp}-${index}`}
               >
-                <span className="navigation-sidebar__log-level">{entry.level}</span>
-                <span className="navigation-sidebar__log-message">{entry.message}</span>
+                <span className="navigation-sidebar__log-level">
+                  {entry.level}
+                </span>
+                <span className="navigation-sidebar__log-message">
+                  {entry.message}
+                </span>
                 <time>{formatLogTime(entry.timestamp)}</time>
               </li>
             ))}
@@ -786,7 +982,10 @@ function formatViewTitle(view: ActivityView): string {
   return view;
 }
 
-function filterCatalogSources(sources: SourceCatalogSource[], query: string): SourceCatalogSource[] {
+function filterCatalogSources(
+  sources: SourceCatalogSource[],
+  query: string,
+): SourceCatalogSource[] {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
     return sources;
@@ -795,7 +994,10 @@ function filterCatalogSources(sources: SourceCatalogSource[], query: string): So
   return sources.flatMap((source) => {
     const sourceMatches = matchesSource(source, normalizedQuery);
     const interfaces = source.interfaces.flatMap((catalogInterface) => {
-      const interfaceMatches = matchesInterface(catalogInterface, normalizedQuery);
+      const interfaceMatches = matchesInterface(
+        catalogInterface,
+        normalizedQuery,
+      );
       const methods = catalogInterface.methods.filter((method) => {
         return (
           sourceMatches ||
@@ -804,7 +1006,9 @@ function filterCatalogSources(sources: SourceCatalogSource[], query: string): So
           method.signature.toLowerCase().includes(normalizedQuery) ||
           method.returnType.toLowerCase().includes(normalizedQuery) ||
           method.parameters.some((parameter) =>
-            `${parameter.name} ${parameter.typeName}`.toLowerCase().includes(normalizedQuery),
+            `${parameter.name} ${parameter.typeName}`
+              .toLowerCase()
+              .includes(normalizedQuery),
           )
         );
       });
@@ -838,10 +1042,17 @@ function matchesSource(source: SourceCatalogSource, query: string): boolean {
     .includes(query);
 }
 
-function matchesInterface(catalogInterface: SourceCatalogInterface, query: string): boolean {
-  return `${catalogInterface.namespace} ${catalogInterface.interfaceName}`.toLowerCase().includes(query);
+function matchesInterface(
+  catalogInterface: SourceCatalogInterface,
+  query: string,
+): boolean {
+  return `${catalogInterface.namespace} ${catalogInterface.interfaceName}`
+    .toLowerCase()
+    .includes(query);
 }
 
 function formatSourceDetail(source: SourceCatalogSource): string {
-  return source.version ? `${source.reference} @ ${source.version}` : source.reference;
+  return source.version
+    ? `${source.reference} @ ${source.version}`
+    : source.reference;
 }

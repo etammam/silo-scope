@@ -1,7 +1,19 @@
-import { ApplicationMenu, BrowserWindow, BrowserView, Utils } from "electrobun/bun";
-import Electrobun from "electrobun/bun";
+import Electrobun, {
+  ApplicationMenu,
+  BrowserView,
+  BrowserWindow,
+  Utils,
+} from "electrobun/bun";
 import type { SiloScopeRPC } from "../shared/rpc";
-import type { ClusterType, LogEntry, NugetFeed, NugetPackage, SourceOwnedCatalog, Workspace, WorkspaceSource } from "../shared/types";
+import type {
+  ClusterType,
+  LogEntry,
+  NugetFeed,
+  NugetPackage,
+  SourceOwnedCatalog,
+  Workspace,
+  WorkspaceSource,
+} from "../shared/types";
 import { installApplicationMenu } from "./applicationMenu";
 import { SidecarJsonRpcClient } from "./jsonRpcClient";
 
@@ -109,7 +121,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess || !result.Value) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to load workspace.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to load workspace.",
+          );
         }
 
         return { workspace: mapWorkspace(result.Value) };
@@ -122,7 +136,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess || !result.Value) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to set active workspace.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to set active workspace.",
+          );
         }
 
         return { workspace: mapWorkspace(result.Value) };
@@ -135,7 +151,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to save workspace.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to save workspace.",
+          );
         }
 
         return { success: true };
@@ -148,7 +166,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to connect cluster.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to connect cluster.",
+          );
         }
 
         return { message: result.Value ?? "Connected" };
@@ -161,7 +181,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to disconnect cluster.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to disconnect cluster.",
+          );
         }
 
         return { success: true };
@@ -196,12 +218,20 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to list NuGet feeds.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to list NuGet feeds.",
+          );
         }
 
         return { feeds: (result.Value ?? []).map(mapNugetFeed) };
       },
-      createNugetFeed: async ({ name, url, username, password, isPasswordClearText }) => {
+      createNugetFeed: async ({
+        name,
+        url,
+        username,
+        password,
+        isPasswordClearText,
+      }) => {
         const result = await requestSidecar<FluentResult<BackendNugetFeed>>(
           "CreateNugetFeedAsync",
           [
@@ -217,42 +247,87 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess || !result.Value) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to create NuGet feed.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to create NuGet feed.",
+          );
         }
 
         return { feed: mapNugetFeed(result.Value) };
       },
       searchNugetPackages: async ({ query, sourceUrl, feedName, take }) => {
-        const result = await requestSidecar<FluentResult<BackendNugetPackage[]>>(
+        const result = await requestSidecar<
+          FluentResult<BackendNugetPackage[]>
+        >(
           "SearchNugetPackagesAsync",
           [query, sourceUrl ?? null, feedName ?? null, take ?? 20],
           "SearchNugetPackages",
         );
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to search NuGet packages.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to search NuGet packages.",
+          );
         }
 
         return { packages: (result.Value ?? []).map(mapNugetPackage) };
       },
-      addNugetPackageSource: async ({ packageId, version, gateway, sourceUrl, feedName }) => {
+      addNugetPackageSource: async ({
+        packageId,
+        version,
+        gateway,
+        sourceUrl,
+        feedName,
+      }) => {
         const result = await requestSidecar<FluentResult<BackendWorkspaceInfo>>(
           "AddNugetPackageSourceAsync",
-          [packageId, version, gateway ?? null, sourceUrl ?? null, feedName ?? null],
+          [
+            packageId,
+            version,
+            gateway ?? null,
+            sourceUrl ?? null,
+            feedName ?? null,
+          ],
           "AddNugetPackageSource",
         );
 
         if (!result.IsSuccess || !result.Value) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to add NuGet package source.");
+          throw new Error(
+            result.Errors?.[0]?.Message ??
+              "Failed to add NuGet package source.",
+          );
         }
 
         return { workspace: mapWorkspace(result.Value) };
       },
-      invokeGrain: async ({ grainType, method, grainKey, payload, sourceId, functionId }) => {
-        console.log("invokeGrain", grainType, method, grainKey, payload, sourceId, functionId);
-        const result = await requestSidecar<FluentResult<BackendInvocationResult>>(
+      invokeGrain: async ({
+        grainType,
+        method,
+        grainKey,
+        payload,
+        sourceId,
+        functionId,
+      }) => {
+        console.log(
+          "invokeGrain",
+          grainType,
+          method,
+          grainKey,
+          payload,
+          sourceId,
+          functionId,
+        );
+        const result = await requestSidecar<
+          FluentResult<BackendInvocationResult>
+        >(
           "InvokeGrainAsync",
-          [grainType, method, grainKey, payload, sourceId ?? null, functionId ?? null],
+          [
+            grainType,
+            method,
+            grainKey,
+            payload,
+            sourceId ?? null,
+            functionId ?? null,
+          ],
           "InvokeGrain",
         );
 
@@ -271,14 +346,14 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         };
       },
       getWorkspaces: async () => {
-        const result = await requestSidecar<FluentResult<BackendWorkspaceInfo[]>>(
-          "ListWorkspacesAsync",
-          undefined,
-          "ListWorkspaces",
-        );
+        const result = await requestSidecar<
+          FluentResult<BackendWorkspaceInfo[]>
+        >("ListWorkspacesAsync", undefined, "ListWorkspaces");
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to list workspaces.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to list workspaces.",
+          );
         }
 
         return { workspaces: (result.Value ?? []).map(mapWorkspace) };
@@ -323,7 +398,9 @@ async function discoverSourceCatalog(): Promise<SourceOwnedCatalog> {
   );
 
   if (!result.IsSuccess) {
-    throw new Error(result.Errors?.[0]?.Message ?? "Failed to discover source catalog.");
+    throw new Error(
+      result.Errors?.[0]?.Message ?? "Failed to discover source catalog.",
+    );
   }
 
   return mapSourceCatalog(result.Value ?? {});
@@ -349,15 +426,17 @@ function mapNugetPackage(packageInfo: BackendNugetPackage): NugetPackage {
 }
 
 function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
-  console.log("[mapWorkspace] input:", JSON.stringify(workspace, null, 2));
   const gateway = workspace.Cluster?.GatewayEndpoints?.[0] ?? "";
   const [siloAddress, gatewayPortRaw] = gateway.split(":");
   const gatewayPort = Number(gatewayPortRaw);
 
   // Backend sends Type as number: 0 = Homogenous, 1 = Heterogeneous
   const clusterTypeNum = workspace.Cluster?.Type as number | undefined;
-  const isHeterogeneous = clusterTypeNum === 1 || workspace.Cluster?.Type === "Heterogeneous";
-  const clusterType: ClusterType = isHeterogeneous ? "Heterogeneous" : "Homogenous";
+  const isHeterogeneous =
+    clusterTypeNum === 1 || workspace.Cluster?.Type === "Heterogeneous";
+  const clusterType: ClusterType = isHeterogeneous
+    ? "Heterogeneous"
+    : "Homogenous";
 
   const result: Workspace = {
     id: workspace.Id,
@@ -368,20 +447,25 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
     clusterId: workspace.Cluster?.ClusterId ?? "dev",
     serviceId: workspace.Cluster?.ServiceId ?? "SiloScope",
     clusterType,
-    gatewayEndpoints: workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
+    gatewayEndpoints:
+      workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
     orleansVersion: "10.0",
     environmentVariables: {},
-    sources: (workspace.Silos ?? []).map((source): WorkspaceSource => ({
-      sourceId: `${source.Source}:${source.Reference}:${source.Version ?? ""}:${source.Gateway ?? ""}`,
-      sourceType: source.Source.toLowerCase() === "nuget" ? "NuGet" : "DLL",
-      reference: source.Reference,
-      label: source.Source.toLowerCase() === "nuget" && source.Version ? `${source.Reference} ${source.Version}` : source.Reference,
-      version: source.Version ?? null,
-      gateway: source.Gateway ?? null,
-      enabled: source.Enabled,
-    })),
+    sources: (workspace.Silos ?? []).map(
+      (source): WorkspaceSource => ({
+        sourceId: `${source.Source}:${source.Reference}:${source.Version ?? ""}:${source.Gateway ?? ""}`,
+        sourceType: source.Source.toLowerCase() === "nuget" ? "NuGet" : "DLL",
+        reference: source.Reference,
+        label:
+          source.Source.toLowerCase() === "nuget" && source.Version
+            ? `${source.Reference} ${source.Version}`
+            : source.Reference,
+        version: source.Version ?? null,
+        gateway: source.Gateway ?? null,
+        enabled: source.Enabled,
+      }),
+    ),
   };
-  console.log("[mapWorkspace] output:", JSON.stringify(result, null, 2));
   return result;
 }
 
@@ -417,7 +501,9 @@ function mapBackendCluster(workspace: Workspace) {
   };
 }
 
-function mapSourceCatalog(catalog: BackendSourceOwnedCatalog): SourceOwnedCatalog {
+function mapSourceCatalog(
+  catalog: BackendSourceOwnedCatalog,
+): SourceOwnedCatalog {
   return {
     sources: (catalog.Sources ?? []).map((source) => ({
       sourceId: source.SourceId,
@@ -427,7 +513,9 @@ function mapSourceCatalog(catalog: BackendSourceOwnedCatalog): SourceOwnedCatalo
       version: source.Version ?? null,
       gateway: source.Gateway ?? null,
       enabled: source.Enabled,
-      discoveryStatus: isDiscoveryStatus(source.DiscoveryStatus) ? source.DiscoveryStatus : "idle",
+      discoveryStatus: isDiscoveryStatus(source.DiscoveryStatus)
+        ? source.DiscoveryStatus
+        : "idle",
       interfaces: (source.Interfaces ?? []).map((catalogInterface) => ({
         interfaceId: catalogInterface.InterfaceId,
         interfaceName: catalogInterface.InterfaceName,
@@ -448,9 +536,9 @@ function mapSourceCatalog(catalog: BackendSourceOwnedCatalog): SourceOwnedCatalo
               name: parameter.Name,
               typeName: parameter.TypeName,
             })),
-          })),
         })),
       })),
+    })),
   };
 }
 
@@ -482,15 +570,25 @@ function mapInvocationTiming(result: BackendInvocationResult | undefined) {
   };
 }
 
-function isDiscoveryStatus(value: string): value is "idle" | "discovering" | "ready" | "error" {
-  return value === "idle" || value === "discovering" || value === "ready" || value === "error";
+function isDiscoveryStatus(
+  value: string,
+): value is "idle" | "discovering" | "ready" | "error" {
+  return (
+    value === "idle" ||
+    value === "discovering" ||
+    value === "ready" ||
+    value === "error"
+  );
 }
 
 function isGrainKeyType(value: string): value is "Guid" | "String" | "Integer" {
   return value === "Guid" || value === "String" || value === "Integer";
 }
 
-function isCancellationTokenParameter(parameter: { Name?: string; TypeName?: string }): boolean {
+function isCancellationTokenParameter(parameter: {
+  Name?: string;
+  TypeName?: string;
+}): boolean {
   return (
     parameter.TypeName === "CancellationToken" ||
     parameter.TypeName === "System.Threading.CancellationToken" ||
@@ -590,7 +688,11 @@ installApplicationMenu({
     }
 
     if (action === "zoomIn" || action === "zoomOut") {
-      pageZoom = clamp(action === "zoomIn" ? pageZoom + 0.1 : pageZoom - 0.1, 0.7, 1.6);
+      pageZoom = clamp(
+        action === "zoomIn" ? pageZoom + 0.1 : pageZoom - 0.1,
+        0.7,
+        1.6,
+      );
       mainWindow.setPageZoom(pageZoom);
       return;
     }

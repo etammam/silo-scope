@@ -24,6 +24,14 @@ public sealed class InterfaceCatalogLoader(
 
         foreach (var (entry, index) in entries.Select((entry, index) => (entry, index)))
         {
+            _logger?.LogInformation(
+                "Loading entry {Index}: type={SourceType}, gateway={Gateway}, path={Path}",
+                index,
+                entry.SourceType,
+                entry.Gateway ?? "null",
+                entry.DllPath ?? entry.PackageId
+            );
+
             var legacySource = new InterfaceSourceOptions(
                 entry.SourceType,
                 entry.DllPath,
@@ -36,6 +44,11 @@ public sealed class InterfaceCatalogLoader(
             var assemblyPathResult = ResolveAssemblyPath(legacySource);
             if (assemblyPathResult.IsFailed)
             {
+                _logger?.LogWarning(
+                    "Failed to resolve assembly path for entry {Index}: {Error}",
+                    index,
+                    string.Join("; ", assemblyPathResult.Errors.Select(e => e.Message))
+                );
                 return Result.Fail(assemblyPathResult.Errors.Select(e => new Error(e.Message)));
             }
 
@@ -51,6 +64,11 @@ public sealed class InterfaceCatalogLoader(
                 );
                 if (defaultLoadResult.IsFailed)
                 {
+                    _logger?.LogWarning(
+                        "Failed to load assembly {Path}: {Error}",
+                        assemblyPath,
+                        string.Join("; ", defaultLoadResult.Errors.Select(e => e.Message))
+                    );
                     return Result.Fail(defaultLoadResult.Errors.Select(e => new Error(e.Message)));
                 }
 
@@ -72,10 +90,21 @@ public sealed class InterfaceCatalogLoader(
                     entry.Gateway,
                     sourceId
                 );
+                _logger?.LogInformation(
+                    "Entry {Index} discovered {GrainCount} grains",
+                    index,
+                    grains.Count
+                );
                 allGrains.AddRange(grains);
             }
             catch (Exception ex)
             {
+                _logger?.LogWarning(
+                    ex,
+                    "Exception loading assembly {Path}: {Message}",
+                    assemblyPath,
+                    ex.Message
+                );
                 return Result.Fail(
                     $"Failed to load interface assembly '{assemblyPath}': {ex.Message}"
                 );

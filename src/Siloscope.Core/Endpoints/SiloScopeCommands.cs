@@ -248,10 +248,28 @@ public class SiloScopeCommands : ISiloScopeCommands
         var catalogResult = _catalogLoader.LoadAll(entries);
         if (catalogResult.IsFailed)
         {
+            _logger.LogWarning(
+                "Catalog loading failed: {Errors}",
+                string.Join("; ", catalogResult.Errors.Select(e => e.Message))
+            );
             return Result.Fail<GrainCatalog>(catalogResult.Errors.Select(e => e.Message));
         }
 
         var catalog = catalogResult.Value;
+        _logger.LogInformation(
+            "Loaded catalog: {GrainCount} grains, {GatewayCount} gateways: {Gateways}",
+            catalog.Grains.Count,
+            catalog.Gateways.Count,
+            string.Join(", ", catalog.Gateways)
+        );
+        foreach (var grain in catalog.Grains)
+        {
+            _logger.LogInformation(
+                "Grain {GrainName} has gateway {Gateway}",
+                grain.Name,
+                grain.Gateway ?? "null"
+            );
+        }
         var grainInfos = catalog
             .Grains.Select(g => new GrainInfo(
                 g.Name,
