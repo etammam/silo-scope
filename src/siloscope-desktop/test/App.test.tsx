@@ -4,10 +4,31 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/renderer/App";
 import { useAppStore } from "@/renderer/store";
 
+const electrobunMock = vi.hoisted(() => {
+  const request = {
+    getGrains: vi.fn(),
+    getSourceCatalog: vi.fn(),
+    invokeGrain: vi.fn(),
+    getWorkspaces: vi.fn(),
+  };
+  const send = {
+    connectionChanged: vi.fn(),
+    logEntry: vi.fn(),
+  };
+  const ElectroviewMock = Object.assign(
+    vi.fn(function (this: { rpc: { request: typeof request; send: typeof send } }) {
+      this.rpc = { request, send };
+    }),
+    {
+      defineRPC: vi.fn((config) => config),
+    },
+  );
+
+  return { ElectroviewMock, request, send };
+});
+
 vi.mock("electrobun/view", () => ({
-  Electroview: {
-    defineRPC: vi.fn(),
-  },
+  Electroview: electrobunMock.ElectroviewMock,
 }));
 
 vi.mock("@/renderer/components/MonacoEditor", () => ({
@@ -27,6 +48,25 @@ vi.mock("@/renderer/components/MonacoEditor", () => ({
 describe("App shell", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    electrobunMock.request.getGrains.mockClear();
+    electrobunMock.request.getSourceCatalog.mockClear();
+    electrobunMock.request.invokeGrain.mockClear();
+    electrobunMock.request.getWorkspaces.mockClear();
+    electrobunMock.send.connectionChanged.mockClear();
+    electrobunMock.send.logEntry.mockClear();
+    electrobunMock.request.getGrains.mockResolvedValue({
+      grains: [],
+      sourceCatalog: { sources: [] },
+    });
+    electrobunMock.request.invokeGrain.mockResolvedValue({
+      isSuccess: true,
+      result: "{}",
+      timing: {
+        serializationMs: 1,
+        executionMs: 2,
+        totalMs: 3,
+      },
+    });
     useAppStore.setState({
       workspace: null,
       grains: [],
@@ -38,6 +78,151 @@ describe("App shell", () => {
       logs: [],
       isConnected: false,
     });
+  });
+
+  it("loads the source catalog through the desktop backend when a workspace is set", async () => {
+    electrobunMock.request.getGrains.mockResolvedValue({
+      grains: [
+        {
+          interfaceId: "grain-1",
+          interfaceName: "IPlayerGrain",
+          methods: [{ name: "GetScore", parameters: [], signature: "GetScore()", returnType: "int", keyType: "String" }],
+        },
+      ],
+      sourceCatalog: {
+        sources: [
+          {
+            sourceId: "source-1",
+            sourceType: "DLL",
+            reference: "Game.Grains.dll",
+            label: "Game.Grains.dll",
+            enabled: true,
+            discoveryStatus: "ready",
+            interfaces: [
+              {
+                interfaceId: "grain-1",
+                interfaceName: "IPlayerGrain",
+                namespace: "Game.Grains",
+                methods: [
+                  {
+                    functionId: "function-1",
+                    sourceId: "source-1",
+                    interfaceId: "grain-1",
+                    interfaceName: "IPlayerGrain",
+                    namespace: "Game.Grains",
+                    methodName: "GetScore",
+                    signature: "GetScore()",
+                    returnType: "int",
+                    keyType: "String",
+                    parameters: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
+
+    act(() => {
+      rpcConfig.handlers.requests.setWorkspace({
+        workspace: {
+          id: "workspace-1",
+          name: "Local",
+          siloAddress: "127.0.0.1",
+          gatewayPort: 30000,
+          orleansVersion: "10.0",
+        },
+      });
+    });
+    render(<App />);
+
+    expect(await screen.findAllByText("Game.Grains.dll")).not.toHaveLength(0);
+
+    expect(electrobunMock.request.getGrains).toHaveBeenCalledWith({ workspaceId: "workspace-1" });
+    expect(useAppStore.getState().sourceCatalog.sources[0]?.interfaces[0]?.methods[0]?.functionId).toBe("function-1");
+  });
+
+  it("invokes the selected function through the desktop backend", async () => {
+    electrobunMock.request.invokeGrain.mockResolvedValue({
+      isSuccess: true,
+      result: JSON.stringify({ score: 42 }),
+      timing: {
+        serializationMs: 0.4,
+        executionMs: 8.2,
+        totalMs: 8.6,
+      },
+    });
+    useAppStore.setState({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+      },
+      sourceCatalog: {
+        sources: [
+          {
+            sourceId: "source-1",
+            sourceType: "DLL",
+            reference: "Game.Grains.dll",
+            label: "Game.Grains.dll",
+            enabled: true,
+            discoveryStatus: "ready",
+            interfaces: [
+              {
+                interfaceId: "grain-1",
+                interfaceName: "IPlayerGrain",
+                namespace: "Game.Grains",
+                methods: [
+                  {
+                    functionId: "function-1",
+                    sourceId: "source-1",
+                    interfaceId: "grain-1",
+                    interfaceName: "IPlayerGrain",
+                    namespace: "Game.Grains",
+                    methodName: "GetScore",
+                    signature: "GetScore()",
+                    returnType: "int",
+                    keyType: "String",
+                    parameters: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      grains: [
+        {
+          interfaceId: "grain-1",
+          interfaceName: "IPlayerGrain",
+          methods: [{ name: "GetScore", parameters: [], signature: "GetScore()", returnType: "int", keyType: "String" }],
+        },
+      ],
+      selectedGrain: "grain-1",
+      selectedMethod: "GetScore",
+      selectedFunctionId: "function-1",
+    });
+
+    render(<App />);
+
+    fireEvent.change(screen.getByPlaceholderText("Primary key"), { target: { value: "player-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+
+    await screen.findByText(/"score": 42/);
+
+    expect(electrobunMock.request.invokeGrain).toHaveBeenCalledWith({
+      grainType: "IPlayerGrain",
+      method: "GetScore",
+      grainKey: "player-1",
+      payload: "{\n}",
+      sourceId: "source-1",
+      functionId: "function-1",
+    });
+    expect(useAppStore.getState().invocationResult?.timing?.totalMs).toBe(8.6);
   });
 
   it("collapses the response pane from the titlebar", () => {

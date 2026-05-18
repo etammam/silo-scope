@@ -53,6 +53,17 @@ type BackendLogEntry = {
   Exception?: string | null;
 };
 
+type BackendInvocationResult = {
+  IsSuccess: boolean;
+  Result?: string;
+  ErrorMessage?: string;
+  Timing?: {
+    SerializationMs?: number;
+    ExecutionMs?: number;
+    TotalMs?: number;
+  };
+};
+
 const rpc = BrowserView.defineRPC<SiloScopeRPC>({
   handlers: {
     requests: {
@@ -87,9 +98,10 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
       },
       invokeGrain: async ({ grainType, method, grainKey, payload, sourceId, functionId }) => {
         console.log("invokeGrain", grainType, method, grainKey, payload, sourceId, functionId);
-        const result = await sidecar.request<
-          FluentResult<{ IsSuccess: boolean; Result?: string; ErrorMessage?: string }>
-        >("InvokeGrainAsync", [grainType, method, grainKey, payload]);
+        const result = await sidecar.request<FluentResult<BackendInvocationResult>>(
+          "InvokeGrainAsync",
+          [grainType, method, grainKey, payload],
+        );
 
         if (!result.IsSuccess) {
           return {
@@ -102,6 +114,7 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
           isSuccess: result.Value?.IsSuccess ?? false,
           result: result.Value?.Result,
           error: result.Value?.ErrorMessage,
+          timing: mapInvocationTiming(result.Value),
         };
       },
       getWorkspaces: () => {
@@ -168,6 +181,18 @@ function flattenSourceCatalog(catalog: SourceOwnedCatalog) {
       })),
     })),
   );
+}
+
+function mapInvocationTiming(result: BackendInvocationResult | undefined) {
+  if (!result?.Timing) {
+    return undefined;
+  }
+
+  return {
+    serializationMs: result.Timing.SerializationMs ?? 0,
+    executionMs: result.Timing.ExecutionMs ?? 0,
+    totalMs: result.Timing.TotalMs ?? 0,
+  };
 }
 
 function isDiscoveryStatus(value: string): value is "idle" | "discovering" | "ready" | "error" {

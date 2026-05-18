@@ -1,6 +1,7 @@
 import { Electroview } from "electrobun/view";
 import { type CSSProperties, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { SiloScopeRPC } from "../shared/rpc";
+import type { GrainKeyType } from "../shared/types";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { RequestWorkbench } from "./components/RequestWorkbench";
@@ -14,7 +15,17 @@ type WorkbenchTheme = "dark" | "light";
 const themeStorageKey = "siloscope.theme";
 const applicationMenuEventName = "siloscope:application-menu-action";
 
-Electroview.defineRPC<SiloScopeRPC>({
+type GrainInvocationRequest = {
+  grainType: string;
+  grainKey: string;
+  keyType: GrainKeyType;
+  method: string;
+  payload: string;
+  sourceId?: string;
+  functionId?: string;
+};
+
+const rendererRpc = Electroview.defineRPC<SiloScopeRPC>({
   handlers: {
     requests: {
       setWorkspace: ({ workspace }) => {
@@ -24,7 +35,7 @@ Electroview.defineRPC<SiloScopeRPC>({
     },
     messages: {
       requestGrains: ({ workspaceId }) => {
-        console.log("requestGrains for", workspaceId);
+        void refreshWorkspaceCatalog(workspaceId);
       },
       logEntry: ({ entry }) => {
         useAppStore.getState().addLog(entry);
@@ -42,6 +53,8 @@ Electroview.defineRPC<SiloScopeRPC>({
   },
 });
 
+const electroview = new Electroview({ rpc: rendererRpc });
+
 function App() {
   const {
     grains,
@@ -52,7 +65,6 @@ function App() {
     selectedMethod,
     logs,
     clearLogs,
-    setInvocationResult,
     setSelectedGrain,
     setSelectedFunction,
     setSelectedMethod,
@@ -98,6 +110,14 @@ function App() {
   const effectiveSourceCatalog = useMemo(() => {
     return sourceCatalog.sources.length > 0 ? sourceCatalog : buildSourceCatalogFromGrains(grains, workspace);
   }, [grains, sourceCatalog, workspace]);
+
+  useEffect(() => {
+    if (!workspace) {
+      return;
+    }
+
+    void refreshWorkspaceCatalog(workspace.id);
+  }, [workspace?.id]);
 
   const handleSelectFunction = useCallback(
     (functionId: string | null) => {
@@ -151,6 +171,14 @@ function App() {
       document.addEventListener("mouseup", handleMouseUp);
     },
     [paneLayout],
+  );
+
+  const handleInvoke = useCallback(
+    (request: GrainInvocationRequest) => {
+      setResponseTab("response");
+      void invokeGrain(request);
+    },
+    [],
   );
 
   return (
@@ -234,12 +262,7 @@ function App() {
       <main className="app-shell__content">
         <RequestWorkbench
           grains={grains}
-          onInvoke={(request) => {
-            setInvocationResult({
-              isSuccess: false,
-              error: `Invocation pending: ${request.grainType}.${request.method}`,
-            });
-          }}
+          onInvoke={handleInvoke}
           onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
           onSelectMethod={setSelectedMethod}
@@ -288,6 +311,45 @@ function resetWorkspaceState() {
   store.setSourceCatalog({ sources: [] });
   store.setSelectedFunction(null);
   store.setInvocationResult(null);
+}
+
+async function refreshWorkspaceCatalog(workspaceId: string) {
+  try {
+    const response = await electroview.rpc!.request.getGrains({ workspaceId });
+    const store = useAppStore.getState();
+
+    store.setGrains(response.grains);
+    store.setSourceCatalog(response.sourceCatalog ?? buildSourceCatalogFromGrains(response.grains, store.workspace));
+  } catch (error) {
+    const store = useAppStore.getState();
+    store.setGrains([]);
+    store.setSourceCatalog({ sources: [] });
+    store.addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message: error instanceof Error ? error.message : "Failed to refresh workspace catalog.",
+    });
+  }
+}
+
+async function invokeGrain(request: GrainInvocationRequest) {
+  try {
+    const result = await electroview.rpc!.request.invokeGrain({
+      grainType: request.grainType,
+      method: request.method,
+      grainKey: request.grainKey,
+      payload: request.payload,
+      sourceId: request.sourceId,
+      functionId: request.functionId,
+    });
+
+    useAppStore.getState().setInvocationResult(result);
+  } catch (error) {
+    useAppStore.getState().setInvocationResult({
+      isSuccess: false,
+      error: error instanceof Error ? error.message : "Failed to invoke grain.",
+    });
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {
