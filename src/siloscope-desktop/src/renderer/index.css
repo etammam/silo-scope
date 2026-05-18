@@ -736,6 +736,108 @@ textarea,
 	opacity: 0.45;
 }
 
+.navigation-sidebar__packages {
+	display: grid;
+	gap: 6px;
+	list-style: none;
+	margin: 6px 0 0;
+	padding: 0 6px;
+}
+
+.navigation-sidebar__package {
+	background: var(--ui-1);
+	border: 1px solid var(--ui-3);
+	border-radius: 5px;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.navigation-sidebar__package-button {
+	align-items: center;
+	appearance: none;
+	-webkit-appearance: none;
+	background: transparent;
+	border: 0;
+	color: var(--ui-6);
+	cursor: pointer;
+	display: grid;
+	font: inherit;
+	gap: 8px;
+	grid-template-columns: 14px minmax(0, 1fr);
+	min-height: 32px;
+	padding: 6px 8px;
+	text-align: left;
+	width: 100%;
+}
+
+.navigation-sidebar__package-button:hover,
+.navigation-sidebar__package-button:focus-visible {
+	background: var(--ui-2);
+	color: var(--ui-7);
+	outline: none;
+}
+
+.navigation-sidebar__package-button:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.navigation-sidebar__package-icon {
+	border: 1.5px solid var(--ui-5);
+	border-radius: 3px;
+	height: 12px;
+	position: relative;
+	width: 12px;
+}
+
+.navigation-sidebar__package-icon::after {
+	background: var(--ui-5);
+	content: "";
+	height: 1.5px;
+	left: 2px;
+	position: absolute;
+	top: 4px;
+	width: 6px;
+}
+
+.navigation-sidebar__package-main {
+	align-items: baseline;
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.navigation-sidebar__package-name {
+	color: var(--ui-7);
+	font-size: 12px;
+	font-weight: 650;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.navigation-sidebar__package-version {
+	color: var(--ui-5);
+	font-size: 11px;
+	font-weight: 600;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.navigation-sidebar__package-description {
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	color: var(--ui-5);
+	display: -webkit-box;
+	font-size: 11px;
+	line-height: 1.35;
+	overflow: hidden;
+	padding: 0 8px 8px 30px;
+}
+
 .navigation-sidebar__dialog-backdrop {
 	align-items: center;
 	background: rgb(0 0 0 / 0.34);

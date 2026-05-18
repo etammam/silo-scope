@@ -541,18 +541,21 @@ function NuGetRegistryManager({
         {packages.length === 0 ? (
           <div className="navigation-sidebar__empty">No packages loaded</div>
         ) : (
-          <ul className="navigation-sidebar__list" aria-label="NuGet packages">
+          <ul className="navigation-sidebar__packages" aria-label="NuGet packages">
             {packages.map((packageInfo) => (
               <li key={`${packageInfo.packageId}:${packageInfo.version}`} className="navigation-sidebar__package">
                 <button
-                  className="navigation-sidebar__function"
+                  aria-label={`${packageInfo.packageId} ${packageInfo.version}`}
+                  className="navigation-sidebar__package-button"
                   disabled={!workspace}
                   onClick={() => void handleAddPackage(packageInfo)}
+                  title={`Add ${packageInfo.packageId} ${packageInfo.version}`}
                   type="button"
                 >
-                  <span className="navigation-sidebar__grain-icon" aria-hidden="true" />
-                  <span>
-                    {packageInfo.packageId} {packageInfo.version}
+                  <span className="navigation-sidebar__package-icon" aria-hidden="true" />
+                  <span className="navigation-sidebar__package-main">
+                    <span className="navigation-sidebar__package-name">{packageInfo.packageId}</span>
+                    <span className="navigation-sidebar__package-version">{packageInfo.version}</span>
                   </span>
                 </button>
                 {packageInfo.description && (
