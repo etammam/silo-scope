@@ -31,6 +31,8 @@ type RequestWorkbenchProps = {
   }) => void;
 };
 
+type RequestTab = "payload" | "context" | "docs";
+
 export function RequestWorkbench({
   grains,
   sourceCatalog,
@@ -43,6 +45,7 @@ export function RequestWorkbench({
   const [grainKey, setGrainKey] = useState("");
   const [keyType, setKeyType] = useState<GrainKeyType>("String");
   const [payload, setPayload] = useState("{\n}");
+  const [activeTab, setActiveTab] = useState<RequestTab>("payload");
   const activeFunction = useMemo(
     () => findCatalogFunction(sourceCatalog ?? { sources: [] }, selectedFunctionId ?? null),
     [selectedFunctionId, sourceCatalog],
@@ -155,51 +158,215 @@ export function RequestWorkbench({
       </div>
 
       <div className="request-workbench__tabs" aria-label="Request sections">
-        <button aria-selected="true" type="button">Payload</button>
-        <button type="button">Selection</button>
-        <button type="button">Context</button>
-        <button type="button">Docs</button>
+        <button aria-selected={activeTab === "payload"} onClick={() => setActiveTab("payload")} type="button">
+          Payload
+        </button>
+        <button aria-selected={activeTab === "context"} onClick={() => setActiveTab("context")} type="button">
+          Context
+        </button>
+        <button aria-selected={activeTab === "docs"} onClick={() => setActiveTab("docs")} type="button">
+          Docs
+        </button>
       </div>
 
-      <div className="request-workbench__selection" aria-label="Selected function">
-        <div>
-          <span>Interface</span>
-          <strong>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</strong>
-        </div>
-        <div>
-          <span>Method</span>
-          <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
-        </div>
-        <div>
-          <span>Return</span>
-          <strong>{activeFunction?.returnType ?? activeMethod?.returnType ?? "unknown"}</strong>
-        </div>
-        <div>
-          <span>Parameters</span>
-          <strong>{formatParameterList(visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []))}</strong>
-        </div>
-      </div>
+      {activeTab === "payload" && (
+        <>
+          <div className="request-workbench__selection" aria-label="Selected function">
+            <div>
+              <span>Interface</span>
+              <strong>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</strong>
+            </div>
+            <div>
+              <span>Method</span>
+              <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
+            </div>
+            <div>
+              <span>Return</span>
+              <strong>{activeFunction?.returnType ?? activeMethod?.returnType ?? "unknown"}</strong>
+            </div>
+            <div>
+              <span>Parameters</span>
+              <strong>{formatParameterList(visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []))}</strong>
+            </div>
+          </div>
 
-      <div className="request-workbench__editor">
-        <div className="request-workbench__editor-header">
-          <span>Payload</span>
-          <div className="request-workbench__tokens" aria-label="Environment token autocomplete">
-            <button onClick={() => insertEnvToken("clusterId")} type="button">
-              clusterId
-            </button>
-            <button onClick={() => insertEnvToken("workspaceId")} type="button">
-              workspaceId
-            </button>
+          <div className="request-workbench__editor">
+            <div className="request-workbench__editor-header">
+              <span>Payload</span>
+              <div className="request-workbench__tokens" aria-label="Environment token autocomplete">
+                <button onClick={() => insertEnvToken("clusterId")} type="button">
+                  clusterId
+                </button>
+                <button onClick={() => insertEnvToken("workspaceId")} type="button">
+                  workspaceId
+                </button>
+              </div>
+            </div>
+            <MonacoEditor value={payload} onChange={setPayload} theme={theme} />
+          </div>
+
+          <div className="request-workbench__trigger-bar">
+            <span className={payloadError ? "request-workbench__status request-workbench__status--error" : "request-workbench__status"}>
+              {payloadError ?? "JSON valid"}
+            </span>
+          </div>
+        </>
+      )}
+
+      {activeTab === "docs" && (
+        <div className="request-workbench__docs" aria-label="Documentation">
+          <div className="docs-section">
+            <h3>Method Signature</h3>
+            <p>
+              Full C# method signature for invoking this grain method.
+            </p>
+            <div className="docs-signature">
+              <code>
+                {activeFunction?.signature ?? activeMethod?.signature ?? "Task InvokeAsync(string grainId, object payload)"}
+              </code>
+            </div>
+          </div>
+
+          <div className="docs-section">
+            <h3>Request Payload</h3>
+            <p>
+              The request payload is a JSON object containing the method parameters. Map each parameter name to its
+              corresponding value using the appropriate C# type.
+            </p>
+            <div className="docs-parameters">
+              <h4>Parameters ({visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []).length})</h4>
+              {visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []).length > 0 ? (
+                <table className="docs-params-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>C# Type</th>
+                      <th>JSON Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []).map((param) => (
+                      <tr key={param.name}>
+                        <td><code>{param.name}</code></td>
+                        <td><span className="docs-cs-type">{param.typeName}</span></td>
+                        <td><span className="docs-json-example">{defaultJsonValue(param.typeName)}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="docs-empty">No parameters required - send an empty JSON object <code>{"{}"}</code></p>
+              )}
+            </div>
+          </div>
+
+          <div className="docs-section">
+            <h3>Response Payload</h3>
+            <p>
+              The response payload contains the return value from the grain method. The JSON structure depends on the
+              return type of the method.
+            </p>
+            <div className="docs-response">
+              <h4>Return Type</h4>
+              <code className="docs-cs-type">
+                {activeFunction?.returnType ?? activeMethod?.returnType ?? "Task (async void)"}
+              </code>
+              <div className="docs-response-example">
+                <h4>Example Response</h4>
+                <pre>
+{formatResponseExample(activeFunction?.returnType ?? activeMethod?.returnType ?? "void")}
+                </pre>
+              </div>
+            </div>
+          </div>
+
+          <div className="docs-section">
+            <h3>Key Information</h3>
+            <div className="docs-key-info">
+              <div className="docs-info-row">
+                <span className="docs-info-label">Grain Interface</span>
+                <span className="docs-info-value">{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "N/A"}</span>
+              </div>
+              <div className="docs-info-row">
+                <span className="docs-info-label">Namespace</span>
+                <span className="docs-info-value">{activeFunction?.namespace ?? "N/A"}</span>
+              </div>
+              <div className="docs-info-row">
+                <span className="docs-info-label">Key Type</span>
+                <span className="docs-info-value">{activeFunction?.keyType ?? activeMethod?.keyType ?? "String"}</span>
+              </div>
+              <div className="docs-info-row">
+                <span className="docs-info-label">Source</span>
+                <span className="docs-info-value">{activeSource?.sourceId ?? "N/A"}</span>
+              </div>
+            </div>
           </div>
         </div>
-        <MonacoEditor value={payload} onChange={setPayload} theme={theme} />
-      </div>
+      )}
 
-      <div className="request-workbench__trigger-bar">
-        <span className={payloadError ? "request-workbench__status request-workbench__status--error" : "request-workbench__status"}>
-          {payloadError ?? "JSON valid"}
-        </span>
-      </div>
+      {activeTab === "context" && (
+        <div className="request-workbench__context" aria-label="Context">
+          <div className="context-group">
+            <h3>Grain Identity</h3>
+            <div className="context-grid">
+              <div className="context-item">
+                <span className="context-label">Grain ID</span>
+                <span className="context-value code">{grainKey || "(enter grain key)"}</span>
+              </div>
+              <div className="context-item">
+                <span className="context-label">Key Type</span>
+                <span className="context-value">{keyType}</span>
+              </div>
+              <div className="context-item">
+                <span className="context-label">Interface</span>
+                <span className="context-value code">{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "N/A"}</span>
+              </div>
+              <div className="context-item">
+                <span className="context-label">Method</span>
+                <span className="context-value code">{activeFunction?.methodName ?? activeMethod?.name ?? "N/A"}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="context-group">
+            <h3>Source Information</h3>
+            <div className="context-grid">
+              <div className="context-item">
+                <span className="context-label">Source ID</span>
+                <span className="context-value code">{activeSource?.sourceId ?? "N/A"}</span>
+              </div>
+              <div className="context-item">
+                <span className="context-label">Source Type</span>
+                <span className="context-value">{activeSource?.sourceType ?? "N/A"}</span>
+              </div>
+              <div className="context-item full-width">
+                <span className="context-label">Discovery Status</span>
+                <span className={`context-value status status--${activeSource?.discoveryStatus?.toLowerCase() ?? "unknown"}`}>
+                  {activeSource?.discoveryStatus ?? "Unknown"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="context-group">
+            <h3>Invocation Details</h3>
+            <div className="context-details">
+              <div className="context-detail-row">
+                <span className="context-label">Full Signature</span>
+                <code className="context-signature">{activeFunction?.signature ?? activeMethod?.signature ?? "N/A"}</code>
+              </div>
+              <div className="context-detail-row">
+                <span className="context-label">Return Type</span>
+                <span className="context-value code">{activeFunction?.returnType ?? activeMethod?.returnType ?? "Task"}</span>
+              </div>
+              <div className="context-detail-row">
+                <span className="context-label">Function ID</span>
+                <span className="context-value code">{activeFunction?.functionId ?? "N/A"}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -271,4 +438,63 @@ function validateJson(value: string): string | null {
   } catch (error) {
     return error instanceof Error ? error.message : "Invalid JSON";
   }
+}
+
+function formatResponseExample(returnType: string | null | undefined): string {
+  if (!returnType || returnType === "void" || returnType === "Task" || returnType === "ValueTask") {
+    return `{
+  "isSuccess": true,
+  "error": null
+}`;
+  }
+
+  const normalized = returnType.toLowerCase();
+
+  if (normalized.includes("string")) {
+    return `{
+  "isSuccess": true,
+  "value": "example string result"
+}`;
+  }
+
+  if (normalized.includes("int") || normalized.includes("long") || normalized.includes("double") || normalized.includes("float") || normalized.includes("decimal")) {
+    return `{
+  "isSuccess": true,
+  "value": 42
+}`;
+  }
+
+  if (normalized.includes("bool")) {
+    return `{
+  "isSuccess": true,
+  "value": true
+}`;
+  }
+
+  if (normalized.endsWith("[]") || normalized.includes("list") || normalized.includes("collection") || normalized.includes("array")) {
+    return `{
+  "isSuccess": true,
+  "value": [
+    { /* item 1 */ },
+    { /* item 2 */ }
+  ]
+}`;
+  }
+
+  if (normalized.includes("dictionary") || normalized.includes("map")) {
+    return `{
+  "isSuccess": true,
+  "value": {
+    "key1": "value1",
+    "key2": "value2"
+  }
+}`;
+  }
+
+  return `{
+  "isSuccess": true,
+  "value": {
+    /* ${returnType} result */
+  }
+}`;
 }
