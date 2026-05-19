@@ -222,7 +222,7 @@ describe("App shell", () => {
     expect(useAppStore.getState().sourceCatalog.sources[0]?.interfaces[0]?.methods[0]?.functionId).toBe("function-1");
   });
 
-  it("loads, saves, connects, disconnects, and discovers from the workspace panel", async () => {
+  it("loads, saves, connects, disconnects, and discovers from the workspace menu", async () => {
     electrobunMock.request.discoverGrains.mockResolvedValue({
       grains: [
         {
@@ -248,14 +248,17 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Load" }));
-    expect(await screen.findByLabelText("Active workspace")).toHaveValue("workspace-1");
+    fireEvent.click(screen.getByRole("button", { name: "My Workspace" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Open workspace" }));
+    expect(await screen.findByRole("button", { name: "Local" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Save workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect cluster" }));
     await screen.findByText("Connected");
-    fireEvent.click(screen.getByRole("button", { name: "Discover Grains" }));
-    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Discover grains" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect cluster" }));
 
     expect(electrobunMock.request.loadWorkspace).toHaveBeenCalledWith(undefined);
     expect(electrobunMock.request.setActiveWorkspace).toHaveBeenCalledWith({
@@ -272,7 +275,7 @@ describe("App shell", () => {
     expect(electrobunMock.request.disconnectCluster).toHaveBeenCalledWith();
   });
 
-  it("loads persisted workspaces into the workspace selector on startup", async () => {
+  it("loads persisted workspaces into the workspace menu on startup", async () => {
     electrobunMock.request.getWorkspaces.mockResolvedValue({
       workspaces: [
         {
@@ -291,7 +294,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    expect(await screen.findByLabelText("Active workspace")).toHaveValue("workspace-2");
+    expect(await screen.findByRole("button", { name: "Persisted Workspace" })).toBeInTheDocument();
     expect(electrobunMock.request.setActiveWorkspace).toHaveBeenCalledWith({
       workspace: expect.objectContaining({ id: "workspace-2" }),
     });
@@ -376,6 +379,65 @@ describe("App shell", () => {
       functionId: "function-1",
     });
     expect(useAppStore.getState().invocationResult?.timing?.totalMs).toBe(8.6);
+  });
+
+  it("opens a workbench tab when a source function is selected", async () => {
+    useAppStore.setState({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+      },
+      sourceCatalog: {
+        sources: [
+          {
+            sourceId: "source-1",
+            sourceType: "DLL",
+            reference: "Game.Grains.dll",
+            label: "Game.Grains.dll",
+            enabled: true,
+            discoveryStatus: "ready",
+            interfaces: [
+              {
+                interfaceId: "grain-1",
+                interfaceName: "IPlayerGrain",
+                namespace: "Game.Grains",
+                methods: [
+                  {
+                    functionId: "function-1",
+                    sourceId: "source-1",
+                    interfaceId: "grain-1",
+                    interfaceName: "IPlayerGrain",
+                    namespace: "Game.Grains",
+                    methodName: "GetScore",
+                    signature: "GetScore()",
+                    returnType: "int",
+                    keyType: "String",
+                    parameters: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      grains: [],
+      selectedGrain: null,
+      selectedMethod: null,
+      selectedFunctionId: null,
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "GetScore()" }));
+
+    expect(await screen.findByRole("tab", { name: /GetScore.*IPlayerGrain/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(useAppStore.getState().selectedFunctionId).toBe("function-1");
   });
 
   it("wires NuGet feed search and package restore through the desktop backend", async () => {
@@ -508,6 +570,17 @@ describe("App shell", () => {
     expect(container.firstElementChild).toHaveStyle({ "--response-size": "360px" });
   });
 
+  it("resizes the navigation sidebar with the shell splitter", () => {
+    const { container } = render(<App />);
+    const splitter = screen.getByRole("separator", { name: "Resize navigation sidebar" });
+
+    fireEvent.mouseDown(splitter);
+    fireEvent.mouseMove(document, { clientX: 360 });
+    fireEvent.mouseUp(document);
+
+    expect(container.firstElementChild).toHaveStyle({ "--navigation-size": "312px" });
+  });
+
   it("switches the shell and editors to the light theme from settings", () => {
     const { container } = render(<App />);
 
@@ -567,7 +640,7 @@ describe("App shell", () => {
     expect(screen.getByRole("dialog", { name: "New workspace" })).toBeInTheDocument();
   });
 
-  it("opens the workspace creation popup from the navigation new workspace action", () => {
+  it("opens the workspace creation popup from the workspace menu", () => {
     useAppStore.setState({
       workspace: {
         id: "workspace-1",
@@ -596,7 +669,8 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Create workspace" }));
 
     expect(screen.getByRole("dialog", { name: "New workspace" })).toBeInTheDocument();
   });
@@ -604,7 +678,8 @@ describe("App shell", () => {
   it("creates a workspace, configures cluster settings, references a DLL source, and connects", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "My Workspace" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Create workspace" }));
     fireEvent.change(screen.getByLabelText("Workspace name"), {
       target: { value: "Tenant Workspace" },
     });
@@ -622,7 +697,7 @@ describe("App shell", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Add Source" }));
     fireEvent.click(screen.getByRole("button", { name: "Create Workspace" }));
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect cluster" }));
 
     await screen.findByText("Connected");
 
@@ -664,7 +739,8 @@ describe("App shell", () => {
   it("edits a workspace and keeps multiple referenced sources", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "My Workspace" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Create workspace" }));
     fireEvent.change(screen.getByLabelText("Workspace name"), {
       target: { value: "Tenant Workspace" },
     });
@@ -674,7 +750,8 @@ describe("App shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add Source" }));
     fireEvent.click(screen.getByRole("button", { name: "Create Workspace" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tenant Workspace" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Manage workspace" }));
     expect(screen.getByRole("dialog", { name: "Edit workspace" })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Workspace name"), {

@@ -114,26 +114,25 @@ describe("RequestWorkbench", () => {
 
   it("renders method signatures and emits invoke requests", () => {
     const onInvoke = vi.fn();
-    const onSelectGrain = vi.fn();
-    const onSelectMethod = vi.fn();
 
     render(
       <RequestWorkbench
         grains={grains}
         onInvoke={onInvoke}
-        onSelectGrain={onSelectGrain}
-        onSelectMethod={onSelectMethod}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
         selectedGrain="grain-1"
         selectedMethod="SetName"
         theme="dark"
       />,
     );
 
-    expect(screen.getByLabelText("Method")).toHaveValue("SetName(name)");
+    expect(screen.getAllByText("SetName").length).toBeGreaterThan(0);
+    expect(screen.getByText("name: System.String")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Grain")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Method")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Key type")).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Key type"), {
-      target: { value: "Guid" },
-    });
     fireEvent.change(screen.getByLabelText("Grain ID"), {
       target: { value: "player-1" },
     });
@@ -145,7 +144,7 @@ describe("RequestWorkbench", () => {
     expect(onInvoke).toHaveBeenCalledWith({
       grainType: "IPlayerGrain",
       grainKey: "player-1",
-      keyType: "Guid",
+      keyType: "String",
       method: "SetName",
       payload: '{"name":"Ada"}',
     });
@@ -168,9 +167,8 @@ describe("RequestWorkbench", () => {
       />,
     );
 
-    expect(screen.getByText("Core.dll")).toBeInTheDocument();
     expect(screen.getAllByText("IPlayerGrain").length).toBeGreaterThan(0);
-    expect(screen.getByText("SetName")).toBeInTheDocument();
+    expect(screen.getAllByText("SetName").length).toBeGreaterThan(0);
     expect(screen.getByText("name: System.String")).toBeInTheDocument();
     expect(screen.getByText("System.Threading.Tasks.Task")).toBeInTheDocument();
     expect(screen.getByLabelText("Payload editor")).toHaveValue('{\n  "name": ""\n}');
@@ -194,33 +192,6 @@ describe("RequestWorkbench", () => {
     });
   });
 
-  it("scopes the method quick switch to the selected source interface", () => {
-    const onSelectFunction = vi.fn();
-    const onSelectMethod = vi.fn();
-
-    render(
-      <RequestWorkbench
-        grains={grains}
-        onInvoke={vi.fn()}
-        onSelectFunction={onSelectFunction}
-        onSelectGrain={vi.fn()}
-        onSelectMethod={onSelectMethod}
-        selectedFunctionId="function-set-name"
-        selectedGrain="grain-1"
-        selectedMethod="SetName"
-        sourceCatalog={sourceCatalog}
-        theme="dark"
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Method"), {
-      target: { value: "GetState()" },
-    });
-
-    expect(onSelectFunction).toHaveBeenCalledWith("function-get-state");
-    expect(onSelectMethod).toHaveBeenCalledWith("GetState");
-  });
-
   it("can invoke from a source-owned catalog without a flat grain list", () => {
     const onInvoke = vi.fn();
 
@@ -238,7 +209,8 @@ describe("RequestWorkbench", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Grain")).toHaveValue("grain-1");
+    expect(screen.getAllByText("IPlayerGrain").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("SetName").length).toBeGreaterThan(0);
     fireEvent.change(screen.getByLabelText("Grain ID"), {
       target: { value: "player-1" },
     });
@@ -253,28 +225,6 @@ describe("RequestWorkbench", () => {
       sourceId: "source-core",
       functionId: "function-set-name",
     });
-  });
-
-  it("selects methods from a searchable method input", () => {
-    const onSelectMethod = vi.fn();
-
-    render(
-      <RequestWorkbench
-        grains={grains}
-        onInvoke={vi.fn()}
-        onSelectGrain={vi.fn()}
-        onSelectMethod={onSelectMethod}
-        selectedGrain="grain-1"
-        selectedMethod={null}
-        theme="dark"
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Method"), {
-      target: { value: "GetState()" },
-    });
-
-    expect(onSelectMethod).toHaveBeenCalledWith("GetState");
   });
 
   it("prevents invocation until the payload is valid JSON", () => {
@@ -321,27 +271,22 @@ describe("RequestWorkbench", () => {
     );
   });
 
-  it("clears the selected method when a new grain is chosen", () => {
-    const onSelectGrain = vi.fn();
-    const onSelectMethod = vi.fn();
-
+  it("keeps function selection read-only in the request line", () => {
     render(
       <RequestWorkbench
         grains={grains}
         onInvoke={vi.fn()}
-        onSelectGrain={onSelectGrain}
-        onSelectMethod={onSelectMethod}
-        selectedGrain={null}
-        selectedMethod={null}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
         theme="dark"
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Grain"), {
-      target: { value: "grain-1" },
-    });
-
-    expect(onSelectGrain).toHaveBeenCalledWith("grain-1");
-    expect(onSelectMethod).toHaveBeenCalledWith(null);
+    expect(screen.getByLabelText("Grain ID")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Grain")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Method")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Key type")).not.toBeInTheDocument();
   });
 });

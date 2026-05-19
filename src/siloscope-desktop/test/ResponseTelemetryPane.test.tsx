@@ -17,7 +17,7 @@ vi.mock("@/renderer/components/MonacoEditor", () => ({
 }));
 
 describe("ResponseTelemetryPane", () => {
-  it("renders an idle read-only output viewer before invocation", () => {
+  it("renders an idle empty state before invocation", () => {
     render(
       <ResponseTelemetryPane
         activeTab="response"
@@ -28,8 +28,8 @@ describe("ResponseTelemetryPane", () => {
     );
 
     expect(screen.getByText("Idle")).toBeInTheDocument();
-    expect(screen.getByTestId("output-viewer")).toHaveAttribute("data-readonly", "true");
-    expect(screen.getByTestId("output-viewer")).toHaveTextContent('"status": "idle"');
+    expect(screen.getAllByText("No response yet").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("output-viewer")).not.toBeInTheDocument();
     expect(screen.queryByText("No run")).not.toBeInTheDocument();
   });
 

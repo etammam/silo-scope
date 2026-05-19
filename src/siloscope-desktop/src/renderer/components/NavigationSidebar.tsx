@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, ChevronDown, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import type {
   GrainInterfaceDescriptor,
   LogEntry,
@@ -29,6 +29,7 @@ type NavigationSidebarProps = {
   onClearLogs?: () => void;
   onCreateNugetFeed?: (request: {
     name: string;
+    url: string;
     username?: string;
     password?: string;
   }) => Promise<void>;
@@ -160,28 +161,17 @@ export function NavigationSidebar({
 function WorkspaceNavigator({
   grains,
   isConnected,
-  onConnectCluster,
-  onDisconnectCluster,
-  onDiscoverGrains,
-  onLoadWorkspace,
-  onNewWorkspace,
-  onSaveWorkspace,
-  onSelectWorkspace,
-  onEditWorkspace,
   onSelectFunction,
   selectedGrain,
   selectedFunctionId,
   sourceCatalog,
   workspace,
-  workspaces = [],
   onSelectGrain,
 }: WorkspaceNavigatorProps) {
   const catalog = useMemo(
     () => sourceCatalog ?? buildSourceCatalogFromGrains(grains, workspace),
     [grains, sourceCatalog, workspace],
   );
-  const workspaceOptions =
-    workspaces.length > 0 ? workspaces : workspace ? [workspace] : [];
   const [catalogQuery, setCatalogQuery] = useState("");
   const [collapsedSources, setCollapsedSources] = useState<Set<string>>(
     () => new Set(),
@@ -244,102 +234,6 @@ function WorkspaceNavigator({
 
   return (
     <div className="navigation-sidebar__workspace-content">
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="workspace-select-title"
-      >
-        <div className="navigation-sidebar__section-heading">
-          <div
-            className="navigation-sidebar__section-title"
-            id="workspace-select-title"
-          >
-            Workspace
-          </div>
-          <button
-            aria-label="New workspace"
-            className="navigation-sidebar__icon-command"
-            disabled={!onNewWorkspace}
-            onClick={onNewWorkspace}
-            title="New workspace"
-            type="button"
-          >
-            <Plus
-              aria-hidden="true"
-              className="navigation-sidebar__new-workspace-icon"
-              width={14}
-              height={14}
-            />
-          </button>
-        </div>
-        <label className="navigation-sidebar__select-label">
-          <span>Active workspace</span>
-          <select
-            value={workspace?.id ?? "none"}
-            disabled={workspaceOptions.length === 0}
-            onChange={(event) => onSelectWorkspace?.(event.target.value)}
-          >
-            <option value="none">No workspace loaded</option>
-            {workspaceOptions.map((workspaceOption) => (
-              <option key={workspaceOption.id} value={workspaceOption.id}>
-                {workspaceOption.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="navigation-sidebar__command-row">
-          <button
-            className="navigation-sidebar__command"
-            disabled={!onLoadWorkspace}
-            onClick={() => void onLoadWorkspace?.()}
-            type="button"
-          >
-            Load
-          </button>
-          <button
-            className="navigation-sidebar__command"
-            type="button"
-            disabled={!workspace || !onSaveWorkspace}
-            onClick={() => void onSaveWorkspace?.()}
-          >
-            Save
-          </button>
-        </div>
-        <button
-          className="navigation-sidebar__command"
-          disabled={!workspace || !onEditWorkspace}
-          onClick={onEditWorkspace}
-          type="button"
-        >
-          Edit Workspace
-        </button>
-        <div className="navigation-sidebar__command-row">
-          <button
-            className="navigation-sidebar__command"
-            disabled={!workspace || isConnected || !onConnectCluster}
-            onClick={() => void onConnectCluster?.()}
-            type="button"
-          >
-            Connect
-          </button>
-          <button
-            className="navigation-sidebar__command"
-            disabled={!isConnected || !onDisconnectCluster}
-            onClick={() => void onDisconnectCluster?.()}
-            type="button"
-          >
-            Disconnect
-          </button>
-        </div>
-        {/* <button
-          className="navigation-sidebar__command"
-          disabled={!workspace || !onDiscoverGrains}
-          onClick={() => void onDiscoverGrains?.()}
-          type="button"
-        >
-          Discover Grains
-        </button> */}
-      </section>
-
       <section
         className="navigation-sidebar__section navigation-sidebar__section--sources"
         aria-labelledby="source-catalog-title"

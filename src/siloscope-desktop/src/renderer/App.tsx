@@ -1,9 +1,18 @@
 import { Electroview } from "electrobun/view";
 import {
+  ChevronDown,
+  FilePlus,
+  FolderOpen,
   LayoutTemplate,
   PanelLeftClose,
   PanelRightClose,
+  Play,
+  Radar,
+  Save,
   Settings,
+  SlidersHorizontal,
+  Square,
+  X,
 } from "lucide-react";
 import {
   useCallback,
@@ -17,10 +26,15 @@ import type { SiloScopeRPC } from "../shared/rpc";
 import type {
   ClusterType,
   GrainKeyType,
+  SourceCatalogFunction,
   Workspace,
   WorkspaceSource,
 } from "../shared/types";
-import { buildSourceCatalogFromGrains, findCatalogFunction } from "./catalog";
+import {
+  buildSourceCatalogFromGrains,
+  findCatalogFunction,
+  findCatalogSource,
+} from "./catalog";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { RequestWorkbench } from "./components/RequestWorkbench";
@@ -110,8 +124,11 @@ function App() {
   const [paneLayout, setPaneLayout] = useState<PaneLayout>("horizontal");
   const [horizontalResponseSize, setHorizontalResponseSize] = useState(420);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
+  const [navigationSize, setNavigationSize] = useState(280);
+  const [functionTabs, setFunctionTabs] = useState<string[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isWorkspaceDialogOpen, setIsWorkspaceDialogOpen] = useState(false);
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [workspaceDraft, setWorkspaceDraft] = useState<Workspace | null>(null);
   const handleNewWorkspace = useCallback(() => {
     setWorkspaceDraft(null);
@@ -195,7 +212,6 @@ function App() {
       ? sourceCatalog
       : buildSourceCatalogFromGrains(grains, workspace);
   }, [grains, sourceCatalog, workspace]);
-
   useEffect(() => {
     if (!workspace || !isConnected) {
       return;
@@ -218,6 +234,11 @@ function App() {
         return;
       }
 
+      setFunctionTabs((current) =>
+        current.includes(selectedFunction.functionId)
+          ? current
+          : [...current, selectedFunction.functionId],
+      );
       setSelectedGrain(selectedFunction.interfaceId);
       setSelectedMethod(selectedFunction.methodName);
       setSelectedFunction(selectedFunction.functionId);
@@ -230,9 +251,62 @@ function App() {
     ],
   );
 
+  const handleCloseFunctionTab = useCallback(
+    (functionId: string) => {
+      const tabIndex = functionTabs.indexOf(functionId);
+      const nextTabs = functionTabs.filter((tabId) => tabId !== functionId);
+      setFunctionTabs(nextTabs);
+
+      if (selectedFunctionId !== functionId) {
+        return;
+      }
+
+      const nextFunctionId = nextTabs[tabIndex] ?? nextTabs[tabIndex - 1] ?? null;
+      if (nextFunctionId) {
+        handleSelectFunction(nextFunctionId);
+        return;
+      }
+
+      setSelectedFunction(null);
+      setSelectedGrain(null);
+      setSelectedMethod(null);
+    },
+    [
+      functionTabs,
+      handleSelectFunction,
+      selectedFunctionId,
+      setSelectedFunction,
+      setSelectedGrain,
+      setSelectedMethod,
+    ],
+  );
+
   const shellStyle = {
     "--response-size": `${responseSize}px`,
+    "--navigation-size": `${navigationSize}px`,
   } as CSSProperties;
+
+  const handleNavigationResizeStart = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const activityOffset = isActivityBarVisible ? 48 : 0;
+        setNavigationSize(
+          clamp(moveEvent.clientX - activityOffset, 220, 460),
+        );
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [isActivityBarVisible],
+  );
 
   const handleResizeStart = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -293,6 +367,7 @@ function App() {
       useAppStore.getState().setSourceCatalog({ sources: [] });
       useAppStore.getState().setInvocationResult(null);
       useAppStore.getState().setIsConnected(false);
+      setFunctionTabs([]);
     },
     [setWorkspace, workspaces],
   );
@@ -306,6 +381,7 @@ function App() {
       useAppStore.getState().setSelectedFunction(null);
       useAppStore.getState().setInvocationResult(null);
       useAppStore.getState().setIsConnected(false);
+      setFunctionTabs([]);
       setIsWorkspaceDialogOpen(false);
       setWorkspaceDraft(null);
       void persistWorkspace(nextWorkspace);
@@ -337,7 +413,69 @@ function App() {
       )}
 
       <header className="app-titlebar electrobun-webkit-app-region-drag">
-        <div className="app-titlebar__spacer" />
+        <div className="app-titlebar__workspace electrobun-webkit-app-region-no-drag">
+          <button
+            aria-expanded={isWorkspaceMenuOpen}
+            aria-haspopup="menu"
+            className="workspace-menu__trigger"
+            onClick={() => setIsWorkspaceMenuOpen((open) => !open)}
+            type="button"
+          >
+            <span>{workspace?.name ?? "My Workspace"}</span>
+            <ChevronDown aria-hidden="true" width={12} height={12} />
+          </button>
+          <button
+            aria-label={isConnected ? "Disconnect cluster" : "Connect cluster"}
+            aria-pressed={isConnected}
+            className="workspace-connection-toggle"
+            disabled={!workspace || (!isConnected && !workspace)}
+            onClick={() => {
+              if (isConnected) {
+                void disconnectCluster();
+                return;
+              }
+
+              void connectCluster();
+            }}
+            title={isConnected ? "Disconnect cluster" : "Connect cluster"}
+            type="button"
+          >
+            {isConnected ? (
+              <Square aria-hidden="true" width={12} height={12} />
+            ) : (
+              <Play aria-hidden="true" width={12} height={12} />
+            )}
+          </button>
+          {isWorkspaceMenuOpen && (
+            <div className="workspace-menu" role="menu">
+              <div className="workspace-menu__current">
+                <strong>{workspace?.name ?? "No workspace loaded"}</strong>
+                <span>{isConnected ? "Connected" : "Disconnected"}</span>
+              </div>
+              <button role="menuitem" type="button" onClick={() => { setIsWorkspaceMenuOpen(false); handleNewWorkspace(); }}>
+                <FilePlus aria-hidden="true" width={14} height={14} />
+                Create workspace
+              </button>
+              <button role="menuitem" type="button" onClick={() => { setIsWorkspaceMenuOpen(false); void loadWorkspace(); }}>
+                <FolderOpen aria-hidden="true" width={14} height={14} />
+                Open workspace
+              </button>
+              <button role="menuitem" type="button" disabled={!workspace} onClick={() => { setIsWorkspaceMenuOpen(false); void saveCurrentWorkspace(); }}>
+                <Save aria-hidden="true" width={14} height={14} />
+                Save workspace
+              </button>
+              <button role="menuitem" type="button" disabled={!workspace} onClick={() => { setIsWorkspaceMenuOpen(false); handleEditWorkspace(); }}>
+                <SlidersHorizontal aria-hidden="true" width={14} height={14} />
+                Manage workspace
+              </button>
+              <div className="workspace-menu__separator" />
+              <button role="menuitem" type="button" disabled={!workspace} onClick={() => { setIsWorkspaceMenuOpen(false); void discoverWorkspaceGrains(); }}>
+                <Radar aria-hidden="true" width={14} height={14} />
+                Discover grains
+              </button>
+            </div>
+          )}
+        </div>
         <div className="app-titlebar__command">Siloscope Workbench</div>
         <div className="app-titlebar__actions">
           <button
@@ -462,40 +600,115 @@ function App() {
           workspaces={workspaces}
         />
       )}
+      {isNavigationVisible && (
+        <div
+          aria-label="Resize navigation sidebar"
+          aria-orientation="vertical"
+          className="navigation-resizer"
+          onMouseDown={handleNavigationResizeStart}
+          role="separator"
+          tabIndex={0}
+        />
+      )}
 
       <main className="app-shell__content">
-        <RequestWorkbench
-          grains={grains}
-          onInvoke={handleInvoke}
-          onSelectFunction={handleSelectFunction}
-          onSelectGrain={setSelectedGrain}
-          onSelectMethod={setSelectedMethod}
-          selectedFunctionId={selectedFunctionId}
-          selectedGrain={selectedGrain}
-          selectedMethod={selectedMethod}
-          sourceCatalog={effectiveSourceCatalog}
-          theme={theme}
-        />
-        {isResponseVisible && (
-          <div
-            aria-label="Resize request and response panels"
-            aria-orientation={
-              paneLayout === "horizontal" ? "vertical" : "horizontal"
-            }
-            className="workbench-resizer"
-            onMouseDown={handleResizeStart}
-            role="separator"
-            tabIndex={0}
-          />
-        )}
-        {isResponseVisible && (
-          <ResponseTelemetryPane
-            activeTab={responseTab}
-            onTabChange={setResponseTab}
-            result={invocationResult}
+        <div className="workbench-tabs" role="tablist" aria-label="Open functions">
+          {functionTabs.length > 0 ? (
+            functionTabs.map((functionId) => {
+              const tabFunction = findCatalogFunction(
+                effectiveSourceCatalog,
+                functionId,
+              );
+              const tabSource = findCatalogSource(
+                effectiveSourceCatalog,
+                tabFunction?.sourceId ?? null,
+              );
+              return (
+                <div
+                  aria-label={`${formatFunctionTabLabel(tabFunction, functionId)} ${formatFunctionTabContext(tabFunction, tabSource)}`}
+                  aria-selected={selectedFunctionId === functionId}
+                  className="workbench-tabs__tab"
+                  key={functionId}
+                  onClick={() => handleSelectFunction(functionId)}
+                  role="tab"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleSelectFunction(functionId);
+                    }
+                  }}
+                  title={formatFunctionTabContext(tabFunction, tabSource)}
+                >
+                  <span className="workbench-tabs__primary">
+                    <span className="workbench-tabs__kind">RPC</span>
+                    <span className="workbench-tabs__name">
+                      {formatFunctionTabLabel(tabFunction, functionId)}
+                    </span>
+                  </span>
+                  <button
+                    aria-label={`Close ${formatFunctionTabLabel(tabFunction, functionId)}`}
+                    className="workbench-tabs__close"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleCloseFunctionTab(functionId);
+                    }}
+                    type="button"
+                  >
+                    <X aria-hidden="true" width={12} height={12} />
+                  </button>
+                  <span className="workbench-tabs__meta">
+                    {formatFunctionTabContext(tabFunction, tabSource)}
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            <div className="workbench-tabs__empty">Select a function from Sources</div>
+          )}
+          <button
+            aria-label="Open a function from Sources"
+            className="workbench-tabs__add"
+            disabled
+            type="button"
+          >
+            +
+          </button>
+        </div>
+        <section className="workbench-tab-panel" aria-label="Function workbench">
+          <RequestWorkbench
+            grains={grains}
+            onInvoke={handleInvoke}
+            onSelectFunction={handleSelectFunction}
+            onSelectGrain={setSelectedGrain}
+            onSelectMethod={setSelectedMethod}
+            selectedFunctionId={selectedFunctionId}
+            selectedGrain={selectedGrain}
+            selectedMethod={selectedMethod}
+            sourceCatalog={effectiveSourceCatalog}
             theme={theme}
           />
-        )}
+          {isResponseVisible && (
+            <div
+              aria-label="Resize request and response panels"
+              aria-orientation={
+                paneLayout === "horizontal" ? "vertical" : "horizontal"
+              }
+              className="workbench-resizer"
+              onMouseDown={handleResizeStart}
+              role="separator"
+              tabIndex={0}
+            />
+          )}
+          {isResponseVisible && (
+            <ResponseTelemetryPane
+              activeTab={responseTab}
+              onTabChange={setResponseTab}
+              result={invocationResult}
+              theme={theme}
+            />
+          )}
+        </section>
       </main>
       {isWorkspaceDialogOpen && (
         <NewWorkspaceDialog
@@ -797,6 +1010,29 @@ function NewWorkspaceDialog({
       </section>
     </div>
   );
+}
+
+function formatFunctionTabLabel(
+  catalogFunction: SourceCatalogFunction | null,
+  fallback: string,
+): string {
+  if (!catalogFunction) {
+    return fallback;
+  }
+
+  return catalogFunction.methodName || catalogFunction.signature;
+}
+
+function formatFunctionTabContext(
+  catalogFunction: SourceCatalogFunction | null,
+  source: { label: string } | null,
+): string {
+  if (!catalogFunction) {
+    return "Function";
+  }
+
+  const sourceLabel = source?.label ? `${source.label} / ` : "";
+  return `${sourceLabel}${catalogFunction.interfaceName}`;
 }
 
 function readStoredTheme(): WorkbenchTheme {

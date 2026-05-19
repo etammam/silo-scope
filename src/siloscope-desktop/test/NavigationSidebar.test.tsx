@@ -41,60 +41,9 @@ describe("NavigationSidebar", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Active workspace")).toHaveValue("none");
     expect(screen.getByText("Sources")).toBeInTheDocument();
-    expect(screen.getAllByText("No workspace loaded")).toHaveLength(2);
+    expect(screen.getByText("No workspace loaded")).toBeInTheDocument();
     expect(screen.getByText("Disconnected")).toBeInTheDocument();
-  });
-
-  it("starts a new workspace from the workspace header action", () => {
-    const onNewWorkspace = vi.fn();
-
-    render(
-      <NavigationSidebar
-        activeView="workspace"
-        grains={[]}
-        isConnected={false}
-        onNewWorkspace={onNewWorkspace}
-        onSelectGrain={vi.fn()}
-        onThemeChange={vi.fn()}
-        selectedGrain={null}
-        theme="dark"
-        workspace={null}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "New workspace" }));
-
-    expect(onNewWorkspace).toHaveBeenCalledOnce();
-  });
-
-  it("selects an existing workspace from the sidebar", () => {
-    const onSelectWorkspace = vi.fn();
-
-    render(
-      <NavigationSidebar
-        activeView="workspace"
-        grains={[]}
-        isConnected={false}
-        onSelectWorkspace={onSelectWorkspace}
-        onSelectGrain={vi.fn()}
-        onThemeChange={vi.fn()}
-        selectedGrain={null}
-        theme="dark"
-        workspace={workspace}
-        workspaces={[
-          workspace,
-          { ...workspace, id: "workspace-2", name: "Remote Cluster" },
-        ]}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Active workspace"), {
-      target: { value: "workspace-2" },
-    });
-
-    expect(onSelectWorkspace).toHaveBeenCalledWith("workspace-2");
   });
 
   it("renders source-owned function catalog and selectable method leaves", () => {
@@ -120,11 +69,8 @@ describe("NavigationSidebar", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Active workspace")).toHaveValue("workspace-1");
-    expect(screen.getByRole("button", { name: "Load" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Discover Grains" })).toBeEnabled();
+    expect(screen.queryByLabelText("Active workspace")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load" })).not.toBeInTheDocument();
     expect(screen.getByText("DLL")).toBeInTheDocument();
     expect(screen.getByText("127.0.0.1:30000")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "127.0.0.1:30000 2" })).toHaveAttribute(

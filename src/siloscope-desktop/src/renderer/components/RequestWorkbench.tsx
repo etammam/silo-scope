@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Play } from "lucide-react";
 import type {
   GrainInterfaceDescriptor,
@@ -38,16 +38,11 @@ export function RequestWorkbench({
   selectedGrain,
   selectedMethod,
   theme,
-  onSelectGrain,
-  onSelectFunction,
-  onSelectMethod,
   onInvoke,
 }: RequestWorkbenchProps) {
   const [grainKey, setGrainKey] = useState("");
   const [keyType, setKeyType] = useState<GrainKeyType>("String");
-  const [methodQuery, setMethodQuery] = useState("");
   const [payload, setPayload] = useState("{\n}");
-  const methodListId = useId();
   const activeFunction = useMemo(
     () => findCatalogFunction(sourceCatalog ?? { sources: [] }, selectedFunctionId ?? null),
     [selectedFunctionId, sourceCatalog],
@@ -67,20 +62,6 @@ export function RequestWorkbench({
     () => grains.find((grain) => grain.interfaceId === selectedGrain) ?? null,
     [grains, selectedGrain],
   );
-  const grainOptions = useMemo(() => {
-    if (!activeFunction || grains.some((grain) => grain.interfaceId === activeFunction.interfaceId)) {
-      return grains;
-    }
-
-    return [
-      ...grains,
-      {
-        interfaceId: activeFunction.interfaceId,
-        interfaceName: activeFunction.interfaceName,
-        methods: activeInterface?.methods.map(toGrainMethod) ?? [toGrainMethod(activeFunction)],
-      },
-    ];
-  }, [activeFunction, activeInterface, grains]);
   const methods = useMemo(
     () => activeInterface?.methods.map(toGrainMethod) ?? activeGrain?.methods ?? [],
     [activeGrain, activeInterface],
@@ -88,13 +69,6 @@ export function RequestWorkbench({
   const activeMethod = activeFunction
     ? toGrainMethod(activeFunction)
     : methods.find((method) => method.name === selectedMethod) ?? null;
-  const filteredMethods = useMemo(
-    () =>
-      methods.filter((method) =>
-        formatMethodLabel(method).toLowerCase().includes(methodQuery.trim().toLowerCase()),
-      ),
-    [methodQuery, methods],
-  );
   const payloadError = useMemo(() => validateJson(payload), [payload]);
   const expectsSourceOwnedSelection = Boolean(sourceCatalog?.sources.some((source) => source.interfaces.length > 0));
   const canInvoke = Boolean(
@@ -104,11 +78,6 @@ export function RequestWorkbench({
       grainKey.trim() &&
       !payloadError,
   );
-
-  useEffect(() => {
-    const selected = activeFunction ? toGrainMethod(activeFunction) : methods.find((method) => method.name === selectedMethod) ?? null;
-    setMethodQuery(selected ? formatMethodLabel(selected) : "");
-  }, [activeFunction, methods, selectedMethod]);
 
   useEffect(() => {
     if (!activeFunction) {
@@ -122,27 +91,6 @@ export function RequestWorkbench({
     setKeyType(activeFunction.keyType);
     setPayload(createPayloadTemplate(activeFunction));
   }, [activeFunction, selectedFunctionId]);
-
-  const handleGrainChange = (grainId: string) => {
-    const nextGrain = grainId.length > 0 ? grainId : null;
-    onSelectGrain(nextGrain);
-    onSelectMethod(null);
-  };
-
-  const handleMethodQueryChange = (query: string) => {
-    setMethodQuery(query);
-    const nextCatalogFunction = activeInterface?.methods.find(
-      (method) => method.methodName === query || method.signature === query,
-    );
-    if (activeInterface) {
-      onSelectFunction?.(nextCatalogFunction?.functionId ?? null);
-      onSelectMethod(nextCatalogFunction?.methodName ?? null);
-      return;
-    }
-
-    const nextMethod = methods.find((method) => method.name === query || formatMethodLabel(method) === query);
-    onSelectMethod(nextMethod?.name ?? null);
-  };
 
   const insertEnvToken = (token: string) => {
     setPayload((currentPayload) => {
@@ -179,53 +127,9 @@ export function RequestWorkbench({
 
   return (
     <section className="request-workbench" aria-labelledby="request-workbench-title">
-      <div className="request-workbench__toolbar">
-        <div className="request-workbench__title">
-          <span id="request-workbench-title">Request</span>
-          <strong>{activeSource?.label ?? "No collection selected"}</strong>
-        </div>
-        <span>{activeFunction ? activeFunction.signature : activeMethod ? formatMethodLabel(activeMethod) : "Pick a function from the catalog"}</span>
-      </div>
+      <h2 className="request-workbench__sr-title" id="request-workbench-title">Request</h2>
 
       <div className="request-workbench__request-line">
-        <label>
-          <span>Grain</span>
-          <select value={selectedGrain ?? ""} onChange={(event) => handleGrainChange(event.target.value)}>
-            <option value="">Select grain</option>
-            {grainOptions.map((grain) => (
-              <option key={grain.interfaceId} value={grain.interfaceId}>
-                {grain.interfaceName}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Method</span>
-          <input
-            aria-label="Method"
-            list={methodListId}
-            disabled={!activeGrain}
-            placeholder="Search methods"
-            value={methodQuery}
-            onChange={(event) => handleMethodQueryChange(event.target.value)}
-          />
-          <datalist id={methodListId}>
-            {filteredMethods.map((method) => (
-              <option key={method.name} value={formatMethodLabel(method)} />
-            ))}
-          </datalist>
-        </label>
-
-        <label>
-          <span>Key type</span>
-          <select value={keyType} onChange={(event) => setKeyType(event.target.value as GrainKeyType)}>
-            <option value="Guid">Guid</option>
-            <option value="String">String</option>
-            <option value="Integer">Integer</option>
-          </select>
-        </label>
-
         <label>
           <span>Grain ID</span>
           <input
@@ -234,6 +138,15 @@ export function RequestWorkbench({
             onChange={(event) => setGrainKey(event.target.value)}
           />
         </label>
+
+        <div className="request-workbench__grain-summary" aria-label="Grain selection summary">
+          <div>
+            <span>Grain</span>
+            <small>{activeFunction?.keyType ?? activeMethod?.keyType ?? keyType} key</small>
+          </div>
+          <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
+          <small>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</small>
+        </div>
 
         <button className="request-workbench__invoke-button" disabled={!canInvoke} onClick={handleInvoke} type="button">
           <Play aria-hidden="true" width={12} height={12} />
@@ -286,22 +199,9 @@ export function RequestWorkbench({
         <span className={payloadError ? "request-workbench__status request-workbench__status--error" : "request-workbench__status"}>
           {payloadError ?? "JSON valid"}
         </span>
-        <span>{activeFunction?.keyType ?? keyType} key</span>
       </div>
     </section>
   );
-}
-
-function formatMethodLabel(method: GrainMethodDescriptor): string {
-  if (method.signature) {
-    return method.signature;
-  }
-
-  if (method.parameters.length === 0) {
-    return `${method.name}()`;
-  }
-
-  return `${method.name}(${visibleParameters(method.parameters).map((parameter) => parameter.name).join(", ")})`;
 }
 
 function toGrainMethod(catalogFunction: SourceCatalogFunction): GrainMethodDescriptor {

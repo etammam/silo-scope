@@ -43,21 +43,32 @@ export function ResponseTelemetryPane({
             Timing
           </button>
         </div>
-        <span>{result ? (result.isSuccess ? "Success" : "Error") : "Idle"}</span>
       </div>
 
       {activeTab === "response" && (
         <div
           aria-labelledby="response-pane-title"
-          className="response-pane__section response-pane__section--editor"
+          className={`response-pane__section ${result ? "response-pane__section--editor" : "response-pane__section--empty"}`}
           id="response-output-panel"
           role="tabpanel"
         >
-          <div className="response-pane__section-header">
-            <span>Output</span>
-            <span>Read-only</span>
-          </div>
-          <MonacoEditor value={output} onChange={() => undefined} readOnly theme={theme} />
+          {result ? (
+            <>
+              <div className="response-pane__section-header">
+                <span>Output</span>
+                <span>Read-only</span>
+              </div>
+              <MonacoEditor value={output} onChange={() => undefined} readOnly theme={theme} />
+            </>
+          ) : (
+            <div className="response-pane__empty-state">
+              <div aria-hidden="true" className="response-pane__empty-mark">
+                <span />
+              </div>
+              <strong>No response yet</strong>
+              <span>Invoke a grain to inspect the serialized result here.</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -75,6 +86,11 @@ export function ResponseTelemetryPane({
           <TimingBars timing={result?.timing ?? null} />
         </div>
       )}
+
+      <div className="response-pane__status-bar">
+        <span>{result ? (result.isSuccess ? "Success" : "Error") : "Idle"}</span>
+        <span>{result ? "Response received" : "No response yet"}</span>
+      </div>
     </aside>
   );
 }
@@ -131,7 +147,7 @@ function TimingBars({ timing }: { timing: InvocationTiming | null }) {
 
 function formatResult(result: InvocationResult | null): string {
   if (!result) {
-    return "No invocation result yet";
+    return JSON.stringify({ status: "idle" }, null, 2);
   }
 
   if (result.isSuccess && result.result) {
