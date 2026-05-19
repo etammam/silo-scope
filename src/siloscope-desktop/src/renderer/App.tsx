@@ -36,7 +36,10 @@ import {
   findCatalogSource,
 } from "./catalog";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
-import { NavigationSidebar } from "./components/NavigationSidebar";
+import {
+  NavigationSidebar,
+  NuGetRegistryManager,
+} from "./components/NavigationSidebar";
 import { RequestWorkbench } from "./components/RequestWorkbench";
 import {
   ResponseTelemetryPane,
@@ -106,7 +109,6 @@ function App() {
     selectedMethod,
     logs,
     nugetFeeds,
-    nugetPackages,
     clearLogs,
     setWorkspace,
     setSelectedGrain,
@@ -121,6 +123,9 @@ function App() {
   const [isNavigationVisible, setIsNavigationVisible] = useState(true);
   const [isResponseVisible, setIsResponseVisible] = useState(true);
   const [responseTab, setResponseTab] = useState<ResponsePaneTab>("response");
+  const [invocationHistory, setInvocationHistory] = useState<
+    { timestamp: number; isSuccess: boolean; timing: { totalMs: number; executionMs: number; serializationMs: number } | null }[]
+  >([]);
   const [paneLayout, setPaneLayout] = useState<PaneLayout>("horizontal");
   const [horizontalResponseSize, setHorizontalResponseSize] = useState(420);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
@@ -172,6 +177,19 @@ function App() {
       );
     };
   }, []);
+
+  useEffect(() => {
+    if (invocationResult) {
+      setInvocationHistory((prev) => [
+        {
+          timestamp: Date.now(),
+          isSuccess: invocationResult.isSuccess,
+          timing: invocationResult.timing ?? null,
+        },
+        ...prev.slice(0, 49),
+      ]);
+    }
+  }, [invocationResult]);
 
   useEffect(() => {
     const handleApplicationMenuAction = (event: Event) => {
@@ -317,22 +335,26 @@ function App() {
 
       event.preventDefault();
       const bounds = container.getBoundingClientRect();
+      const minSize = Math.min(150, bounds.width * 0.2);
+      const maxSize = bounds.width * 0.65;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (paneLayout === "horizontal") {
           const nextSize = clamp(
             bounds.right - moveEvent.clientX,
-            180,
-            bounds.width * 0.65,
+            minSize,
+            maxSize,
           );
           setHorizontalResponseSize(nextSize);
           return;
         }
 
+        const vMinSize = Math.min(100, bounds.height * 0.15);
+        const vMaxSize = bounds.height * 0.7;
         const nextSize = clamp(
           bounds.bottom - moveEvent.clientY,
-          180,
-          bounds.height * 0.7,
+          vMinSize,
+          vMaxSize,
         );
         setVerticalResponseSize(nextSize);
       };
@@ -349,7 +371,6 @@ function App() {
   );
 
   const handleInvoke = useCallback((request: GrainInvocationRequest) => {
-    setResponseTab("response");
     void invokeGrain(request);
   }, []);
 
@@ -409,7 +430,10 @@ function App() {
       style={shellStyle}
     >
       {isActivityBarVisible && (
-        <ActivityBar activeView={activeView} onViewChange={setActiveView} />
+        <ActivityBar
+          activeView={activeView}
+          onViewChange={setActiveView}
+        />
       )}
 
       <header className="app-titlebar electrobun-webkit-app-region-drag">
@@ -424,6 +448,13 @@ function App() {
             <span>{workspace?.name ?? "My Workspace"}</span>
             <ChevronDown aria-hidden="true" width={12} height={12} />
           </button>
+          <span
+            className={`workspace-connection-state ${isConnected ? "workspace-connection-state--connected" : ""}`}
+            title={isConnected ? "Connected" : "Disconnected"}
+          >
+            <span aria-hidden="true" />
+            {isConnected ? "Connected" : "Disconnected"}
+          </span>
           <button
             aria-label={isConnected ? "Disconnect cluster" : "Connect cluster"}
             aria-pressed={isConnected}
@@ -575,12 +606,7 @@ function App() {
           grains={grains}
           isConnected={isConnected}
           logs={logs}
-          nugetFeeds={nugetFeeds}
-          nugetPackages={nugetPackages}
           onClearLogs={clearLogs}
-          onCreateNugetFeed={createNugetFeed}
-          onSearchNugetPackages={searchNugetPackages}
-          onAddNugetPackageSource={addNugetPackageSource}
           onConnectCluster={connectCluster}
           onDisconnectCluster={disconnectCluster}
           onDiscoverGrains={discoverWorkspaceGrains}
@@ -612,7 +638,16 @@ function App() {
       )}
 
       <main className="app-shell__content">
-        <div className="workbench-tabs" role="tablist" aria-label="Open functions">
+        {activeView === "nuget" ? (
+          <NuGetRegistryManager
+            feeds={nugetFeeds}
+            onCreateFeed={createNugetFeed}
+            onTestFeed={testNugetFeed}
+            onUpdateFeed={updateNugetFeed}
+          />
+        ) : (
+          <>
+          <div className="workbench-tabs" role="tablist" aria-label="Open functions">
           {functionTabs.length > 0 ? (
             functionTabs.map((functionId) => {
               const tabFunction = findCatalogFunction(
@@ -706,9 +741,12 @@ function App() {
               onTabChange={setResponseTab}
               result={invocationResult}
               theme={theme}
+              invocationHistory={invocationHistory}
             />
           )}
         </section>
+        </>
+        )}
       </main>
       {isWorkspaceDialogOpen && (
         <NewWorkspaceDialog
@@ -1327,6 +1365,41 @@ async function createNugetFeed(request: {
   const store = useAppStore.getState();
   store.setNugetFeeds([
     ...store.nugetFeeds.filter((feed) => feed.name !== response.feed.name),
+    response.feed,
+  ]);
+}
+
+async function testNugetFeed(request: {
+  name: string;
+  url: string;
+  username?: string;
+  password?: string;
+}) {
+  await electroview.rpc!.request.testNugetFeed({
+    ...request,
+    isPasswordClearText: true,
+  });
+}
+
+async function updateNugetFeed(
+  name: string,
+  request: {
+    name: string;
+    url: string;
+    username?: string;
+    password?: string;
+  },
+) {
+  const response = await electroview.rpc!.request.updateNugetFeed({
+    name,
+    feed: {
+      ...request,
+      isPasswordClearText: true,
+    },
+  });
+  const store = useAppStore.getState();
+  store.setNugetFeeds([
+    ...store.nugetFeeds.filter((feed) => feed.name !== name && feed.name !== response.feed.name),
     response.feed,
   ]);
 }

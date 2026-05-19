@@ -4,7 +4,6 @@ import type {
   GrainInterfaceDescriptor,
   LogEntry,
   NugetFeed,
-  NugetPackage,
   SourceCatalogInterface,
   SourceCatalogSource,
   SourceOwnedCatalog,
@@ -24,27 +23,7 @@ type NavigationSidebarProps = {
   activeView: ActivityView;
   theme: "dark" | "light" | "vscode-dark" | "vscode-light";
   logs?: LogEntry[];
-  nugetFeeds?: NugetFeed[];
-  nugetPackages?: NugetPackage[];
   onClearLogs?: () => void;
-  onCreateNugetFeed?: (request: {
-    name: string;
-    url: string;
-    username?: string;
-    password?: string;
-  }) => Promise<void>;
-  onSearchNugetPackages?: (request: {
-    query: string;
-    sourceUrl?: string;
-    feedName?: string;
-  }) => Promise<void>;
-  onAddNugetPackageSource?: (request: {
-    packageId: string;
-    version: string;
-    gateway?: string;
-    sourceUrl?: string;
-    feedName?: string;
-  }) => Promise<void>;
   onConnectCluster?: () => Promise<void>;
   onDisconnectCluster?: () => Promise<void>;
   onDiscoverGrains?: () => Promise<void>;
@@ -78,12 +57,7 @@ export function NavigationSidebar({
   grains,
   isConnected,
   logs = [],
-  nugetFeeds = [],
-  nugetPackages = [],
   onClearLogs,
-  onCreateNugetFeed,
-  onSearchNugetPackages,
-  onAddNugetPackageSource,
   onConnectCluster,
   onDisconnectCluster,
   onDiscoverGrains,
@@ -113,7 +87,7 @@ export function NavigationSidebar({
         <span>{title}</span>
       </div>
 
-      {activeView === "workspace" && (
+      {activeView !== "settings" && (
         <WorkspaceNavigator
           grains={grains}
           isConnected={isConnected}
@@ -132,17 +106,6 @@ export function NavigationSidebar({
           sourceCatalog={sourceCatalog}
           workspace={workspace}
           workspaces={workspaces}
-        />
-      )}
-
-      {activeView === "nuget" && (
-        <NuGetRegistryManager
-          feeds={nugetFeeds}
-          packages={nugetPackages}
-          onAddPackageSource={onAddNugetPackageSource}
-          onCreateFeed={onCreateNugetFeed}
-          onSearchPackages={onSearchNugetPackages}
-          workspace={workspace}
         />
       )}
 
@@ -329,21 +292,6 @@ function WorkspaceNavigator({
         </div>
       </section>
 
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="connection-title"
-      >
-        <div
-          className="navigation-sidebar__section-title"
-          id="connection-title"
-        >
-          Connection
-        </div>
-        <div className="navigation-sidebar__row">
-          <span className={`navigation-sidebar__dot ${isConnected ? "navigation-sidebar__dot--connected" : ""}`} />
-          <span>{isConnected ? "Connected" : "Disconnected"}</span>
-        </div>
-      </section>
     </div>
   );
 }
@@ -446,43 +394,40 @@ function SourceInterfaceTree({
   );
 }
 
-function NuGetRegistryManager({
+export function NuGetRegistryManager({
   feeds,
-  packages,
-  onAddPackageSource,
   onCreateFeed,
-  onSearchPackages,
-  workspace,
+  onTestFeed,
+  onUpdateFeed,
 }: {
   feeds: NugetFeed[];
-  packages: NugetPackage[];
-  workspace: Workspace | null;
   onCreateFeed?: (request: {
     name: string;
     url: string;
     username?: string;
     password?: string;
   }) => Promise<void>;
-  onSearchPackages?: (request: {
-    query: string;
-    sourceUrl?: string;
-    feedName?: string;
+  onTestFeed?: (request: {
+    name: string;
+    url: string;
+    username?: string;
+    password?: string;
   }) => Promise<void>;
-  onAddPackageSource?: (request: {
-    packageId: string;
-    version: string;
-    gateway?: string;
-    sourceUrl?: string;
-    feedName?: string;
-  }) => Promise<void>;
+  onUpdateFeed?: (
+    name: string,
+    request: {
+      name: string;
+      url: string;
+      username?: string;
+      password?: string;
+    },
+  ) => Promise<void>;
 }) {
-  const [activeFeedName, setActiveFeedName] = useState("nuget.org");
-  const [isFeedDialogOpen, setIsFeedDialogOpen] = useState(false);
+  const [editingFeedName, setEditingFeedName] = useState<string | null>(null);
   const [feedName, setFeedName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
   const [feedUsername, setFeedUsername] = useState("");
   const [feedPassword, setFeedPassword] = useState("");
-  const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Ready");
   const availableFeeds = useMemo(
     () => [
@@ -491,269 +436,187 @@ function NuGetRegistryManager({
     ],
     [feeds],
   );
-  const activeFeed =
-    availableFeeds.find((feed) => feed.name === activeFeedName) ??
-    defaultNugetFeed;
+  const editableFeeds = availableFeeds.filter((feed) => !feed.isDefault);
+  const isEditing = editingFeedName !== null;
+  const canSubmit = Boolean(feedName.trim() && feedUrl.trim());
 
-  const handleCreateFeed = async () => {
-    if (!feedName.trim() || !feedUrl.trim() || !onCreateFeed) {
+  const resetForm = () => {
+    setEditingFeedName(null);
+    setFeedName("");
+    setFeedUrl("");
+    setFeedUsername("");
+    setFeedPassword("");
+  };
+
+  const editFeed = (feed: NugetFeed) => {
+    setEditingFeedName(feed.name);
+    setFeedName(feed.name);
+    setFeedUrl(feed.url);
+    setFeedUsername("");
+    setFeedPassword("");
+    setStatus(`Editing ${feed.name}`);
+  };
+
+  const buildRequest = () => ({
+    name: feedName.trim(),
+    url: feedUrl.trim(),
+    username: feedUsername.trim() || undefined,
+    password: feedPassword || undefined,
+  });
+
+  const handleTestFeed = async () => {
+    if (!canSubmit || !onTestFeed) {
       return;
     }
 
-    setStatus("Adding feed");
+    setStatus("Testing connection");
     try {
-      await onCreateFeed({
-        name: feedName.trim(),
-        url: feedUrl.trim(),
-        username: feedUsername.trim() || undefined,
-        password: feedPassword || undefined,
-      });
-      setActiveFeedName(feedName.trim());
-      setFeedName("");
-      setFeedUrl("");
-      setFeedUsername("");
-      setFeedPassword("");
-      setIsFeedDialogOpen(false);
-      setStatus("Feed added");
+      await onTestFeed(buildRequest());
+      setStatus("Connection succeeded");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Feed add failed");
+      setStatus(error instanceof Error ? error.message : "Connection failed");
     }
   };
 
-  const handleSearch = async () => {
-    if (!query.trim() || !onSearchPackages) {
+  const handleSaveFeed = async () => {
+    if (!canSubmit || !onCreateFeed) {
       return;
     }
 
-    setStatus("Searching");
+    setStatus(isEditing ? "Saving feed" : "Connecting and saving");
     try {
-      await onSearchPackages({
-        query: query.trim(),
-        sourceUrl: activeFeed.url,
-        feedName: activeFeed.isDefault ? undefined : activeFeed.name,
-      });
-      setStatus("Search complete");
+      if (isEditing && editingFeedName && onUpdateFeed) {
+        await onUpdateFeed(editingFeedName, buildRequest());
+      } else {
+        await onCreateFeed(buildRequest());
+      }
+      setStatus(isEditing ? "Feed updated" : "Feed connected and saved");
+      resetForm();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Search failed");
-    }
-  };
-
-  const handleAddPackage = async (packageInfo: NugetPackage) => {
-    if (!workspace || !onAddPackageSource) {
-      return;
-    }
-
-    setStatus("Restoring package");
-    try {
-      await onAddPackageSource({
-        packageId: packageInfo.packageId,
-        version: packageInfo.version,
-        sourceUrl: activeFeed.url,
-        feedName: activeFeed.isDefault ? undefined : activeFeed.name,
-      });
-      setStatus("Package source added");
-    } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : "Package restore failed",
-      );
+      setStatus(error instanceof Error ? error.message : "Feed save failed");
     }
   };
 
   return (
-    <div className="navigation-sidebar__workspace-content">
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="nuget-sources-title"
-      >
-        <div
-          className="navigation-sidebar__section-title"
-          id="nuget-sources-title"
-        >
-          Package Sources
+    <section className="feed-manager" aria-labelledby="feed-manager-title">
+      <header className="feed-manager__header">
+        <div>
+          <span>NuGet</span>
+          <h2 id="feed-manager-title">Package feeds</h2>
+          <p>Configure package registries used by NuGet workspace sources.</p>
         </div>
-        <label className="navigation-sidebar__select-label">
-          <span>Active source</span>
-          <select
-            value={activeFeed.name}
-            onChange={(event) => setActiveFeedName(event.target.value)}
-          >
-            {availableFeeds.map((feed) => (
-              <option key={feed.name} value={feed.name}>
-                {feed.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="navigation-sidebar__row">
-          <span className="navigation-sidebar__feed-dot" />
-          <span>{activeFeed.url}</span>
-        </div>
-        <button
-          className="navigation-sidebar__command"
-          onClick={() => setIsFeedDialogOpen(true)}
-          type="button"
-        >
-          Add Feed
-        </button>
-      </section>
+      </header>
 
-      {isFeedDialogOpen && (
-        <div
-          className="navigation-sidebar__dialog-backdrop"
-          role="presentation"
-        >
-          <div
-            aria-labelledby="nuget-add-feed-title"
-            aria-modal="true"
-            className="navigation-sidebar__dialog"
-            role="dialog"
-          >
-            <div className="navigation-sidebar__dialog-header">
-              <div
-                className="navigation-sidebar__section-title"
-                id="nuget-add-feed-title"
-              >
-                Add Feed
-              </div>
-              <button
-                aria-label="Close add feed"
-                className="navigation-sidebar__mini-command"
-                onClick={() => setIsFeedDialogOpen(false)}
-                type="button"
-              >
-                Close
-              </button>
-            </div>
-            <label className="navigation-sidebar__select-label">
+      <div className="feed-manager__content">
+        <section className="feed-manager__panel" aria-labelledby="feed-form-title">
+          <div>
+            <h3 id="feed-form-title">{isEditing ? "Edit feed" : "New feed"}</h3>
+            <p>{isEditing ? "Update a saved feed connection." : "Test a registry before saving it."}</p>
+          </div>
+          <div className="feed-manager__form">
+            <label>
               <span>Name</span>
               <input
+                aria-label="Feed name"
                 value={feedName}
                 onChange={(event) => setFeedName(event.target.value)}
                 placeholder="github"
               />
             </label>
-            <label className="navigation-sidebar__select-label">
+            <label>
               <span>URL</span>
               <input
+                aria-label="Feed URL"
                 value={feedUrl}
                 onChange={(event) => setFeedUrl(event.target.value)}
-                placeholder="https://..."
+                placeholder="https://nuget.pkg.github.com/org/index.json"
               />
             </label>
-            <label className="navigation-sidebar__select-label">
+            <label>
               <span>Username</span>
               <input
+                aria-label="Feed username"
                 value={feedUsername}
                 onChange={(event) => setFeedUsername(event.target.value)}
                 placeholder="Optional"
               />
             </label>
-            <label className="navigation-sidebar__select-label">
+            <label>
               <span>Token</span>
               <input
+                aria-label="Feed token"
                 value={feedPassword}
                 onChange={(event) => setFeedPassword(event.target.value)}
-                placeholder="Optional"
+                placeholder={isEditing ? "Leave blank to clear credentials" : "Optional"}
                 type="password"
               />
             </label>
+          </div>
+          <div className="feed-manager__actions">
             <button
-              className="navigation-sidebar__command"
-              disabled={!feedName.trim() || !feedUrl.trim()}
-              onClick={handleCreateFeed}
+              className="feed-manager__ghost-button"
+              disabled={!canSubmit || !onTestFeed}
+              onClick={handleTestFeed}
               type="button"
             >
-              Save Feed
+              Test connection
             </button>
+            <button
+              className="feed-manager__primary-button"
+              disabled={!canSubmit || !onCreateFeed}
+              onClick={handleSaveFeed}
+              type="button"
+            >
+              {isEditing ? "Save changes" : "Connect and save"}
+            </button>
+            {isEditing && (
+              <button className="feed-manager__ghost-button" onClick={resetForm} type="button">
+                Cancel edit
+              </button>
+            )}
           </div>
-        </div>
-      )}
+          <div className="feed-manager__status" role="status">{status}</div>
+        </section>
 
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="nuget-search-title"
-      >
-        <div
-          className="navigation-sidebar__section-title"
-          id="nuget-search-title"
-        >
-          Registry Search
-        </div>
-        <label className="navigation-sidebar__select-label">
-          <span>Package ID</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Orleans package"
-          />
-        </label>
-        <button
-          className="navigation-sidebar__command"
-          disabled={!query.trim()}
-          onClick={handleSearch}
-          type="button"
-        >
-          Search Packages
-        </button>
-      </section>
-
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="nuget-results-title"
-      >
-        <div
-          className="navigation-sidebar__section-title"
-          id="nuget-results-title"
-        >
-          Results
-        </div>
-        {packages.length === 0 ? (
-          <div className="navigation-sidebar__empty">No packages loaded</div>
-        ) : (
-          <ul
-            className="navigation-sidebar__packages"
-            aria-label="NuGet packages"
-          >
-            {packages.map((packageInfo) => (
-              <li
-                key={`${packageInfo.packageId}:${packageInfo.version}`}
-                className="navigation-sidebar__package"
-              >
-                <button
-                  aria-label={`${packageInfo.packageId} ${packageInfo.version}`}
-                  className="navigation-sidebar__package-button"
-                  disabled={!workspace}
-                  onClick={() => void handleAddPackage(packageInfo)}
-                  title={`Add ${packageInfo.packageId} ${packageInfo.version}`}
-                  type="button"
-                >
-                  <span
-                    className="navigation-sidebar__package-icon"
-                    aria-hidden="true"
-                  />
-                  <span className="navigation-sidebar__package-main">
-                    <span className="navigation-sidebar__package-name">
-                      {packageInfo.packageId}
-                    </span>
-                    <span className="navigation-sidebar__package-version">
-                      {packageInfo.version}
-                    </span>
-                  </span>
+        <section className="feed-manager__panel" aria-labelledby="configured-feeds-title">
+          <div>
+            <h3 id="configured-feeds-title">Configured feeds</h3>
+            <p>Default nuget.org is always available. Saved feeds appear below.</p>
+          </div>
+          <ul className="feed-manager__feeds" aria-label="Configured feeds">
+            <li className="feed-manager__feed-card" data-default="true">
+              <div>
+                <strong>{defaultNugetFeed.name}</strong>
+                <span>{defaultNugetFeed.url}</span>
+              </div>
+              <small>Default</small>
+            </li>
+            {editableFeeds.map((feed) => (
+              <li className="feed-manager__feed-card" key={feed.name}>
+                <div>
+                  <strong>{feed.name}</strong>
+                  <span>{feed.url}</span>
+                </div>
+                <small>{feed.hasCredentials ? "Authenticated" : "Public"}</small>
+                <button className="feed-manager__ghost-button" onClick={() => editFeed(feed)} type="button">
+                  Edit
                 </button>
-                {packageInfo.description && (
-                  <div className="navigation-sidebar__package-description">
-                    {packageInfo.description}
-                  </div>
-                )}
               </li>
             ))}
           </ul>
+          {editableFeeds.length === 0 ? (
+            <div className="feed-manager__empty">
+              <strong>No saved feeds yet</strong>
+              <span>Add a private or corporate NuGet feed, test it, then save it for workspace sources.</span>
+            </div>
+        ) : (
+            <div className="feed-manager__hint">
+              Use Edit to rotate tokens or update feed endpoints.
+            </div>
         )}
-        <div className="navigation-sidebar__empty" role="status">
-          {status}
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
+    </section>
   );
 }
 

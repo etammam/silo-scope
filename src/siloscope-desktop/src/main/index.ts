@@ -254,6 +254,62 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
 
         return { feed: mapNugetFeed(result.Value) };
       },
+      testNugetFeed: async ({
+        name,
+        url,
+        username,
+        password,
+        isPasswordClearText,
+      }) => {
+        const result = await requestSidecar<FluentResult<null>>(
+          "TestNugetFeedAsync",
+          [
+            {
+              Name: name,
+              Url: url,
+              Username: username ?? null,
+              Password: password ?? null,
+              IsPasswordClearText: isPasswordClearText ?? true,
+            },
+          ],
+          "TestNugetFeed",
+        );
+
+        if (!result.IsSuccess) {
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to test NuGet feed.",
+          );
+        }
+
+        return { success: true };
+      },
+      updateNugetFeed: async ({
+        name,
+        feed: { name: feedName, url, username, password, isPasswordClearText },
+      }) => {
+        const result = await requestSidecar<FluentResult<BackendNugetFeed>>(
+          "UpdateNugetFeedAsync",
+          [
+            name,
+            {
+              Name: feedName,
+              Url: url,
+              Username: username ?? null,
+              Password: password ?? null,
+              IsPasswordClearText: isPasswordClearText ?? true,
+            },
+          ],
+          "UpdateNugetFeed",
+        );
+
+        if (!result.IsSuccess || !result.Value) {
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to update NuGet feed.",
+          );
+        }
+
+        return { feed: mapNugetFeed(result.Value) };
+      },
       searchNugetPackages: async ({ query, sourceUrl, feedName, take }) => {
         const result = await requestSidecar<
           FluentResult<BackendNugetPackage[]>

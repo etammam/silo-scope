@@ -4,11 +4,18 @@ import { MonacoEditor } from "./MonacoEditor";
 
 export type ResponsePaneTab = "response" | "timing";
 
+type InvocationHistoryEntry = {
+  timestamp: number;
+  isSuccess: boolean;
+  timing: { totalMs: number; executionMs: number; serializationMs: number } | null;
+};
+
 type ResponseTelemetryPaneProps = {
   activeTab: ResponsePaneTab;
   onTabChange: (tab: ResponsePaneTab) => void;
   result: InvocationResult | null;
   theme: "dark" | "light" | "vscode-dark" | "vscode-light";
+  invocationHistory?: InvocationHistoryEntry[];
 };
 
 export function ResponseTelemetryPane({
@@ -16,6 +23,7 @@ export function ResponseTelemetryPane({
   onTabChange,
   result,
   theme,
+  invocationHistory = [],
 }: ResponseTelemetryPaneProps) {
   const output = useMemo(() => formatResult(result), [result]);
 
@@ -79,11 +87,10 @@ export function ResponseTelemetryPane({
           id="response-timing-panel"
           role="tabpanel"
         >
-          <div className="response-pane__section-header">
-            <span>Breakdown</span>
-            <span>{formatTotal(result?.timing)}</span>
-          </div>
-          <TimingBars timing={result?.timing ?? null} />
+          <TimingDashboard
+            currentTiming={result?.timing ?? null}
+            history={invocationHistory}
+          />
         </div>
       )}
 
@@ -141,6 +148,115 @@ function TimingBars({ timing }: { timing: InvocationTiming | null }) {
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+function TimingDashboard({
+  currentTiming,
+  history,
+}: {
+  currentTiming: InvocationTiming | null;
+  history: InvocationHistoryEntry[];
+}) {
+  const totalCalls = history.length;
+  const successCount = history.filter((h) => h.isSuccess).length;
+  const failureCount = totalCalls - successCount;
+  const successRate = totalCalls > 0 ? (successCount / totalCalls) * 100 : 0;
+
+  const avgTotal =
+    totalCalls > 0
+      ? history.reduce((sum, h) => sum + (h.timing?.totalMs ?? 0), 0) / totalCalls
+      : 0;
+  const minTotal =
+    totalCalls > 0
+      ? Math.min(...history.filter((h) => h.timing).map((h) => h.timing!.totalMs))
+      : 0;
+  const maxTotal =
+    totalCalls > 0
+      ? Math.max(...history.filter((h) => h.timing).map((h) => h.timing!.totalMs))
+      : 0;
+
+  return (
+    <div className="timing-dashboard">
+      <div className="timing-dashboard__header">
+        <span>Call History</span>
+      </div>
+
+      <div className="timing-dashboard__stats">
+        <div className="timing-dashboard__stat">
+          <span className="timing-dashboard__stat-label">Total Calls</span>
+          <span className="timing-dashboard__stat-value">{totalCalls}</span>
+        </div>
+        <div className="timing-dashboard__stat timing-dashboard__stat--success">
+          <span className="timing-dashboard__stat-label">Success</span>
+          <span className="timing-dashboard__stat-value">{successCount}</span>
+        </div>
+        <div className="timing-dashboard__stat timing-dashboard__stat--error">
+          <span className="timing-dashboard__stat-label">Failed</span>
+          <span className="timing-dashboard__stat-value">{failureCount}</span>
+        </div>
+        <div className="timing-dashboard__stat">
+          <span className="timing-dashboard__stat-label">Success Rate</span>
+          <span className="timing-dashboard__stat-value">{successRate.toFixed(1)}%</span>
+        </div>
+      </div>
+
+      {totalCalls > 0 && (
+        <>
+          <div className="timing-dashboard__header timing-dashboard__header--secondary">
+            <span>Performance</span>
+          </div>
+
+          <div className="timing-dashboard__stats timing-dashboard__stats--secondary">
+            <div className="timing-dashboard__stat">
+              <span className="timing-dashboard__stat-label">Avg</span>
+              <span className="timing-dashboard__stat-value">{formatMs(avgTotal)}</span>
+            </div>
+            <div className="timing-dashboard__stat">
+              <span className="timing-dashboard__stat-label">Min</span>
+              <span className="timing-dashboard__stat-value">{formatMs(minTotal)}</span>
+            </div>
+            <div className="timing-dashboard__stat">
+              <span className="timing-dashboard__stat-label">Max</span>
+              <span className="timing-dashboard__stat-value">{formatMs(maxTotal)}</span>
+            </div>
+          </div>
+
+          <div className="timing-dashboard__timeline">
+            <div className="timing-dashboard__timeline-label">Timeline (last {Math.min(20, totalCalls)} calls)</div>
+            <div className="timing-dashboard__timeline-bars">
+              {history.slice(0, 20).map((entry, index) => (
+                <div
+                  key={index}
+                  className={`timing-dashboard__timeline-bar ${entry.isSuccess ? "timing-dashboard__timeline-bar--success" : "timing-dashboard__timeline-bar--error"}`}
+                  style={{
+                    height: entry.timing
+                      ? `${Math.min(100, (entry.timing.totalMs / maxTotal) * 100)}%`
+                      : "0%",
+                  }}
+                  title={`${entry.isSuccess ? "Success" : "Failed"}: ${entry.timing ? formatMs(entry.timing.totalMs) : "N/A"}`}
+                />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {currentTiming && (
+        <>
+          <div className="timing-dashboard__header timing-dashboard__header--secondary">
+            <span>Current Call Breakdown</span>
+          </div>
+          <TimingBars timing={currentTiming} />
+        </>
+      )}
+
+      {totalCalls === 0 && !currentTiming && (
+        <div className="timing-dashboard__empty">
+          No invocations yet. Invoke a grain to see timing data.
+        </div>
+      )}
     </div>
   );
 }

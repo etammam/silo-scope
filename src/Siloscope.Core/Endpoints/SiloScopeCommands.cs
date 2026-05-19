@@ -468,38 +468,73 @@ public class SiloScopeCommands : ISiloScopeCommands
         CancellationToken cancellationToken = default
     )
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
+        var feedResult = CreateNugetFeedSource(request);
+        if (feedResult.IsFailed)
         {
-            return Result.Fail<NugetFeedInfo>("Feed name is required.");
+            return Result.Fail<NugetFeedInfo>(feedResult.Errors.Select(e => e.Message));
         }
 
-        if (string.IsNullOrWhiteSpace(request.Url))
-        {
-            return Result.Fail<NugetFeedInfo>("Feed URL is required.");
-        }
-
-        var credentials =
-            !string.IsNullOrWhiteSpace(request.Username)
-            && !string.IsNullOrWhiteSpace(request.Password)
-                ? new NugetFeedSourceAuthentication(
-                    request.Username,
-                    request.Password,
-                    request.IsPasswordClearText
-                )
-                : null;
-        var result = await _nugetManager.CreateAsync(
-            new NugetFeedSource(request.Url, request.Name, true, credentials),
-            cancellationToken
-        );
+        var result = await _nugetManager.CreateAsync(feedResult.Value, cancellationToken);
 
         if (result.IsFailed)
         {
             return Result.Fail<NugetFeedInfo>(result.Errors.Select(e => e.Message));
         }
 
-        return Result.Ok(
-            new NugetFeedInfo(request.Name, request.Url, credentials is not null, false)
-        );
+        return Result.Ok(ToNugetFeedInfo(feedResult.Value));
+    }
+
+    public Task<Result> TestNugetFeedAsync(
+        CreateNugetFeedRequest request,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var feedResult = CreateNugetFeedSource(request);
+        if (feedResult.IsFailed)
+        {
+            return Task.FromResult(Result.Fail(feedResult.Errors.Select(e => e.Message)));
+        }
+
+        return Task.FromResult(_nugetManager.Test(feedResult.Value));
+    }
+
+    public async Task<Result<NugetFeedInfo>> UpdateNugetFeedAsync(
+        string name,
+        CreateNugetFeedRequest request,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Result.Fail<NugetFeedInfo>("Feed name is required.");
+        }
+
+        var existingResult = _nugetManager.Get(name);
+        if (existingResult.IsFailed)
+        {
+            return Result.Fail<NugetFeedInfo>(existingResult.Errors.Select(e => e.Message));
+        }
+
+        var feedResult = CreateNugetFeedSource(request);
+        if (feedResult.IsFailed)
+        {
+            return Result.Fail<NugetFeedInfo>(feedResult.Errors.Select(e => e.Message));
+        }
+
+        var existing = existingResult.Value;
+        existing.Name = feedResult.Value.Name;
+        existing.Url = feedResult.Value.SourceUrl;
+        existing.Username = feedResult.Value.Credentials?.Username;
+        existing.Password = feedResult.Value.Credentials?.Password;
+        existing.IsPasswordClearText = feedResult.Value.Credentials?.IsPasswordClearText;
+
+        var result = await _nugetManager.UpdateAsync(existing, cancellationToken);
+        if (result.IsFailed)
+        {
+            return Result.Fail<NugetFeedInfo>(result.Errors.Select(e => e.Message));
+        }
+
+        return Result.Ok(ToNugetFeedInfo(feedResult.Value));
     }
 
     public async Task<Result<IReadOnlyList<NugetPackageInfo>>> SearchNugetPackagesAsync(
@@ -613,6 +648,34 @@ public class SiloScopeCommands : ISiloScopeCommands
 
         return Result.Ok(ToWorkspaceInfo(_currentWorkspace));
     }
+
+    private static Result<NugetFeedSource> CreateNugetFeedSource(CreateNugetFeedRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return Result.Fail<NugetFeedSource>("Feed name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Url))
+        {
+            return Result.Fail<NugetFeedSource>("Feed URL is required.");
+        }
+
+        var credentials =
+            !string.IsNullOrWhiteSpace(request.Username)
+            && !string.IsNullOrWhiteSpace(request.Password)
+                ? new NugetFeedSourceAuthentication(
+                    request.Username,
+                    request.Password,
+                    request.IsPasswordClearText
+                )
+                : null;
+
+        return Result.Ok(new NugetFeedSource(request.Url, request.Name, true, credentials));
+    }
+
+    private static NugetFeedInfo ToNugetFeedInfo(NugetFeedSource feed) =>
+        new(feed.Name, feed.SourceUrl, feed.Credentials is not null, false);
 
     private static SourceOwnedGrainCatalog BuildSourceOwnedCatalog(
         Components.Workspace.Workspace workspace,

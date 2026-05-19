@@ -20,6 +20,7 @@ public interface INugetConnectionManager
         NugetFeedSource feed,
         CancellationToken cancellationToken = default
     );
+    Result Test(NugetFeedSource feed);
 
     Result<Feed> Get(string name);
     Result<IReadOnlyList<Feed>> List();
@@ -62,11 +63,23 @@ public class NugetConnectionManager : INugetConnectionManager
         WriteIndented = true,
     };
 
+    private static string GetStableAppDataPath()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        return Path.Combine(appData, "Siloscope", "feeds.json");
+    }
+
     public NugetConnectionManager(ILogger<NugetConnectionManager> logger)
     {
-        Init("app-data", "feeds.json");
-        _sourcePath = Path.Combine(AppContext.BaseDirectory, "app-data", "feeds.json");
         _logger = logger;
+        var stablePath = GetStableAppDataPath();
+        _logger.LogInformation(
+            "NugetConnectionManager initializing. Stable app data path: {Path}",
+            stablePath
+        );
+        Init(Path.GetDirectoryName(stablePath)!, Path.GetFileName(stablePath));
+        _sourcePath = stablePath;
+        _logger.LogInformation("Feeds loaded: {Count} feeds", _feeds.Count);
     }
 
     public async ValueTask<Result> CreateAsync(
@@ -135,15 +148,18 @@ public class NugetConnectionManager : INugetConnectionManager
         }
     }
 
-    private void Init(string folder, string fileName)
+    public Result Test(NugetFeedSource feed) => ValidateConnection(feed);
+
+    private void Init(string fullPath, string fileName)
     {
         try
         {
-            var location = Path.Combine(AppContext.BaseDirectory, folder);
-            if (!Directory.Exists(location))
-                Directory.CreateDirectory(location);
+            _logger.LogInformation("Init: Using directory at {Location}", fullPath);
+            if (!Directory.Exists(fullPath))
+                Directory.CreateDirectory(fullPath);
 
-            var filePath = Path.Combine(location, fileName);
+            var filePath = Path.Combine(fullPath, fileName);
+            _logger.LogInformation("Init: Using file path {FilePath}", filePath);
             if (!File.Exists(filePath))
             {
                 using var _ = File.Create(filePath);
@@ -159,21 +175,29 @@ public class NugetConnectionManager : INugetConnectionManager
                 _jsonSerializerOptions
             )!;
 
+            _logger.LogInformation("Init: Loaded {Count} feeds from file", content.Count);
             _feeds.AddRange(content);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Init: Failed to initialize feed storage");
             throw;
         }
     }
 
     private async Task WriteAsync(CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation(
+            "WriteAsync: Writing {Count} feeds to {Path}",
+            _feeds.Count,
+            _sourcePath
+        );
         await File.WriteAllTextAsync(
             _sourcePath,
             JsonSerializer.Serialize(_feeds, _jsonSerializerOptions),
             cancellationToken
         );
+        _logger.LogInformation("WriteAsync: Successfully saved feeds");
     }
 
     public Result<Feed> Get(string name)

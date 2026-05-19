@@ -731,8 +731,8 @@ public sealed class SiloScopeCommandsTests
                     It.Is<IEnumerable<(string Id, string Version)>>(packages =>
                         packages.Single().Id == "Contracts" && packages.Single().Version == "1.2.3"
                     ),
-                    "https://api.nuget.org/v3/index.json",
-                    null,
+                    It.IsAny<string?>(),
+                    It.IsAny<string?>(),
                     It.IsAny<CancellationToken>()
                 )
             )

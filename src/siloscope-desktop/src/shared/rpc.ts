@@ -31,6 +31,8 @@ export type SiloScopeRPC = {
       getSourceCatalog: { params: { workspaceId: string }; response: { sourceCatalog: SourceOwnedCatalog } };
       listNugetFeeds: { params: void; response: { feeds: NugetFeed[] } };
       createNugetFeed: { params: CreateNugetFeedRequest; response: { feed: NugetFeed } };
+      testNugetFeed: { params: CreateNugetFeedRequest; response: { success: boolean } };
+      updateNugetFeed: { params: { name: string; feed: CreateNugetFeedRequest }; response: { feed: NugetFeed } };
       searchNugetPackages: {
         params: { query: string; sourceUrl?: string; feedName?: string; take?: number };
         response: { packages: NugetPackage[] };

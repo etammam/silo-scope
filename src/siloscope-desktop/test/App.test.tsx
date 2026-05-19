@@ -16,6 +16,8 @@ const electrobunMock = vi.hoisted(() => {
     getSourceCatalog: vi.fn(),
     listNugetFeeds: vi.fn(),
     createNugetFeed: vi.fn(),
+    testNugetFeed: vi.fn(),
+    updateNugetFeed: vi.fn(),
     searchNugetPackages: vi.fn(),
     addNugetPackageSource: vi.fn(),
     invokeGrain: vi.fn(),
@@ -68,6 +70,8 @@ describe("App shell", () => {
     electrobunMock.request.getSourceCatalog.mockClear();
     electrobunMock.request.listNugetFeeds.mockClear();
     electrobunMock.request.createNugetFeed.mockClear();
+    electrobunMock.request.testNugetFeed.mockClear();
+    electrobunMock.request.updateNugetFeed.mockClear();
     electrobunMock.request.searchNugetPackages.mockClear();
     electrobunMock.request.addNugetPackageSource.mockClear();
     electrobunMock.request.invokeGrain.mockClear();
@@ -115,6 +119,15 @@ describe("App shell", () => {
     });
     electrobunMock.request.searchNugetPackages.mockResolvedValue({ packages: [] });
     electrobunMock.request.createNugetFeed.mockResolvedValue({
+      feed: {
+        name: "private",
+        url: "https://nuget.example/v3/index.json",
+        hasCredentials: true,
+        isDefault: false,
+      },
+    });
+    electrobunMock.request.testNugetFeed.mockResolvedValue({ success: true });
+    electrobunMock.request.updateNugetFeed.mockResolvedValue({
       feed: {
         name: "private",
         url: "https://nuget.example/v3/index.json",
@@ -440,16 +453,7 @@ describe("App shell", () => {
     expect(useAppStore.getState().selectedFunctionId).toBe("function-1");
   });
 
-  it("wires NuGet feed search and package restore through the desktop backend", async () => {
-    electrobunMock.request.searchNugetPackages.mockResolvedValue({
-      packages: [
-        {
-          packageId: "SiloScope.Contracts",
-          version: "1.0.0",
-          description: "Contracts",
-        },
-      ],
-    });
+  it("opens package feeds as a full-page manager and tests then saves a feed", async () => {
     useAppStore.setState({
       workspace: {
         id: "workspace-1",
@@ -462,25 +466,37 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "NuGet" }));
-    await screen.findByLabelText("Active source");
-    fireEvent.change(screen.getByLabelText("Package ID"), {
-      target: { value: "SiloScope" },
+    fireEvent.click(screen.getByRole("button", { name: "Package feeds" }));
+    await screen.findByRole("heading", { name: "Package feeds" });
+    fireEvent.change(screen.getByLabelText("Feed name"), {
+      target: { value: "private" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Search Packages" }));
-    fireEvent.click(await screen.findByRole("button", { name: "SiloScope.Contracts 1.0.0" }));
+    fireEvent.change(screen.getByLabelText("Feed URL"), {
+      target: { value: "https://nuget.example/v3/index.json" },
+    });
+    fireEvent.change(screen.getByLabelText("Feed username"), {
+      target: { value: "user" },
+    });
+    fireEvent.change(screen.getByLabelText("Feed token"), {
+      target: { value: "token" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    await screen.findByText("Connection succeeded");
+    fireEvent.click(screen.getByRole("button", { name: "Connect and save" }));
 
-    expect(electrobunMock.request.searchNugetPackages).toHaveBeenCalledWith({
-      query: "SiloScope",
-      sourceUrl: "https://api.nuget.org/v3/index.json",
-      feedName: undefined,
-      take: 20,
+    expect(electrobunMock.request.testNugetFeed).toHaveBeenCalledWith({
+      name: "private",
+      url: "https://nuget.example/v3/index.json",
+      username: "user",
+      password: "token",
+      isPasswordClearText: true,
     });
-    expect(electrobunMock.request.addNugetPackageSource).toHaveBeenCalledWith({
-      packageId: "SiloScope.Contracts",
-      version: "1.0.0",
-      sourceUrl: "https://api.nuget.org/v3/index.json",
-      feedName: undefined,
+    expect(electrobunMock.request.createNugetFeed).toHaveBeenCalledWith({
+      name: "private",
+      url: "https://nuget.example/v3/index.json",
+      username: "user",
+      password: "token",
+      isPasswordClearText: true,
     });
   });
 

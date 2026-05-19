@@ -79,6 +79,19 @@ public interface ISiloScopeCommands
         CancellationToken cancellationToken = default
     );
 
+    [JsonRpcMethod("TestNugetFeedAsync")]
+    Task<Result> TestNugetFeedAsync(
+        CreateNugetFeedRequest request,
+        CancellationToken cancellationToken = default
+    );
+
+    [JsonRpcMethod("UpdateNugetFeedAsync")]
+    Task<Result<NugetFeedInfo>> UpdateNugetFeedAsync(
+        string name,
+        CreateNugetFeedRequest request,
+        CancellationToken cancellationToken = default
+    );
+
     [JsonRpcMethod("SearchNugetPackagesAsync")]
     Task<Result<IReadOnlyList<NugetPackageInfo>>> SearchNugetPackagesAsync(
         string query,

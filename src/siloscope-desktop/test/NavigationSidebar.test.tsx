@@ -43,7 +43,7 @@ describe("NavigationSidebar", () => {
 
     expect(screen.getByText("Sources")).toBeInTheDocument();
     expect(screen.getByText("No workspace loaded")).toBeInTheDocument();
-    expect(screen.getByText("Disconnected")).toBeInTheDocument();
+    expect(screen.queryByText("Disconnected")).not.toBeInTheDocument();
   });
 
   it("renders source-owned function catalog and selectable method leaves", () => {

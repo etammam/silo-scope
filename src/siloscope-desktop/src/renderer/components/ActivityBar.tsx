@@ -22,7 +22,10 @@ type ActivityBarProps = {
   onViewChange: (view: ActivityView) => void;
 };
 
-export function ActivityBar({ activeView, onViewChange }: ActivityBarProps) {
+export function ActivityBar({
+  activeView,
+  onViewChange,
+}: ActivityBarProps) {
   return (
     <nav className="activity-bar" aria-label="Primary views">
       <div className="activity-bar__items" role="list">

@@ -11,19 +11,27 @@ describe("ActivityBar", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "NuGet" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Package feeds" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
     expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
   });
 
-  it("notifies when a different view is selected", () => {
+  it("opens package feeds without changing the active view", () => {
     const onViewChange = vi.fn();
-    render(<ActivityBar activeView="workspace" onViewChange={onViewChange} />);
+    const onOpenNugetRegistry = vi.fn();
+    render(
+      <ActivityBar
+        activeView="workspace"
+        onOpenNugetRegistry={onOpenNugetRegistry}
+        onViewChange={onViewChange}
+      />,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "NuGet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Package feeds" }));
 
-    expect(onViewChange).toHaveBeenNthCalledWith(1, "nuget");
+    expect(onOpenNugetRegistry).toHaveBeenCalledTimes(1);
+    expect(onViewChange).not.toHaveBeenCalled();
   });
 });
