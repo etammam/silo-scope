@@ -20,7 +20,12 @@ public class JsonRpcServerTests
             throw new InvalidOperationException("Could not find repository root");
         }
 
-        var coreDir = Path.Combine(repoRoot, "src", "Siloscope.Core", "bin", "Debug", "net10.0");
+        var config = testDir.Contains(
+            $"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}"
+        )
+            ? "Release"
+            : "Debug";
+        var coreDir = Path.Combine(repoRoot, "src", "Siloscope.Core", "bin", config, "net10.0");
 
         if (OperatingSystem.IsWindows())
         {
