@@ -171,7 +171,7 @@ describe("NavigationSidebar", () => {
     expect(screen.queryByRole("button", { name: "GetItem()" })).not.toBeInTheDocument();
   });
 
-  it("renders NuGet registry manager when NuGet view is active", () => {
+  it("renders NuGet workspace navigation when NuGet view is active", () => {
     render(
       <NavigationSidebar
         activeView="nuget"
@@ -186,62 +186,8 @@ describe("NavigationSidebar", () => {
     );
 
     expect(screen.getByText("NuGet")).toBeInTheDocument();
-    expect(screen.getByLabelText("Active source")).toHaveValue("nuget.org");
-    expect(screen.getByLabelText("Package ID")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Search Packages" })).toBeInTheDocument();
-  });
-
-  it("searches NuGet packages and adds a package source", async () => {
-    const onSearchPackages = vi.fn().mockResolvedValue(undefined);
-    const onAddPackageSource = vi.fn().mockResolvedValue(undefined);
-
-    render(
-      <NavigationSidebar
-        activeView="nuget"
-        grains={[]}
-        isConnected={false}
-        nugetFeeds={[
-          {
-            name: "nuget.org",
-            url: "https://api.nuget.org/v3/index.json",
-            hasCredentials: false,
-            isDefault: true,
-          },
-        ]}
-        nugetPackages={[
-          {
-            packageId: "SiloScope.Contracts",
-            version: "1.0.0",
-            description: "Contracts",
-          },
-        ]}
-        onAddNugetPackageSource={onAddPackageSource}
-        onSearchNugetPackages={onSearchPackages}
-        onSelectGrain={vi.fn()}
-        onThemeChange={vi.fn()}
-        selectedGrain={null}
-        theme="dark"
-        workspace={workspace}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Package ID"), {
-      target: { value: "SiloScope" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Search Packages" }));
-    fireEvent.click(screen.getByRole("button", { name: "SiloScope.Contracts 1.0.0" }));
-
-    expect(onSearchPackages).toHaveBeenCalledWith({
-      query: "SiloScope",
-      sourceUrl: "https://api.nuget.org/v3/index.json",
-      feedName: undefined,
-    });
-    expect(onAddPackageSource).toHaveBeenCalledWith({
-      packageId: "SiloScope.Contracts",
-      version: "1.0.0",
-      sourceUrl: "https://api.nuget.org/v3/index.json",
-      feedName: undefined,
-    });
+    expect(screen.getByText("Sources")).toBeInTheDocument();
+    expect(screen.getByText("No workspace loaded")).toBeInTheDocument();
   });
 
   it("renders system settings when settings view is active", () => {
