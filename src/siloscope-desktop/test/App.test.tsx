@@ -466,7 +466,7 @@ describe("App shell", () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Package feeds" }));
+    fireEvent.click(screen.getByRole("button", { name: "NuGet" }));
     await screen.findByRole("heading", { name: "Package feeds" });
     fireEvent.change(screen.getByLabelText("Feed name"), {
       target: { value: "private" },
