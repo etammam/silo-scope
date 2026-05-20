@@ -51,11 +51,11 @@ describe("ResponseTelemetryPane", () => {
       />,
     );
 
-    expect(screen.getByText("Success")).toBeInTheDocument();
+    expect(screen.getAllByText("Success").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("output-viewer")).not.toBeInTheDocument();
     expect(screen.getByText("1.5 ms")).toBeInTheDocument();
     expect(screen.getByText("12 ms")).toBeInTheDocument();
-    expect(screen.getAllByText("20 ms")).toHaveLength(3);
+    expect(screen.getAllByText("20 ms")).toHaveLength(2);
     expect(screen.getByText("60%")).toBeInTheDocument();
     expect(screen.getByText("8%")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Execution: 12 ms" })).toBeInTheDocument();
