@@ -281,10 +281,6 @@ function formatResult(result: InvocationResult | null): string {
   return "Empty result";
 }
 
-function formatTotal(timing: InvocationTiming | undefined): string {
-  return timing ? formatMs(timing.totalMs) : "No run";
-}
-
 function formatMs(value: number): string {
   return `${value.toFixed(value < 10 && value > 0 ? 1 : 0)} ms`;
 }

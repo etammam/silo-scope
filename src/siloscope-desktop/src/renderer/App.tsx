@@ -1404,39 +1404,6 @@ async function updateNugetFeed(
   ]);
 }
 
-async function searchNugetPackages(request: {
-  query: string;
-  sourceUrl?: string;
-  feedName?: string;
-}) {
-  const response = await electroview.rpc!.request.searchNugetPackages({
-    ...request,
-    take: 20,
-  });
-  useAppStore.getState().setNugetPackages(response.packages);
-}
-
-async function addNugetPackageSource(request: {
-  packageId: string;
-  version: string;
-  gateway?: string;
-  sourceUrl?: string;
-  feedName?: string;
-}) {
-  const response =
-    await electroview.rpc!.request.addNugetPackageSource(request);
-  const store = useAppStore.getState();
-  store.setWorkspace(response.workspace);
-  addWorkspaceToSession(response.workspace);
-  store.setSourceCatalog({ sources: [] });
-  store.setGrains([]);
-  await electroview.rpc!.request.saveWorkspace({
-    workspace: response.workspace,
-    path: undefined,
-  });
-  await refreshWorkspaceCatalog(response.workspace.id);
-}
-
 async function invokeGrain(request: GrainInvocationRequest) {
   try {
     const result = await electroview.rpc!.request.invokeGrain({
