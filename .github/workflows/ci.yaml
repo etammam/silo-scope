@@ -244,5 +244,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: src/siloscope-desktop/artifacts
+          path: |
+            src/siloscope-desktop/build/
+            src/siloscope-desktop/artifacts/
           retention-days: 30
