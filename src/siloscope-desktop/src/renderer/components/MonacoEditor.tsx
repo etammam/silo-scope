@@ -17,6 +17,8 @@ interface MonacoEditorProps {
   readOnly?: boolean;
   language?: "json" | "csharp" | "text" | string;
   theme?: AppTheme;
+  fontFamily?: string;
+  fontSize?: number;
 }
 
 export function MonacoEditor({
@@ -25,6 +27,8 @@ export function MonacoEditor({
   readOnly = false,
   language = "json",
   theme = "dark",
+  fontFamily,
+  fontSize,
 }: MonacoEditorProps) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
 
@@ -95,7 +99,8 @@ export function MonacoEditor({
       options={{
         readOnly,
         minimap: { enabled: false },
-        fontSize: 14,
+        fontSize: fontSize ?? 14,
+        fontFamily: fontFamily,
         lineNumbers: "on",
         lineDecorationsWidth: 8,
         lineNumbersMinChars: 3,

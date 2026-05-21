@@ -1,4 +1,4 @@
-import { Folder, Package } from "lucide-react";
+import { Folder, Package, Settings } from "lucide-react";
 
 export type ActivityView = "workspace" | "nuget" | "settings";
 
@@ -15,6 +15,7 @@ type ActivityBarItem = {
 const activityItems: ActivityBarItem[] = [
   { id: "workspace", label: "Workspace", Icon: Folder },
   { id: "nuget", label: "NuGet", Icon: Package },
+  { id: "settings", label: "Settings", Icon: Settings },
 ];
 
 type ActivityBarProps = {

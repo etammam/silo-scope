@@ -16,6 +16,8 @@ type ResponseTelemetryPaneProps = {
   result: InvocationResult | null;
   theme: "dark" | "light" | "vscode-dark" | "vscode-light";
   invocationHistory?: InvocationHistoryEntry[];
+  fontFamily?: string;
+  fontSize?: number;
 };
 
 export function ResponseTelemetryPane({
@@ -24,6 +26,8 @@ export function ResponseTelemetryPane({
   result,
   theme,
   invocationHistory = [],
+  fontFamily,
+  fontSize,
 }: ResponseTelemetryPaneProps) {
   const output = useMemo(() => formatResult(result), [result]);
 
@@ -66,7 +70,7 @@ export function ResponseTelemetryPane({
                 <span>Output</span>
                 <span>Read-only</span>
               </div>
-              <MonacoEditor value={output} onChange={() => undefined} readOnly theme={theme} />
+              <MonacoEditor value={output} onChange={() => undefined} readOnly theme={theme} fontFamily={fontFamily} fontSize={fontSize} />
             </>
           ) : (
             <div className="response-pane__empty-state">

@@ -13,6 +13,8 @@ interface AppState {
   nugetFeeds: NugetFeed[];
   nugetPackages: NugetPackage[];
   isConnected: boolean;
+  fontFamily: string;
+  fontSize: number;
 
   setWorkspace: (workspace: Workspace | null) => void;
   setGrains: (grains: GrainInterfaceDescriptor[]) => void;
@@ -26,6 +28,8 @@ interface AppState {
   setNugetFeeds: (feeds: NugetFeed[]) => void;
   setNugetPackages: (packages: NugetPackage[]) => void;
   setIsConnected: (connected: boolean) => void;
+  setFontFamily: (fontFamily: string) => void;
+  setFontSize: (fontSize: number) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -40,6 +44,8 @@ export const useAppStore = create<AppState>((set) => ({
   nugetFeeds: [],
   nugetPackages: [],
   isConnected: false,
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+  fontSize: 13,
 
   setWorkspace: (workspace) => set({ workspace, selectedFunctionId: null, selectedGrain: null, selectedMethod: null }),
   setGrains: (grains) => set({ grains }),
@@ -53,4 +59,6 @@ export const useAppStore = create<AppState>((set) => ({
   setNugetFeeds: (nugetFeeds) => set({ nugetFeeds }),
   setNugetPackages: (nugetPackages) => set({ nugetPackages }),
   setIsConnected: (isConnected) => set({ isConnected }),
+  setFontFamily: (fontFamily) => set({ fontFamily }),
+  setFontSize: (fontSize) => set({ fontSize }),
 }));

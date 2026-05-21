@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import type {
   GrainInterfaceDescriptor,
-  LogEntry,
   NugetFeed,
   SourceCatalogInterface,
   SourceCatalogSource,
@@ -21,15 +20,11 @@ const defaultNugetFeed: NugetFeed = {
 
 type NavigationSidebarProps = {
   activeView: ActivityView;
-  theme: "dark" | "light" | "vscode-dark" | "vscode-light";
-  logs?: LogEntry[];
-  onClearLogs?: () => void;
   onConnectCluster?: () => Promise<void>;
   onDisconnectCluster?: () => Promise<void>;
   onDiscoverGrains?: () => Promise<void>;
   onLoadWorkspace?: () => Promise<void>;
   onSaveWorkspace?: () => Promise<void>;
-  onThemeChange: (theme: "dark" | "light" | "vscode-dark" | "vscode-light") => void;
 } & WorkspaceNavigatorProps;
 
 type WorkspaceNavigatorProps = {
@@ -56,8 +51,6 @@ export function NavigationSidebar({
   activeView,
   grains,
   isConnected,
-  logs = [],
-  onClearLogs,
   onConnectCluster,
   onDisconnectCluster,
   onDiscoverGrains,
@@ -70,11 +63,9 @@ export function NavigationSidebar({
   selectedGrain,
   selectedFunctionId,
   sourceCatalog,
-  theme,
   workspace,
   workspaces,
   onSelectGrain,
-  onThemeChange,
 }: NavigationSidebarProps) {
   const title = formatViewTitle(activeView);
 
@@ -87,36 +78,25 @@ export function NavigationSidebar({
         <span>{title}</span>
       </div>
 
-      {activeView !== "settings" && (
-        <WorkspaceNavigator
-          grains={grains}
-          isConnected={isConnected}
-          onConnectCluster={onConnectCluster}
-          onDisconnectCluster={onDisconnectCluster}
-          onDiscoverGrains={onDiscoverGrains}
-          onLoadWorkspace={onLoadWorkspace}
-          onNewWorkspace={onNewWorkspace}
-          onSaveWorkspace={onSaveWorkspace}
-          onSelectWorkspace={onSelectWorkspace}
-          onEditWorkspace={onEditWorkspace}
-          onSelectFunction={onSelectFunction}
-          onSelectGrain={onSelectGrain}
-          selectedFunctionId={selectedFunctionId}
-          selectedGrain={selectedGrain}
-          sourceCatalog={sourceCatalog}
-          workspace={workspace}
-          workspaces={workspaces}
-        />
-      )}
-
-      {activeView === "settings" && (
-        <SystemSettings
-          logs={logs}
-          onClearLogs={onClearLogs}
-          onThemeChange={onThemeChange}
-          theme={theme}
-        />
-      )}
+      <WorkspaceNavigator
+        grains={grains}
+        isConnected={isConnected}
+        onConnectCluster={onConnectCluster}
+        onDisconnectCluster={onDisconnectCluster}
+        onDiscoverGrains={onDiscoverGrains}
+        onLoadWorkspace={onLoadWorkspace}
+        onNewWorkspace={onNewWorkspace}
+        onSaveWorkspace={onSaveWorkspace}
+        onSelectWorkspace={onSelectWorkspace}
+        onEditWorkspace={onEditWorkspace}
+        onSelectFunction={onSelectFunction}
+        onSelectGrain={onSelectGrain}
+        selectedFunctionId={selectedFunctionId}
+        selectedGrain={selectedGrain}
+        sourceCatalog={sourceCatalog}
+        workspace={workspace}
+        workspaces={workspaces}
+      />
     </aside>
   );
 }
@@ -618,149 +598,6 @@ export function NuGetRegistryManager({
       </div>
     </section>
   );
-}
-
-function SystemSettings({
-  logs,
-  onClearLogs,
-  onThemeChange,
-  theme,
-}: {
-  logs: LogEntry[];
-  onClearLogs?: () => void;
-  onThemeChange: (theme: "dark" | "light" | "vscode-dark" | "vscode-light") => void;
-  theme: "dark" | "light" | "vscode-dark" | "vscode-light";
-}) {
-  return (
-    <div className="navigation-sidebar__workspace-content">
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="settings-app-title"
-      >
-        <div
-          className="navigation-sidebar__section-title"
-          id="settings-app-title"
-        >
-          Application
-        </div>
-        <label className="navigation-sidebar__check-row">
-          <input type="checkbox" defaultChecked />
-          <span>Use native titlebar</span>
-        </label>
-        <label className="navigation-sidebar__check-row">
-          <input type="checkbox" defaultChecked />
-          <span>Disable text selection</span>
-        </label>
-      </section>
-
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="settings-core-title"
-      >
-        <div
-          className="navigation-sidebar__section-title"
-          id="settings-core-title"
-        >
-          Core Sidecar
-        </div>
-        <div className="navigation-sidebar__row">
-          <span className="navigation-sidebar__file-icon" />
-          <span>Auto discover executable</span>
-        </div>
-        <button className="navigation-sidebar__command" type="button">
-          Choose Executable
-        </button>
-      </section>
-
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="settings-theme-title"
-      >
-        <div
-          className="navigation-sidebar__section-title"
-          id="settings-theme-title"
-        >
-          Theme
-        </div>
-        <label className="navigation-sidebar__select-label">
-<span>Workbench theme</span>
-            <select
-              value={theme}
-              onChange={(event) =>
-                onThemeChange(
-                  event.target.value as
-                    | "dark"
-                    | "light"
-                    | "vscode-dark"
-                    | "vscode-light",
-                )
-              }
-            >
-              <option value="dark">Codex Dark</option>
-              <option value="light">Codex Light</option>
-              <option value="vscode-dark">VSCode Dark</option>
-              <option value="vscode-light">VSCode Light</option>
-            </select>
-        </label>
-      </section>
-
-      <section
-        className="navigation-sidebar__section"
-        aria-labelledby="settings-logs-title"
-      >
-        <div className="navigation-sidebar__section-heading">
-          <div
-            className="navigation-sidebar__section-title"
-            id="settings-logs-title"
-          >
-            Logs
-          </div>
-          <button
-            className="navigation-sidebar__mini-command"
-            disabled={logs.length === 0 || !onClearLogs}
-            onClick={onClearLogs}
-            type="button"
-          >
-            Clear
-          </button>
-        </div>
-        {logs.length > 0 ? (
-          <ol className="navigation-sidebar__logs" aria-label="Core logs">
-            {logs.slice(-8).map((entry, index) => (
-              <li
-                className="navigation-sidebar__log-entry"
-                data-level={entry.level}
-                key={`${entry.timestamp}-${index}`}
-              >
-                <span className="navigation-sidebar__log-level">
-                  {entry.level}
-                </span>
-                <span className="navigation-sidebar__log-message">
-                  {entry.message}
-                </span>
-                <time>{formatLogTime(entry.timestamp)}</time>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <div className="navigation-sidebar__empty">No logs captured</div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function formatLogTime(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return "--:--:--";
-  }
-
-  return date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
 }
 
 function formatViewTitle(view: ActivityView): string {

@@ -15,7 +15,10 @@ describe("ActivityBar", () => {
       "aria-pressed",
       "false",
     );
-    expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("changes view to NuGet when the NuGet button is clicked", () => {

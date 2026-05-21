@@ -11,7 +11,6 @@ import {
   Play,
   Radar,
   Save,
-  Settings,
   SlidersHorizontal,
   Square,
   X,
@@ -47,6 +46,7 @@ import {
   ResponseTelemetryPane,
   type ResponsePaneTab,
 } from "./components/ResponseTelemetryPane";
+import { SettingsPage } from "./components/SettingsPage";
 import { useAppStore } from "./store";
 
 type PaneLayout = "horizontal" | "vertical";
@@ -109,15 +109,17 @@ function App() {
     selectedGrain,
     selectedFunctionId,
     selectedMethod,
-    logs,
     nugetFeeds,
-    clearLogs,
     setWorkspace,
     setSelectedGrain,
     setSelectedFunction,
     setSelectedMethod,
     sourceCatalog,
     workspace,
+    fontFamily,
+    fontSize,
+    setFontFamily,
+    setFontSize,
   } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
   const [theme, setTheme] = useState<WorkbenchTheme>(() => readStoredTheme());
@@ -619,21 +621,6 @@ function App() {
               height={16}
             />
           </button>
-          <button
-            aria-label="Settings"
-            aria-pressed={activeView === "settings"}
-            className="titlebar-action titlebar-settings electrobun-webkit-app-region-no-drag"
-            onClick={() => setActiveView("settings")}
-            title="Settings"
-            type="button"
-          >
-            <Settings
-              aria-hidden="true"
-              className="titlebar-settings__icon"
-              width={16}
-              height={16}
-            />
-          </button>
         </div>
         {platform !== "mac" && (
           <div className="app-titlebar__window-controls electrobun-webkit-app-region-no-drag">
@@ -679,8 +666,6 @@ function App() {
           activeView={activeView}
           grains={grains}
           isConnected={isConnected}
-          logs={logs}
-          onClearLogs={clearLogs}
           onConnectCluster={connectCluster}
           onDisconnectCluster={disconnectCluster}
           onDiscoverGrains={discoverWorkspaceGrains}
@@ -691,11 +676,9 @@ function App() {
           onSelectFunction={handleSelectFunction}
           onSelectGrain={setSelectedGrain}
           onNewWorkspace={handleNewWorkspace}
-          onThemeChange={setTheme}
           selectedFunctionId={selectedFunctionId}
           selectedGrain={selectedGrain}
           sourceCatalog={effectiveSourceCatalog}
-          theme={theme}
           workspace={workspace}
           workspaces={workspaces}
         />
@@ -718,6 +701,15 @@ function App() {
             onCreateFeed={createNugetFeed}
             onTestFeed={testNugetFeed}
             onUpdateFeed={updateNugetFeed}
+          />
+        ) : activeView === "settings" ? (
+          <SettingsPage
+            theme={theme}
+            onThemeChange={setTheme}
+            fontFamily={fontFamily}
+            onFontFamilyChange={setFontFamily}
+            fontSize={fontSize}
+            onFontSizeChange={setFontSize}
           />
         ) : (
           <>
@@ -816,6 +808,8 @@ function App() {
               result={invocationResult}
               theme={theme}
               invocationHistory={invocationHistory}
+              fontFamily={fontFamily}
+              fontSize={fontSize}
             />
           )}
         </section>
