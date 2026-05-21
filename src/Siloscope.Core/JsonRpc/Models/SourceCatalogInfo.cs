@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.JsonRpc.Models;
 
 /// <summary>
@@ -13,13 +15,13 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="DiscoveryStatus">The discovery status of the source, such as "ready" or "idle".</param>
 /// <param name="Interfaces">The list of discovered interfaces for this source.</param>
 public sealed record SourceCatalogInfo(
-    string SourceId,
-    string SourceType,
-    string Reference,
-    string Label,
-    string? Version,
-    string? Gateway,
-    bool Enabled,
-    string DiscoveryStatus,
-    IReadOnlyList<SourceCatalogInterface> Interfaces
+    [property: JsonPropertyName("sourceId")] string SourceId,
+    [property: JsonPropertyName("sourceType")] string SourceType,
+    [property: JsonPropertyName("reference")] string Reference,
+    [property: JsonPropertyName("label")] string Label,
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("gateway")] string? Gateway,
+    [property: JsonPropertyName("enabled")] bool Enabled,
+    [property: JsonPropertyName("discoveryStatus")] string DiscoveryStatus,
+    [property: JsonPropertyName("interfaces")] IReadOnlyList<SourceCatalogInterface> Interfaces
 );

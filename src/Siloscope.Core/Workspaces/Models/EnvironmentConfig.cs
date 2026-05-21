@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Workspaces;
 
 /// <summary>
@@ -8,6 +10,7 @@ public sealed record EnvironmentConfig
     /// <summary>
     /// Gets the name of the environment.
     /// </summary>
+    [JsonPropertyName("name")]
     public string Name { get; init; } = string.Empty;
 
     /// <summary>

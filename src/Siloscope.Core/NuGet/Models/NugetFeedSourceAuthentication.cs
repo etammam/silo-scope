@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.NuGet.Models;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace Siloscope.Core.NuGet.Models;
 /// <param name="Password">The password for authentication.</param>
 /// <param name="IsPasswordClearText"><see langword="true" /> if the password is stored in clear text; otherwise, <see langword="false" />.</param>
 public sealed record NugetFeedSourceAuthentication(
-    string Username,
-    string Password,
-    bool IsPasswordClearText
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("password")] string Password,
+    [property: JsonPropertyName("isPasswordClearText")] bool IsPasswordClearText
 );

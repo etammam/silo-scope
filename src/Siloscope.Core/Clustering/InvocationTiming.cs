@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Clustering;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace Siloscope.Core.Clustering;
 /// <param name="ExecutionMs">The time spent executing the grain method, in milliseconds.</param>
 /// <param name="TotalMs">The total time for the invocation, in milliseconds.</param>
 public readonly record struct InvocationTiming(
-    long SerializationMs,
-    long ExecutionMs,
-    long TotalMs
+    [property: JsonPropertyName("serializationMs")] long SerializationMs,
+    [property: JsonPropertyName("executionMs")] long ExecutionMs,
+    [property: JsonPropertyName("totalMs")] long TotalMs
 );

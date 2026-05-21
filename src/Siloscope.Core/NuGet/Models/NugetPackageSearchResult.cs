@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.NuGet.Models;
 
 /// <summary>
@@ -9,9 +11,9 @@ namespace Siloscope.Core.NuGet.Models;
 /// <param name="Authors">An optional comma-separated list of authors.</param>
 /// <param name="DownloadCount">The optional download count of the package.</param>
 public readonly record struct NugetPackageSearchResult(
-    string PackageId,
-    string Version,
-    string? Description,
-    string? Authors,
-    long? DownloadCount
+    [property: JsonPropertyName("packageId")] string PackageId,
+    [property: JsonPropertyName("version")] string Version,
+    [property: JsonPropertyName("description")] string? Description,
+    [property: JsonPropertyName("authors")] string? Authors,
+    [property: JsonPropertyName("downloadCount")] long? DownloadCount
 );

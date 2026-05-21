@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Configuration;
 
 /// <summary>
@@ -6,6 +8,6 @@ namespace Siloscope.Core.Configuration;
 /// <param name="Cluster">The cluster connection options.</param>
 /// <param name="Interfaces">The list of interface entries to load.</param>
 public sealed record RuntimeOptions(
-    ToolClusterOptions Cluster,
-    IReadOnlyList<InterfaceEntry> Interfaces
+    [property: JsonPropertyName("cluster")] ToolClusterOptions Cluster,
+    [property: JsonPropertyName("interfaces")] IReadOnlyList<InterfaceEntry> Interfaces
 );

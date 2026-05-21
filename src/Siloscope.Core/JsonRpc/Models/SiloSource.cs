@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.JsonRpc.Models;
 
 /// <summary>
@@ -9,9 +11,9 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="Gateway">The optional gateway endpoint associated with the source.</param>
 /// <param name="Enabled"><see langword="true" /> if the source is enabled; otherwise, <see langword="false" />.</param>
 public sealed record SiloSource(
-    string Reference,
-    string Source,
-    string? Version,
-    string? Gateway,
-    bool Enabled
+    [property: JsonPropertyName("reference")] string Reference,
+    [property: JsonPropertyName("source")] string Source,
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("gateway")] string? Gateway,
+    [property: JsonPropertyName("enabled")] bool Enabled
 );

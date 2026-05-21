@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.JsonRpc.Models;
 
 /// <summary>
@@ -14,14 +16,14 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="KeyType">The grain key type required by the interface.</param>
 /// <param name="Parameters">The list of method parameters.</param>
 public sealed record SourceCatalogFunction(
-    string FunctionId,
-    string SourceId,
-    string InterfaceId,
-    string InterfaceName,
-    string Namespace,
-    string MethodName,
-    string Signature,
-    string ReturnType,
-    string KeyType,
-    IReadOnlyList<FunctionParameterInfo> Parameters
+    [property: JsonPropertyName("functionId")] string FunctionId,
+    [property: JsonPropertyName("sourceId")] string SourceId,
+    [property: JsonPropertyName("interfaceId")] string InterfaceId,
+    [property: JsonPropertyName("interfaceName")] string InterfaceName,
+    [property: JsonPropertyName("namespace")] string Namespace,
+    [property: JsonPropertyName("methodName")] string MethodName,
+    [property: JsonPropertyName("signature")] string Signature,
+    [property: JsonPropertyName("returnType")] string ReturnType,
+    [property: JsonPropertyName("keyType")] string KeyType,
+    [property: JsonPropertyName("parameters")] IReadOnlyList<FunctionParameterInfo> Parameters
 );

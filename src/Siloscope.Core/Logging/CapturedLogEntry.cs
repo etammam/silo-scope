@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Logging;
 
 /// <summary>
@@ -9,9 +11,9 @@ namespace Siloscope.Core.Logging;
 /// <param name="Message">The log message.</param>
 /// <param name="Exception">An optional exception string representation.</param>
 public sealed record CapturedLogEntry(
-    DateTimeOffset Timestamp,
-    string Level,
-    string Category,
-    string Message,
-    string? Exception
+    [property: JsonPropertyName("timestamp")] DateTimeOffset Timestamp,
+    [property: JsonPropertyName("level")] string Level,
+    [property: JsonPropertyName("category")] string Category,
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("exception")] string? Exception
 );

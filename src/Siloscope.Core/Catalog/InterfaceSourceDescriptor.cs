@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Catalog;
 
 /// <summary>
@@ -12,12 +14,12 @@ namespace Siloscope.Core.Catalog;
 /// <param name="Enabled"><see langword="true" /> if the source is enabled; otherwise, <see langword="false" />.</param>
 /// <param name="AssemblyPath">The file path of the loaded assembly.</param>
 public readonly record struct InterfaceSourceDescriptor(
-    string SourceId,
-    string SourceType,
-    string Reference,
-    string Label,
-    string? Version,
-    string? Gateway,
-    bool Enabled,
-    string AssemblyPath
+    [property: JsonPropertyName("sourceId")] string SourceId,
+    [property: JsonPropertyName("sourceType")] string SourceType,
+    [property: JsonPropertyName("reference")] string Reference,
+    [property: JsonPropertyName("label")] string Label,
+    [property: JsonPropertyName("version")] string? Version,
+    [property: JsonPropertyName("gateway")] string? Gateway,
+    [property: JsonPropertyName("enabled")] bool Enabled,
+    [property: JsonPropertyName("assemblyPath")] string AssemblyPath
 );

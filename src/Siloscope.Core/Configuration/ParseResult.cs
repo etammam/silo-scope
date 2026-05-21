@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Configuration;
 
 /// <summary>
@@ -7,7 +9,11 @@ namespace Siloscope.Core.Configuration;
 /// <param name="IsSuccess"><see langword="true" /> if parsing succeeded; otherwise, <see langword="false" />.</param>
 /// <param name="Value">The parsed value, or <see langword="default" /> if parsing failed.</param>
 /// <param name="ErrorMessage">An error message if parsing failed; otherwise, <see langword="null" />.</param>
-public readonly record struct ParseResult<T>(bool IsSuccess, T? Value, string? ErrorMessage)
+public readonly record struct ParseResult<T>(
+    [property: JsonPropertyName("isSuccess")] bool IsSuccess,
+    [property: JsonPropertyName("value")] T? Value,
+    [property: JsonPropertyName("errorMessage")] string? ErrorMessage
+)
 {
     /// <summary>
     /// Creates a successful parse result.

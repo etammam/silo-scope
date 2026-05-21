@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Configuration;
 
 /// <summary>
@@ -8,8 +10,8 @@ namespace Siloscope.Core.Configuration;
 /// <param name="GatewayEndpoints">The list of gateway endpoint addresses.</param>
 /// <param name="Clustering">Optional clustering provider configuration.</param>
 public sealed record ToolClusterOptions(
-    string ClusterId,
-    string ServiceId,
-    IReadOnlyList<string> GatewayEndpoints,
-    ToolClusteringOptions? Clustering = null
+    [property: JsonPropertyName("clusterId")] string ClusterId,
+    [property: JsonPropertyName("serviceId")] string ServiceId,
+    [property: JsonPropertyName("gatewayEndpoints")] IReadOnlyList<string> GatewayEndpoints,
+    [property: JsonPropertyName("clustering")] ToolClusteringOptions? Clustering = null
 );

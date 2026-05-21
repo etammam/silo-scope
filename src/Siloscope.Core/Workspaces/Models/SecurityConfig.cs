@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Workspaces;
 
 /// <summary>
@@ -8,5 +10,6 @@ public sealed record SecurityConfig
     /// <summary>
     /// Gets the workspace salt used for security operations.
     /// </summary>
+    [JsonPropertyName("workspaceSalt")]
     public string WorkspaceSalt { get; init; } = string.Empty;
 }

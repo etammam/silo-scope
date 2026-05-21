@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.JsonRpc.Models;
 
 /// <summary>
@@ -9,9 +11,9 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="Methods">The list of methods exposed by the grain interface.</param>
 /// <param name="Gateway">The optional gateway endpoint associated with the grain.</param>
 public sealed record GrainInfo(
-    string FullName,
-    string Name,
-    string Namespace,
-    IReadOnlyList<MethodInfo> Methods,
-    string? Gateway
+    [property: JsonPropertyName("fullName")] string FullName,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("namespace")] string Namespace,
+    [property: JsonPropertyName("methods")] IReadOnlyList<MethodInfo> Methods,
+    [property: JsonPropertyName("gateway")] string? Gateway
 );

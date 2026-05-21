@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Siloscope.Core.Workspaces;
 
 namespace Siloscope.Core.JsonRpc.Models;
@@ -10,8 +11,8 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="GatewayEndpoints">The list of gateway endpoint addresses.</param>
 /// <param name="Type">The clustering type. The default is <see cref="ClusterType.Homogenous" />.</param>
 public sealed record ClusterOptions(
-    string ClusterId,
-    string ServiceId,
-    List<string> GatewayEndpoints,
-    ClusterType Type = ClusterType.Homogenous
+    [property: JsonPropertyName("clusterId")] string ClusterId,
+    [property: JsonPropertyName("serviceId")] string ServiceId,
+    [property: JsonPropertyName("gatewayEndpoints")] List<string> GatewayEndpoints,
+    [property: JsonPropertyName("type")] ClusterType Type = ClusterType.Homogenous
 );

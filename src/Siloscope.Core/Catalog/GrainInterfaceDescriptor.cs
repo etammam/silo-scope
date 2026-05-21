@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Catalog;
 
 /// <summary>
@@ -9,9 +11,9 @@ namespace Siloscope.Core.Catalog;
 /// <param name="Gateway">The optional gateway endpoint associated with the interface.</param>
 /// <param name="SourceId">The optional source identifier that owns this interface.</param>
 public sealed record GrainInterfaceDescriptor(
-    string Name,
-    Type InterfaceType,
-    IReadOnlyList<GrainMethodDescriptor> Methods,
-    string? Gateway,
-    string? SourceId = null
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("interfaceType")] Type InterfaceType,
+    [property: JsonPropertyName("methods")] IReadOnlyList<GrainMethodDescriptor> Methods,
+    [property: JsonPropertyName("gateway")] string? Gateway,
+    [property: JsonPropertyName("sourceId")] string? SourceId = null
 );

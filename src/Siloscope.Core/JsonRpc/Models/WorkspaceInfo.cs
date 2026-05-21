@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.JsonRpc.Models;
 
 /// <summary>
@@ -10,10 +12,11 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="Silos">The list of silo sources in the workspace.</param>
 /// <param name="EnvironmentVariables">The active environment variables for the workspace.</param>
 public sealed record WorkspaceInfo(
-    string Id,
-    string Name,
-    string? Description,
-    ClusterOptions Cluster,
-    List<SiloSource> Silos,
-    Dictionary<string, string> EnvironmentVariables
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("description")] string? Description,
+    [property: JsonPropertyName("cluster")] ClusterOptions Cluster,
+    [property: JsonPropertyName("silos")] List<SiloSource> Silos,
+    [property: JsonPropertyName("environmentVariables")]
+        Dictionary<string, string> EnvironmentVariables
 );

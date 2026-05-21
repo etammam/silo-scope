@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.Catalog;
 
 /// <summary>
@@ -6,6 +8,6 @@ namespace Siloscope.Core.Catalog;
 /// <param name="Signature">The formatted method signature.</param>
 /// <param name="MethodInfo">The runtime <see cref="System.Reflection.MethodInfo" /> of the method.</param>
 public sealed record GrainMethodDescriptor(
-    string Signature,
-    System.Reflection.MethodInfo MethodInfo
+    [property: JsonPropertyName("signature")] string Signature,
+    [property: JsonPropertyName("methodInfo")] System.Reflection.MethodInfo MethodInfo
 );

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.JsonRpc.Models;
 
 /// <summary>
@@ -9,9 +11,9 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="Password">An optional password for authenticated feeds.</param>
 /// <param name="IsPasswordClearText"><see langword="true" /> if the password is in clear text; otherwise, <see langword="false" />. The default is <see langword="true" />.</param>
 public sealed record CreateNugetFeedRequest(
-    string Name,
-    string Url,
-    string? Username,
-    string? Password,
-    bool IsPasswordClearText = true
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("url")] string Url,
+    [property: JsonPropertyName("username")] string? Username,
+    [property: JsonPropertyName("password")] string? Password,
+    [property: JsonPropertyName("isPasswordClearText")] bool IsPasswordClearText = true
 );

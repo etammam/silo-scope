@@ -24,6 +24,7 @@ public sealed class NugetConnectionManager : INugetConnectionManager
     private static readonly JsonSerializerOptions JsonSerializerOptions = new()
     {
         WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
     };
 
     private static string GetStableAppDataPath()

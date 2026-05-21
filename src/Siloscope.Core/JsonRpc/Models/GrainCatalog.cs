@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Siloscope.Core.JsonRpc.Models;
 
 /// <summary>
@@ -6,6 +8,6 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="Grains">The list of discovered grain interfaces.</param>
 /// <param name="AssemblyPaths">The list of assembly paths that contain the grain interfaces.</param>
 public sealed record GrainCatalog(
-    IReadOnlyList<GrainInfo> Grains,
-    IReadOnlyList<string> AssemblyPaths
+    [property: JsonPropertyName("grains")] IReadOnlyList<GrainInfo> Grains,
+    [property: JsonPropertyName("assemblyPaths")] IReadOnlyList<string> AssemblyPaths
 );
