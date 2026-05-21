@@ -1,7 +1,7 @@
 using AwesomeAssertions;
-using Siloscope.Core.Cluster;
+using Siloscope.Core.Catalog;
+using Siloscope.Core.Clustering;
 using Siloscope.Core.Configuration;
-using Siloscope.Core.Interfaces;
 using Xunit;
 
 namespace Siloscope.Test.Core;

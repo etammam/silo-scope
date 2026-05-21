@@ -5,8 +5,8 @@ using NuGet.Frameworks;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
-using Siloscope.Core.Components.Nuget;
-using Siloscope.Core.Nuget.Models;
+using Siloscope.Core.NuGet;
+using Siloscope.Core.NuGet.Models;
 using Xunit;
 
 namespace Siloscope.Test.Core;

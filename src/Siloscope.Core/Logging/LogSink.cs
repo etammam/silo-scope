@@ -1,29 +1,13 @@
-using Microsoft.Extensions.Logging;
-
 namespace Siloscope.Core.Logging;
 
-public sealed record CapturedLogEntry(
-    DateTimeOffset Timestamp,
-    string Level,
-    string Category,
-    string Message,
-    string? Exception
-);
-
-public interface ILogSink
-{
-    event EventHandler<CapturedLogEntry>? EntryCaptured;
-
-    IReadOnlyList<CapturedLogEntry> Entries { get; }
-
-    void Clear();
-}
-
+/// <summary>
+/// Provides a thread-safe in-memory sink for captured log entries with a configurable maximum capacity.
+/// </summary>
 public sealed class LogSink : ILogSink
 {
     private const int MaxEntries = 1_000;
     private readonly List<CapturedLogEntry> _entries = [];
-    private readonly object _gate = new();
+    private readonly Lock _gate = new();
 
     public event EventHandler<CapturedLogEntry>? EntryCaptured;
 
@@ -59,65 +43,4 @@ public sealed class LogSink : ILogSink
 
         EntryCaptured?.Invoke(this, entry);
     }
-}
-
-public sealed class LogSinkLoggerProvider(LogSink sink) : ILoggerProvider
-{
-    public ILogger CreateLogger(string categoryName)
-    {
-        return new LogSinkLogger(categoryName, sink);
-    }
-
-    public void Dispose() { }
-}
-
-internal sealed class LogSinkLogger(string category, LogSink sink) : ILogger
-{
-    public IDisposable? BeginScope<TState>(TState state)
-        where TState : notnull
-    {
-        return NullScope.Instance;
-    }
-
-    public bool IsEnabled(LogLevel logLevel)
-    {
-        return logLevel != LogLevel.None;
-    }
-
-    public void Log<TState>(
-        LogLevel logLevel,
-        EventId eventId,
-        TState state,
-        Exception? exception,
-        Func<TState, Exception?, string> formatter
-    )
-    {
-        if (!IsEnabled(logLevel))
-        {
-            return;
-        }
-
-        var message = formatter(state, exception);
-        if (string.IsNullOrWhiteSpace(message) && exception is null)
-        {
-            return;
-        }
-
-        sink.Capture(
-            new CapturedLogEntry(
-                DateTimeOffset.UtcNow,
-                logLevel.ToString().ToLowerInvariant(),
-                category,
-                message,
-                exception?.ToString()
-            )
-        );
-    }
-}
-
-internal sealed class NullScope : IDisposable
-{
-    public static readonly NullScope Instance = new();
-
-    public void Dispose() { }
 }

@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using Siloscope.Core.Components.Workspace;
+using Siloscope.Core.Workspaces;
 using Xunit;
 
 namespace Siloscope.Test.Core;
@@ -54,13 +54,17 @@ public sealed class WorkspaceServiceTests
     [Fact]
     public async Task SaveAsync_MultipleWorkspaces_CanLoadEach()
     {
-        var workspace1 = CreateTestWorkspace();
-        workspace1.Id = "workspace-1";
-        workspace1.WorkspaceInfo.Name = "Workspace One";
+        var workspace1 = CreateTestWorkspace() with
+        {
+            Id = "workspace-1",
+            WorkspaceInfo = CreateTestWorkspace().WorkspaceInfo with { Name = "Workspace One" },
+        };
 
-        var workspace2 = CreateTestWorkspace();
-        workspace2.Id = "workspace-2";
-        workspace2.WorkspaceInfo.Name = "Workspace Two";
+        var workspace2 = CreateTestWorkspace() with
+        {
+            Id = "workspace-2",
+            WorkspaceInfo = CreateTestWorkspace().WorkspaceInfo with { Name = "Workspace Two" },
+        };
 
         var filePath1 = Path.Combine(_testDirectory, "workspace1.json");
         var filePath2 = Path.Combine(_testDirectory, "workspace2.json");
@@ -80,13 +84,17 @@ public sealed class WorkspaceServiceTests
     [Fact]
     public async Task ListAsync_ReturnsPersistedWorkspaces()
     {
-        var workspace1 = CreateTestWorkspace();
-        workspace1.Id = "workspace-list-1";
-        workspace1.WorkspaceInfo.Name = "Workspace B";
+        var workspace1 = CreateTestWorkspace() with
+        {
+            Id = "workspace-list-1",
+            WorkspaceInfo = CreateTestWorkspace().WorkspaceInfo with { Name = "Workspace B" },
+        };
 
-        var workspace2 = CreateTestWorkspace();
-        workspace2.Id = "workspace-list-2";
-        workspace2.WorkspaceInfo.Name = "Workspace A";
+        var workspace2 = CreateTestWorkspace() with
+        {
+            Id = "workspace-list-2",
+            WorkspaceInfo = CreateTestWorkspace().WorkspaceInfo with { Name = "Workspace A" },
+        };
 
         await _workspaceService.SaveAsync(
             _workspaceService.GetWorkspacePath(workspace1.Id),
@@ -130,7 +138,7 @@ public sealed class WorkspaceServiceTests
         return new Workspace
         {
             Id = "test-workspace-id",
-            WorkspaceInfo = new Siloscope.Core.Components.Workspace.WorkspaceInfo
+            WorkspaceInfo = new Siloscope.Core.Workspaces.WorkspaceInfo
             {
                 Name = "Test Workspace",
                 Description = "A test workspace",
@@ -145,7 +153,7 @@ public sealed class WorkspaceServiceTests
             },
             Silos =
             [
-                new Siloscope.Core.Components.Workspace.SiloSource
+                new Siloscope.Core.Workspaces.SiloSource
                 {
                     Reference = "../../test.dll",
                     Source = "DLL",

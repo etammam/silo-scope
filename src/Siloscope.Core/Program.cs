@@ -3,15 +3,18 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
-using Siloscope.Core.Cluster;
-using Siloscope.Core.Components.Nuget;
-using Siloscope.Core.Components.Workspace;
-using Siloscope.Core.Endpoints;
-using Siloscope.Core.Interfaces;
+using Siloscope.Core.Catalog;
+using Siloscope.Core.Clustering;
+using Siloscope.Core.JsonRpc;
 using Siloscope.Core.Logging;
+using Siloscope.Core.NuGet;
 using Siloscope.Core.Serialization;
+using Siloscope.Core.Workspaces;
 using StreamJsonRpc;
 
+/// <summary>
+/// The SiloScope backend entry point. Sets up dependency injection, logging, and starts a JSON-RPC server over standard input and output.
+/// </summary>
 var logPath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
     "SiloScope",

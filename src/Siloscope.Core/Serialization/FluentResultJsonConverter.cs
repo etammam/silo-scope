@@ -3,6 +3,9 @@ using Newtonsoft.Json;
 
 namespace Siloscope.Core.Serialization;
 
+/// <summary>
+/// Converts <see cref="Result" /> and <see cref="Result{T}" /> instances to JSON for JSON-RPC serialization.
+/// </summary>
 public sealed class FluentResultJsonConverter : JsonConverter
 {
     public override bool CanRead => false;

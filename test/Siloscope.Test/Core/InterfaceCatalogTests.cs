@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using Siloscope.Core.Interfaces;
+using Siloscope.Core.Catalog;
 using Xunit;
 
 namespace Siloscope.Test.Core;

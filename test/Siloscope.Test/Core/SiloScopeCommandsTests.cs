@@ -2,14 +2,14 @@ using AwesomeAssertions;
 using FluentResults;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Siloscope.Core.Cluster;
-using Siloscope.Core.Components.Nuget;
-using Siloscope.Core.Components.Workspace;
+using Siloscope.Core.Catalog;
+using Siloscope.Core.Clustering;
 using Siloscope.Core.Configuration;
-using Siloscope.Core.Endpoints;
-using Siloscope.Core.Interfaces;
-using Siloscope.Core.Nuget.Models;
-using Siloscope.Core.Nuget.Store;
+using Siloscope.Core.JsonRpc;
+using Siloscope.Core.JsonRpc.Models;
+using Siloscope.Core.NuGet;
+using Siloscope.Core.NuGet.Models;
+using Siloscope.Core.Workspaces;
 using Xunit;
 
 namespace Siloscope.Test.Core;
@@ -127,7 +127,7 @@ public sealed class SiloScopeCommandsTests
                 Id = "workspace-1",
                 Silos =
                 [
-                    new Siloscope.Core.Components.Workspace.SiloSource
+                    new Siloscope.Core.Workspaces.SiloSource
                     {
                         Reference = assemblyPath,
                         Source = "DLL",
@@ -188,12 +188,12 @@ public sealed class SiloScopeCommandsTests
     [Fact]
     public async Task SetWorkspaceAsync_StoresActiveWorkspaceForDiscovery()
     {
-        var workspace = new Siloscope.Core.Endpoints.WorkspaceInfo(
+        var workspace = new Siloscope.Core.JsonRpc.Models.WorkspaceInfo(
             "workspace-1",
             "Local",
             "Local dev workspace",
             new ClusterOptions("dev", "SiloScope", ["127.0.0.1:30000"]),
-            [new Siloscope.Core.Endpoints.SiloSource("missing.dll", "DLL", null, null, false)],
+            [new Siloscope.Core.JsonRpc.Models.SiloSource("missing.dll", "DLL", null, null, false)],
             new Dictionary<string, string> { ["ASPNETCORE_ENVIRONMENT"] = "Development" }
         );
 
@@ -212,9 +212,11 @@ public sealed class SiloScopeCommandsTests
     [Fact]
     public async Task ListWorkspacesAsync_ReturnsPersistedWorkspaceSummaries()
     {
-        var workspace = CreateTestWorkspace();
-        workspace.Id = "workspace-1";
-        workspace.WorkspaceInfo.Name = "Actors Workspace";
+        var workspace = CreateTestWorkspace() with
+        {
+            Id = "workspace-1",
+            WorkspaceInfo = CreateTestWorkspace().WorkspaceInfo with { Name = "Actors Workspace" },
+        };
         _workspaceServiceMock.Setup(service => service.ListAsync()).ReturnsAsync([workspace]);
 
         var result = await _commands.ListWorkspacesAsync();
@@ -264,14 +266,14 @@ public sealed class SiloScopeCommandsTests
                 Id = "test",
                 Silos =
                 [
-                    new Siloscope.Core.Components.Workspace.SiloSource
+                    new Siloscope.Core.Workspaces.SiloSource
                     {
                         Reference = "/tmp/Core.dll",
                         Source = "DLL",
                         Gateway = "127.0.0.1:30000",
                         Enabled = true,
                     },
-                    new Siloscope.Core.Components.Workspace.SiloSource
+                    new Siloscope.Core.Workspaces.SiloSource
                     {
                         Reference = "Contracts",
                         Source = "nuget",
@@ -340,14 +342,14 @@ public sealed class SiloScopeCommandsTests
                 Id = "test",
                 Silos =
                 [
-                    new Siloscope.Core.Components.Workspace.SiloSource
+                    new Siloscope.Core.Workspaces.SiloSource
                     {
                         Reference = "/tmp/Core.dll",
                         Source = "DLL",
                         Gateway = "127.0.0.1:30000",
                         Enabled = true,
                     },
-                    new Siloscope.Core.Components.Workspace.SiloSource
+                    new Siloscope.Core.Workspaces.SiloSource
                     {
                         Reference = "Contracts",
                         Source = "nuget",
@@ -545,7 +547,7 @@ public sealed class SiloScopeCommandsTests
                 Id = "test",
                 Silos =
                 [
-                    new Siloscope.Core.Components.Workspace.SiloSource
+                    new Siloscope.Core.Workspaces.SiloSource
                     {
                         Reference = "Contracts.dll",
                         Source = "DLL",
@@ -606,7 +608,7 @@ public sealed class SiloScopeCommandsTests
         return new Workspace
         {
             Id = "test-workspace",
-            WorkspaceInfo = new Siloscope.Core.Components.Workspace.WorkspaceInfo
+            WorkspaceInfo = new Siloscope.Core.Workspaces.WorkspaceInfo
             {
                 Name = "Test",
                 Description = "Test workspace",
@@ -626,7 +628,7 @@ public sealed class SiloScopeCommandsTests
     [Fact]
     public async Task RestorePackagesAsync_NoNugetSilos_ReturnsEmptyResult()
     {
-        var silos = new Siloscope.Core.Endpoints.SiloSource[]
+        var silos = new Siloscope.Core.JsonRpc.Models.SiloSource[]
         {
             new("test.dll", "DLL", null, null, true),
         };
@@ -757,7 +759,7 @@ public sealed class SiloScopeCommandsTests
     [Fact]
     public async Task RestorePackagesAsync_WithNugetSilos_RestoresPackages()
     {
-        var silos = new Siloscope.Core.Endpoints.SiloSource[]
+        var silos = new Siloscope.Core.JsonRpc.Models.SiloSource[]
         {
             new("Newtonsoft.Json", "nuget", "13.0.3", null, true),
         };
@@ -782,7 +784,7 @@ public sealed class SiloScopeCommandsTests
     [Fact]
     public async Task RestorePackagesAsync_FailedDownload_TracksFailure()
     {
-        var silos = new Siloscope.Core.Endpoints.SiloSource[]
+        var silos = new Siloscope.Core.JsonRpc.Models.SiloSource[]
         {
             new("NonExistent", "nuget", "1.0.0", null, true),
         };
