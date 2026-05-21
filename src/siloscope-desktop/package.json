@@ -1,41 +1,41 @@
 {
-	"name": "electrobun-hello-world",
-	"version": "1.0.0",
-	"type": "module",
-	"description": "A simple Electrobun app showcasing core features",
-	"scripts": {
-		"start": "electrobun run",
-		"dev": "electrobun dev",
-		"dev:watch": "electrobun dev --watch",
-		"prepare:core": "bun ./scripts/prepare-core-sidecar.ts",
-		"typecheck": "tsc --noEmit",
-		"test": "vitest",
-		"test:run": "vitest run",
-		"build:dev": "electrobun build",
-		"build:canary": "electrobun build --env=canary",
-		"build:stable": "electrobun build --env=stable"
-	},
-	"dependencies": {
-		"@monaco-editor/react": "^4.7.0",
-		"autoprefixer": "^10.5.0",
-		"electrobun": "1.18.1",
-		"lucide-react": "^1.16.0",
-		"postcss": "^8.5.14",
-		"react": "^19.2.6",
-		"react-dom": "^19.2.6",
-		"tailwindcss": "^4.3.0",
-		"zustand": "^5.0.13"
-	},
-	"devDependencies": {
-		"@testing-library/jest-dom": "^6.9.1",
-		"@testing-library/react": "^16.3.2",
-		"@types/bun": "latest",
-		"@types/react": "^19.2.14",
-		"@types/react-dom": "^19.2.3",
-		"@types/three": "^0.184.1",
-		"@vitejs/plugin-react": "^6.0.2",
-		"jsdom": "^29.1.1",
-		"typescript": "^6.0.3",
-		"vitest": "^4.1.6"
-	}
+  "name": "electrobun-hello-world",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A simple Electrobun app showcasing core features",
+  "scripts": {
+    "start": "electrobun run",
+    "dev": "electrobun dev",
+    "dev:watch": "electrobun dev --watch",
+    "prepare:core": "bun ./scripts/prepare-core-sidecar.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "build:dev": "electrobun build",
+    "build:canary": "electrobun build --env=canary",
+    "build:stable": "electrobun build --env=stable"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "autoprefixer": "^10.5.0",
+    "electrobun": "1.18.1",
+    "lucide-react": "^1.16.0",
+    "postcss": "^8.5.14",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwindcss": "^4.3.0",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/bun": "latest",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.184.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  }
 }

@@ -1,9 +1,11 @@
 import { Electroview } from "electrobun/view";
 import {
+  Briefcase,
   ChevronDown,
   FilePlus,
   FolderOpen,
   LayoutTemplate,
+  Minus,
   PanelLeftClose,
   PanelRightClose,
   Play,
@@ -135,6 +137,23 @@ function App() {
   const [isWorkspaceDialogOpen, setIsWorkspaceDialogOpen] = useState(false);
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [workspaceDraft, setWorkspaceDraft] = useState<Workspace | null>(null);
+  const platform = useMemo(() => {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes("mac")) return "mac";
+    if (ua.includes("win")) return "win";
+    return "linux";
+  }, []);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const handleMinimize = useCallback(async () => {
+    await electroview.rpc?.request.minimizeWindow();
+  }, []);
+  const handleMaximize = useCallback(async () => {
+    const result = await electroview.rpc?.request.maximizeWindow();
+    setIsMaximized(result?.isMaximized ?? false);
+  }, []);
+  const handleClose = useCallback(async () => {
+    await electroview.rpc?.request.closeWindow();
+  }, []);
   const handleNewWorkspace = useCallback(() => {
     setWorkspaceDraft(null);
     setIsWorkspaceDialogOpen(true);
@@ -177,6 +196,22 @@ function App() {
       );
     };
   }, []);
+
+  useEffect(() => {
+    if (!isWorkspaceMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const workspaceEl = document.querySelector(".app-titlebar__workspace");
+      if (workspaceEl && !workspaceEl.contains(event.target as Node)) {
+        setIsWorkspaceMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isWorkspaceMenuOpen]);
 
   useEffect(() => {
     if (invocationResult) {
@@ -425,6 +460,7 @@ function App() {
       data-activity-visible={isActivityBarVisible}
       data-navigation-visible={isNavigationVisible}
       data-pane-layout={paneLayout}
+      data-platform={platform}
       data-response-visible={isResponseVisible}
       data-theme={theme}
       style={shellStyle}
@@ -445,6 +481,7 @@ function App() {
             onClick={() => setIsWorkspaceMenuOpen((open) => !open)}
             type="button"
           >
+            <Briefcase aria-hidden="true" width={13} height={13} />
             <span>{workspace?.name ?? "My Workspace"}</span>
             <ChevronDown aria-hidden="true" width={12} height={12} />
           </button>
@@ -598,6 +635,43 @@ function App() {
             />
           </button>
         </div>
+        {platform !== "mac" && (
+          <div className="app-titlebar__window-controls electrobun-webkit-app-region-no-drag">
+            <button
+              aria-label="Minimize window"
+              className="window-control window-control--minimize"
+              onClick={handleMinimize}
+              type="button"
+            >
+              <Minus aria-hidden="true" width={14} height={14} />
+            </button>
+            <button
+              aria-label={isMaximized ? "Restore window" : "Maximize window"}
+              className="window-control window-control--maximize"
+              onClick={handleMaximize}
+              type="button"
+            >
+              {isMaximized ? (
+                <svg aria-hidden="true" height="14" viewBox="0 0 24 24" width="14">
+                  <rect fill="none" height="14" rx="1.5" stroke="currentColor" strokeWidth="2" width="14" x="5" y="5" />
+                  <rect fill="none" height="8" rx="1" stroke="currentColor" strokeWidth="2" width="8" x="9" y="9" />
+                </svg>
+              ) : (
+                <svg aria-hidden="true" height="14" viewBox="0 0 24 24" width="14">
+                  <rect fill="none" height="14" rx="1.5" stroke="currentColor" strokeWidth="2" width="14" x="5" y="5" />
+                </svg>
+              )}
+            </button>
+            <button
+              aria-label="Close window"
+              className="window-control window-control--close"
+              onClick={handleClose}
+              type="button"
+            >
+              <X aria-hidden="true" width={14} height={14} />
+            </button>
+          </div>
+        )}
       </header>
 
       {isNavigationVisible && (

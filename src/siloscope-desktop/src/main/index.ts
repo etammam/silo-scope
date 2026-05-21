@@ -414,6 +414,23 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
 
         return { workspaces: (result.Value ?? []).map(mapWorkspace) };
       },
+      minimizeWindow: async (): Promise<{ success: boolean }> => {
+        mainWindow.minimize();
+        return { success: true };
+      },
+      maximizeWindow: async (): Promise<{ success: boolean; isMaximized: boolean }> => {
+        const isMaximized = Boolean(mainWindow.isMaximized());
+        if (isMaximized) {
+          mainWindow.unmaximize();
+        } else {
+          mainWindow.maximize();
+        }
+        return { success: true, isMaximized: !isMaximized };
+      },
+      closeWindow: async (): Promise<{ success: boolean }> => {
+        mainWindow.close();
+        return { success: true };
+      },
     },
     messages: {
       connectionChanged: ({ isConnected }) => {

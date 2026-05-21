@@ -53,6 +53,9 @@ export type SiloScopeRPC = {
         response: InvocationResult;
       };
       getWorkspaces: { params: void; response: { workspaces: Workspace[] } };
+      minimizeWindow: { params: void; response: { success: boolean } };
+      maximizeWindow: { params: void; response: { success: boolean; isMaximized: boolean } };
+      closeWindow: { params: void; response: { success: boolean } };
     };
     messages: {
       connectionChanged: { isConnected: boolean };
