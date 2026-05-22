@@ -31,65 +31,63 @@ export function SettingsPage({
     <section className="settings-page" aria-label="Settings">
       <header className="settings-page__header">
         <div>
-          <span>Appearance</span>
-          <h2 id="settings-title">Themes</h2>
-          <p>Choose a color theme for the workbench and editor.</p>
+          <span>Settings</span>
+          <h2 id="settings-title">Appearance</h2>
+          <p>Theme and response panel preferences.</p>
         </div>
       </header>
 
-      <nav className="settings-page__sidebar" aria-label="Settings categories">
-        <ul role="list">
-          <li>
-            <button
-              aria-current="page"
-              className="settings-page__nav-item settings-page__nav-item--active"
-              type="button"
-            >
-              Appearance
-            </button>
-          </li>
-        </ul>
-      </nav>
-
       <div className="settings-page__body">
-        <div className="settings-page__theme-section">
-          <h3 className="settings-page__theme-heading">Light Theme</h3>
-          <div
-            className="settings-page__theme-grid"
-            role="radiogroup"
-            aria-label="Light themes"
-          >
-            {lightThemes.map((t) => (
-              <ThemeCard
-                key={t.id}
-                theme={t}
-                isSelected={theme === t.id}
-                onSelect={() => onThemeChange(t.id)}
-              />
-            ))}
+        <section className="settings-page__section" aria-labelledby="settings-theme-title">
+          <div className="settings-page__section-heading">
+            <h3 id="settings-theme-title">Color Theme</h3>
+            <p>Choose the workbench palette.</p>
           </div>
-        </div>
 
-        <div className="settings-page__theme-section">
-          <h3 className="settings-page__theme-heading">Dark Theme</h3>
-          <div
-            className="settings-page__theme-grid"
-            role="radiogroup"
-            aria-label="Dark themes"
-          >
-            {darkThemes.map((t) => (
-              <ThemeCard
-                key={t.id}
-                theme={t}
-                isSelected={theme === t.id}
-                onSelect={() => onThemeChange(t.id)}
-              />
-            ))}
+          <div className="settings-page__theme-stack">
+            <div className="settings-page__theme-group">
+              <h4>Light</h4>
+              <div
+                className="settings-page__theme-grid"
+                role="radiogroup"
+                aria-label="Light themes"
+              >
+                {lightThemes.map((t) => (
+                  <ThemeCard
+                    key={t.id}
+                    theme={t}
+                    isSelected={theme === t.id}
+                    onSelect={() => onThemeChange(t.id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-page__theme-group">
+              <h4>Dark</h4>
+              <div
+                className="settings-page__theme-grid"
+                role="radiogroup"
+                aria-label="Dark themes"
+              >
+                {darkThemes.map((t) => (
+                  <ThemeCard
+                    key={t.id}
+                    theme={t}
+                    isSelected={theme === t.id}
+                    onSelect={() => onThemeChange(t.id)}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="settings-page__theme-section">
-          <h3 className="settings-page__theme-heading">Response Panel</h3>
+        <section className="settings-page__section" aria-labelledby="settings-response-title">
+          <div className="settings-page__section-heading">
+            <h3 id="settings-response-title">Response Panel</h3>
+            <p>Control response text rendering.</p>
+          </div>
           <div className="settings-page__form-row">
             <label className="settings-page__input-label">
               <span>Font family</span>
@@ -115,7 +113,7 @@ export function SettingsPage({
               />
             </label>
           </div>
-        </div>
+        </section>
       </div>
     </section>
   );
@@ -149,6 +147,7 @@ function ThemeCard({
         <span className="theme-card__line" />
       </span>
       <span className="theme-card__label">{theme.label}</span>
+      <span className="theme-card__check" aria-hidden="true" />
     </button>
   );
 }

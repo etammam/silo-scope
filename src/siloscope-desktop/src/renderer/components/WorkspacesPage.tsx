@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, ChevronDown, Plus } from "lucide-react";
+import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, ChevronDown, Plus, X } from "lucide-react";
 import type { ClusterType, NugetFeed, NugetPackage, Workspace, WorkspaceSource } from "../../shared/types";
 
 type WorkspacesPageProps = {
@@ -52,9 +52,9 @@ export function WorkspacesPage({
     <section className="workspaces-page" aria-label="Clusters">
       <header className="workspaces-page__header">
         <div>
-          <span>Management</span>
+          <span>Clusters</span>
           <h2 id="workspaces-title">Clusters</h2>
-          <p>Create, edit, and manage your Orleans clusters.</p>
+          <p>{workspaces.length} configured</p>
         </div>
         <div className="workspaces-page__header-actions">
           <button
@@ -79,7 +79,7 @@ export function WorkspacesPage({
           type="button"
         >
           <Plus aria-hidden="true" width={14} height={14} />
-          Create cluster
+          New cluster
         </button>
           <ul className="workspaces-page__list" role="list">
             {workspaces.map((ws) => (
@@ -98,8 +98,13 @@ export function WorkspacesPage({
                     width={14}
                     height={14}
                   />
-                  <span className="workspaces-page__list-name">
-                    {ws.name}
+                  <span className="workspaces-page__list-main">
+                    <span className="workspaces-page__list-name">
+                      {ws.name}
+                    </span>
+                    <span className="workspaces-page__list-meta">
+                      {ws.clusterId || ws.siloAddress}
+                    </span>
                   </span>
                   {activeWorkspace?.id === ws.id && (
                     <span className="workspaces-page__list-badge">
@@ -262,13 +267,21 @@ function WorkspaceForm({
 
   return (
     <div className="workspace-form">
-      <h3 className="workspace-form__title">
-        {isCreating ? "New cluster" : "Edit cluster"}
-      </h3>
+      <div className="workspace-form__header">
+        <div>
+          <span>{isCreating ? "Draft" : "Inspector"}</span>
+          <h3 className="workspace-form__title">
+            {isCreating ? "New cluster" : "Edit cluster"}
+          </h3>
+          {!isCreating && (
+            <strong className="workspace-form__subtitle">{name}</strong>
+          )}
+        </div>
+      </div>
 
       <div className="workspace-form__grid">
-        <section className="workspace-form__panel">
-          <h4>Connection</h4>
+        <section className="workspace-form__section">
+          <h4>Identity</h4>
           <label className="workspace-form__field">
             <span>Name</span>
             <input
@@ -287,8 +300,8 @@ function WorkspaceForm({
           </label>
         </section>
 
-        <section className="workspace-form__panel">
-          <h4>Cluster</h4>
+        <section className="workspace-form__section">
+          <h4>Connection</h4>
           <label className="workspace-form__field">
             <span>Cluster type</span>
             <select
@@ -328,7 +341,7 @@ function WorkspaceForm({
           )}
         </section>
 
-        <section className="workspace-form__panel workspace-form__panel--wide">
+        <section className="workspace-form__section workspace-form__section--sources">
           <h4>Silos</h4>
           <div className="workspace-form__source-form">
             <label className="workspace-form__field">
@@ -407,6 +420,7 @@ function WorkspaceForm({
               onClick={addSource}
               type="button"
             >
+              <Plus aria-hidden="true" width={14} height={14} />
               Add Silo
             </button>
           </div>
@@ -415,12 +429,9 @@ function WorkspaceForm({
             <ul className="workspace-form__sources" aria-label="Cluster silos">
               {sources.map((source) => (
                 <li key={source.sourceId}>
+                  <span className="workspace-form__source-type">{source.sourceType}</span>
                   <strong>{source.label}</strong>
-                  <span>
-                    {source.sourceType}
-                    {source.version ? ` ${source.version}` : ""}
-                    {source.gateway ? ` · ${source.gateway}` : ""}
-                  </span>
+                  <span>{source.version || source.gateway || "Default"}</span>
                   <button
                     aria-label={`Remove ${source.label}`}
                     onClick={() =>
@@ -428,9 +439,10 @@ function WorkspaceForm({
                         current.filter((c) => c.sourceId !== source.sourceId),
                       )
                     }
+                    title="Remove"
                     type="button"
                   >
-                    Remove
+                    <X aria-hidden="true" width={13} height={13} />
                   </button>
                 </li>
               ))}

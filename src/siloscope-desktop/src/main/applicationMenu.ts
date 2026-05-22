@@ -66,6 +66,8 @@ export function createApplicationMenuTemplate(): ApplicationMenuItem[] {
         { role: "cut" },
         { role: "copy" },
         { role: "paste" },
+        { type: "separator" },
+        { role: "selectAll" },
       ],
     },
     {

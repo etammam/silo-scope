@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { CheckCircle2, ChevronRight, ChevronDown, Loader2, XCircle } from "lucide-react";
 import type {
   GrainInterfaceDescriptor,
   NugetFeed,
@@ -17,6 +17,8 @@ const defaultNugetFeed: NugetFeed = {
   hasCredentials: false,
   isDefault: true,
 };
+
+type FeedTestState = "idle" | "testing" | "success" | "error";
 
 type NavigationSidebarProps = {
   activeView: ActivityView;
@@ -408,7 +410,8 @@ export function NuGetRegistryManager({
   const [feedUrl, setFeedUrl] = useState("");
   const [feedUsername, setFeedUsername] = useState("");
   const [feedPassword, setFeedPassword] = useState("");
-  const [status, setStatus] = useState("Ready");
+  const [testState, setTestState] = useState<FeedTestState>("idle");
+  const [testMessage, setTestMessage] = useState("Test connection");
   const availableFeeds = useMemo(
     () => [
       defaultNugetFeed,
@@ -426,6 +429,8 @@ export function NuGetRegistryManager({
     setFeedUrl("");
     setFeedUsername("");
     setFeedPassword("");
+    setTestState("idle");
+    setTestMessage("Test connection");
   };
 
   const editFeed = (feed: NugetFeed) => {
@@ -434,7 +439,8 @@ export function NuGetRegistryManager({
     setFeedUrl(feed.url);
     setFeedUsername("");
     setFeedPassword("");
-    setStatus(`Editing ${feed.name}`);
+    setTestState("idle");
+    setTestMessage("Test connection");
   };
 
   const buildRequest = () => ({
@@ -449,12 +455,15 @@ export function NuGetRegistryManager({
       return;
     }
 
-    setStatus("Testing connection");
+    setTestState("testing");
+    setTestMessage("Testing connection");
     try {
       await onTestFeed(buildRequest());
-      setStatus("Connection succeeded");
+      setTestState("success");
+      setTestMessage("Connection succeeded");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Connection failed");
+      setTestState("error");
+      setTestMessage(error instanceof Error ? error.message : "Connection failed");
     }
   };
 
@@ -463,17 +472,18 @@ export function NuGetRegistryManager({
       return;
     }
 
-    setStatus(isEditing ? "Saving feed" : "Connecting and saving");
+    setTestState("idle");
+    setTestMessage(isEditing ? "Saving feed" : "Connecting and saving");
     try {
       if (isEditing && editingFeedName && onUpdateFeed) {
         await onUpdateFeed(editingFeedName, buildRequest());
       } else {
         await onCreateFeed(buildRequest());
       }
-      setStatus(isEditing ? "Feed updated" : "Feed connected and saved");
       resetForm();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Feed save failed");
+      setTestState("error");
+      setTestMessage(error instanceof Error ? error.message : "Feed save failed");
     }
   };
 
@@ -537,9 +547,19 @@ export function NuGetRegistryManager({
               className="feed-manager__ghost-button"
               disabled={!canSubmit || !onTestFeed}
               onClick={handleTestFeed}
+              title={testMessage}
               type="button"
             >
-              Test connection
+              <span className="feed-manager__test-indicator" data-state={testState} aria-hidden="true">
+                {testState === "testing" ? (
+                  <Loader2 width={14} height={14} />
+                ) : testState === "success" ? (
+                  <CheckCircle2 width={14} height={14} />
+                ) : testState === "error" ? (
+                  <XCircle width={14} height={14} />
+                ) : null}
+              </span>
+              <span>{testState === "testing" ? "Testing" : "Test connection"}</span>
             </button>
             <button
               className="feed-manager__primary-button"
@@ -555,7 +575,7 @@ export function NuGetRegistryManager({
               </button>
             )}
           </div>
-          <div className="feed-manager__status" role="status">{status}</div>
+          <span className="sr-only" role="status">{testMessage}</span>
         </section>
 
         <section className="feed-manager__panel" aria-labelledby="configured-feeds-title">
