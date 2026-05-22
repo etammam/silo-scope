@@ -152,6 +152,16 @@ function App() {
   const handleClose = useCallback(async () => {
     await electroview.rpc?.request.closeWindow();
   }, []);
+  const handleTitleBarDoubleClick = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(".electrobun-webkit-app-region-no-drag")) {
+        return;
+      }
+      void handleMaximize();
+    },
+    [handleMaximize],
+  );
   const handleNewWorkspace = useCallback(() => {
     setActiveView("workspaces");
   }, []);
@@ -488,7 +498,10 @@ function App() {
         />
       )}
 
-      <header className="app-titlebar electrobun-webkit-app-region-drag">
+      <header
+        className="app-titlebar electrobun-webkit-app-region-drag"
+        onDoubleClick={handleTitleBarDoubleClick}
+      >
         <div className="app-titlebar__workspace electrobun-webkit-app-region-no-drag">
           <button
             aria-expanded={isWorkspaceMenuOpen}
