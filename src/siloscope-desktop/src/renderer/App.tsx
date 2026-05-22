@@ -47,6 +47,7 @@ type PaneLayout = "horizontal" | "vertical";
 type WorkbenchTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
 
 const themeStorageKey = "siloscope.theme";
+const workbenchThemes = ["dark", "light", "vscode-dark", "vscode-light"] as const;
 const applicationMenuEventName = "siloscope:application-menu-action";
 
 type GrainInvocationRequest = {
@@ -886,8 +887,8 @@ function readStoredTheme(): WorkbenchTheme {
   }
 
   const storedTheme = window.localStorage.getItem(themeStorageKey);
-  return storedTheme === "light" || storedTheme === "dark"
-    ? storedTheme
+  return workbenchThemes.includes(storedTheme as WorkbenchTheme)
+    ? (storedTheme as WorkbenchTheme)
     : "light";
 }
 

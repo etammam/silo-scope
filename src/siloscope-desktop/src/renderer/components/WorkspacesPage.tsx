@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, ChevronDown } from "lucide-react";
+import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, ChevronDown, Plus } from "lucide-react";
 import type { ClusterType, NugetFeed, NugetPackage, Workspace, WorkspaceSource } from "../../shared/types";
 
 type WorkspacesPageProps = {
@@ -78,7 +78,8 @@ export function WorkspacesPage({
           onClick={handleCreateNew}
           type="button"
         >
-          + Create cluster
+          <Plus aria-hidden="true" width={14} height={14} />
+          Create cluster
         </button>
           <ul className="workspaces-page__list" role="list">
             {workspaces.map((ws) => (
@@ -267,7 +268,7 @@ function WorkspaceForm({
 
       <div className="workspace-form__grid">
         <section className="workspace-form__panel">
-          <h4>Cluster</h4>
+          <h4>Connection</h4>
           <label className="workspace-form__field">
             <span>Name</span>
             <input

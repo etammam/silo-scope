@@ -157,14 +157,14 @@ export function RequestWorkbench({
         </button>
       </div>
 
-      <div className="request-workbench__tabs" aria-label="Request sections">
-        <button aria-selected={activeTab === "payload"} onClick={() => setActiveTab("payload")} type="button">
+      <div className="request-workbench__tabs" aria-label="Request sections" role="tablist">
+        <button aria-selected={activeTab === "payload"} onClick={() => setActiveTab("payload")} role="tab" type="button">
           Payload
         </button>
-        <button aria-selected={activeTab === "context"} onClick={() => setActiveTab("context")} type="button">
+        <button aria-selected={activeTab === "context"} onClick={() => setActiveTab("context")} role="tab" type="button">
           Context
         </button>
-        <button aria-selected={activeTab === "docs"} onClick={() => setActiveTab("docs")} type="button">
+        <button aria-selected={activeTab === "docs"} onClick={() => setActiveTab("docs")} role="tab" type="button">
           Docs
         </button>
       </div>

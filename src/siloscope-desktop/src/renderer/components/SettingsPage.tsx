@@ -2,12 +2,12 @@ type WorkbenchTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
 
 const lightThemes: { id: WorkbenchTheme; label: string }[] = [
   { id: "light", label: "Codex Light" },
-  { id: "vscode-light", label: "VSCode Light" },
+  { id: "vscode-light", label: "VS Code Light" },
 ];
 
 const darkThemes: { id: WorkbenchTheme; label: string }[] = [
   { id: "dark", label: "Codex Dark" },
-  { id: "vscode-dark", label: "VSCode Dark" },
+  { id: "vscode-dark", label: "VS Code Dark" },
 ];
 
 type SettingsPageProps = {

@@ -4,11 +4,8 @@ import type * as Monaco from "monaco-editor";
 
 type AppTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
 
-function mapToMonacoTheme(theme: AppTheme): "dark" | "light" {
-  if (theme.startsWith("vscode")) {
-    return theme === "vscode-light" ? "light" : "dark";
-  }
-  return theme as "dark" | "light";
+function mapToMonacoTheme(theme: AppTheme): string {
+  return `siloscope-${theme}`;
 }
 
 interface MonacoEditorProps {
@@ -77,6 +74,42 @@ export function MonacoEditor({
         "scrollbarSlider.activeBackground": "#73737199",
       },
     });
+    monaco.editor.defineTheme("siloscope-vscode-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#1F1F1F",
+        "editor.foreground": "#CCCCCC",
+        "editor.inactiveSelectionBackground": "#3A3D41",
+        "editor.selectionHighlightBackground": "#ADD6FF26",
+        "editorLineNumber.foreground": "#6E7681",
+        "editorLineNumber.activeForeground": "#CCCCCC",
+        "editorGutter.background": "#1F1F1F",
+        "editorIndentGuide.background1": "#404040",
+        "editorIndentGuide.activeBackground1": "#707070",
+        "editorOverviewRuler.border": "#010409",
+        "focusBorder": "#0078D4",
+      },
+    });
+    monaco.editor.defineTheme("siloscope-vscode-light", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#FFFFFF",
+        "editor.foreground": "#3B3B3B",
+        "editor.inactiveSelectionBackground": "#E5EBF1",
+        "editor.selectionHighlightBackground": "#ADD6FF80",
+        "editorLineNumber.foreground": "#6E7681",
+        "editorLineNumber.activeForeground": "#171184",
+        "editorGutter.background": "#FFFFFF",
+        "editorIndentGuide.background1": "#D3D3D3",
+        "editorIndentGuide.activeBackground1": "#939393",
+        "editorOverviewRuler.border": "#E5E5E5",
+        "focusBorder": "#005FB8",
+      },
+    });
   };
 
   const handleMount: OnMount = (editor) => {
@@ -91,7 +124,7 @@ export function MonacoEditor({
     <Editor
       height="100%"
       language={language}
-      theme={mapToMonacoTheme(theme) === "light" ? "siloscope-light" : "siloscope-dark"}
+      theme={mapToMonacoTheme(theme)}
       value={value}
       onChange={handleChange}
       beforeMount={handleBeforeMount}
