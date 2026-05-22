@@ -25,7 +25,6 @@ export function WorkspacesPage({
   onUpdateWorkspace,
   onDeleteWorkspace,
   onLoadWorkspace,
-  onSaveWorkspace,
   onPickFile,
   nugetFeeds,
   searchNugetPackages,
@@ -487,7 +486,7 @@ function NuGetPackageSearch({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [selectedFeed, setSelectedFeed] = useState<string>("");
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const feedName = selectedFeed || undefined;
 
@@ -621,7 +620,6 @@ function NuGetVersionSearch({
   feedName,
   value,
   onChange,
-  feeds,
   getNugetPackageVersions,
 }: {
   packageId: string;

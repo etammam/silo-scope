@@ -2,16 +2,11 @@ import { Electroview } from "electrobun/view";
 import {
   Briefcase,
   ChevronDown,
-  FilePlus,
-  FolderOpen,
   LayoutTemplate,
   Minus,
   PanelLeftClose,
   PanelRightClose,
   Play,
-  Radar,
-  Save,
-  SlidersHorizontal,
   Square,
   X,
 } from "lucide-react";
