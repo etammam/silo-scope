@@ -42,7 +42,7 @@ describe("NavigationSidebar", () => {
     );
 
     expect(screen.getByText("Sources")).toBeInTheDocument();
-    expect(screen.getByText("No workspace loaded")).toBeInTheDocument();
+    expect(screen.getByText("No cluster loaded")).toBeInTheDocument();
     expect(screen.queryByText("Disconnected")).not.toBeInTheDocument();
   });
 
@@ -185,6 +185,6 @@ describe("NavigationSidebar", () => {
 
     expect(screen.getByText("NuGet")).toBeInTheDocument();
     expect(screen.getByText("Sources")).toBeInTheDocument();
-    expect(screen.getByText("No workspace loaded")).toBeInTheDocument();
+    expect(screen.getByText("No cluster loaded")).toBeInTheDocument();
   });
 });

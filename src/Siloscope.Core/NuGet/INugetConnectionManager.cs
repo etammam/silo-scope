@@ -110,4 +110,19 @@ public interface INugetConnectionManager
         int take = 20,
         CancellationToken cancellationToken = default
     );
+
+    /// <summary>
+    /// Gets all available versions for a NuGet package.
+    /// </summary>
+    /// <param name="packageId">The package identifier.</param>
+    /// <param name="sourceUrl">An optional NuGet feed URL to query.</param>
+    /// <param name="feedName">An optional configured feed name to query.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> containing a read-only list of version strings.</returns>
+    Task<Result<IReadOnlyList<string>>> GetPackageVersionsAsync(
+        string packageId,
+        string? sourceUrl = null,
+        string? feedName = null,
+        CancellationToken cancellationToken = default
+    );
 }

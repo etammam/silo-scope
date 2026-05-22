@@ -311,21 +311,51 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         return { feed: mapNugetFeed(result.Value) };
       },
       searchNugetPackages: async ({ query, sourceUrl, feedName, take }) => {
-        const result = await requestSidecar<
-          FluentResult<BackendNugetPackage[]>
-        >(
-          "SearchNugetPackagesAsync",
-          [query, sourceUrl ?? null, feedName ?? null, take ?? 20],
-          "SearchNugetPackages",
-        );
-
-        if (!result.IsSuccess) {
-          throw new Error(
-            result.Errors?.[0]?.Message ?? "Failed to search NuGet packages.",
+        if (feedName || sourceUrl) {
+          const resolvedSourceUrl = sourceUrl ?? (await resolveFeedUrlByName(feedName));
+          const result = await requestSidecar<
+            FluentResult<BackendNugetPackage[]>
+          >(
+            "SearchNugetPackagesAsync",
+            [query, resolvedSourceUrl ?? null, feedName ?? null, take ?? 20],
+            "SearchNugetPackages",
           );
+
+          if (!result.IsSuccess) {
+            throw new Error(
+              result.Errors?.[0]?.Message ?? "Failed to search NuGet packages.",
+            );
+          }
+
+          return { packages: (result.Value ?? []).map(mapNugetPackage) };
         }
 
-        return { packages: (result.Value ?? []).map(mapNugetPackage) };
+        return { packages: await searchNugetPackagesAcrossAllFeeds(query, take ?? 20) };
+      },
+      getNugetPackageVersions: async ({ packageId, sourceUrl, feedName }) => {
+        if (feedName || sourceUrl) {
+          try {
+            const resolvedSourceUrl = sourceUrl ?? (await resolveFeedUrlByName(feedName));
+            const result = await requestSidecar<FluentResult<string[]>>(
+              "GetNugetPackageVersionsAsync",
+              [packageId, resolvedSourceUrl ?? null, feedName ?? null],
+            );
+            if (!result.IsSuccess) {
+              throw new Error(
+                result.Errors?.[0]?.Message ?? "Failed to get NuGet package versions.",
+              );
+            }
+            return { versions: result.Value ?? [] };
+          } catch (error) {
+            console.warn(
+              `[getNugetPackageVersions] single-feed query failed for "${feedName}":`,
+              error instanceof Error ? error.message : error,
+            );
+            return { versions: [] };
+          }
+        }
+
+        return { versions: await getNugetPackageVersionsAcrossAllFeeds(packageId) };
       },
       addNugetPackageSource: async ({
         packageId,
@@ -439,6 +469,30 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
       logEntry: ({ entry }) => {
         console.log("logEntry", entry);
       },
+      openFileDialog: async ({ allowedFileTypes, canChooseFiles, canChooseDirectories, allowsMultipleSelection }) => {
+        try {
+          const dialogOpts: {
+            canChooseFiles: boolean;
+            canChooseDirectory: boolean;
+            allowsMultipleSelection: boolean;
+            allowedFileTypes?: string;
+          } = {
+            canChooseFiles: canChooseFiles ?? true,
+            canChooseDirectory: canChooseDirectories ?? false,
+            allowsMultipleSelection: allowsMultipleSelection ?? false,
+          };
+          if (allowedFileTypes !== undefined && allowedFileTypes.length > 0) {
+            dialogOpts.allowedFileTypes = allowedFileTypes;
+          }
+          console.log("[openFileDialog] opening dialog with opts:", JSON.stringify(dialogOpts));
+          const result = await Utils.openFileDialog(dialogOpts);
+          console.log("[openFileDialog] dialog result:", JSON.stringify(result));
+          rpc.send.filePicked({ paths: result });
+        } catch (error) {
+          console.error("[openFileDialog] dialog failed:", error instanceof Error ? error.message : error);
+          rpc.send.filePicked({ paths: [] });
+        }
+      },
     },
   },
 });
@@ -477,6 +531,130 @@ async function discoverSourceCatalog(): Promise<SourceOwnedCatalog> {
   }
 
   return mapSourceCatalog(result.Value ?? {});
+}
+
+async function resolveFeedUrlByName(feedName?: string): Promise<string | null> {
+  if (!feedName) return null;
+  const result = await requestSidecar<FluentResult<BackendNugetFeed[]>>(
+    "ListNugetFeedsAsync",
+    undefined,
+    "ListNugetFeeds",
+  );
+  if (!result.IsSuccess || !result.Value) {
+    return null;
+  }
+  const feed = result.Value.find((f) => f.Name === feedName);
+  return feed ? feed.Url : null;
+}
+
+async function listConfiguredFeeds(): Promise<BackendNugetFeed[]> {
+  const result = await requestSidecar<FluentResult<BackendNugetFeed[]>>(
+    "ListNugetFeedsAsync",
+    undefined,
+    "ListNugetFeeds",
+  );
+  if (!result.IsSuccess || !result.Value) {
+    return [];
+  }
+  return result.Value;
+}
+
+async function searchNugetPackagesAcrossAllFeeds(query: string, take: number): Promise<NugetPackage[]> {
+  const feeds = await listConfiguredFeeds();
+  if (feeds.length === 0) {
+    return [];
+  }
+
+  const searchResults = await Promise.allSettled(
+    feeds.map(async (feed) => {
+      const result = await requestSidecar<FluentResult<BackendNugetPackage[]>>(
+        "SearchNugetPackagesAsync",
+        [query, feed.Url, feed.Name, take],
+        "SearchNugetPackages",
+      );
+      if (!result.IsSuccess || !result.Value) {
+        return [] as Array<{ pkg: BackendNugetPackage; isDefault: boolean }>;
+      }
+      return result.Value.map((pkg) => ({ pkg, isDefault: feed.IsDefault }));
+    }),
+  );
+
+  const seen = new Set<string>();
+  const packages: Array<NugetPackage & { _feedPriority: number }> = [];
+
+  for (const outcome of searchResults) {
+    if (outcome.status !== "fulfilled") continue;
+    for (const entry of outcome.value) {
+      const id = entry.pkg.PackageId;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      packages.push({
+        packageId: entry.pkg.PackageId,
+        version: entry.pkg.Version,
+        description: entry.pkg.Description ?? null,
+        authors: entry.pkg.Authors ?? null,
+        downloadCount: entry.pkg.DownloadCount ?? null,
+        _feedPriority: entry.isDefault ? 1 : 0,
+      });
+    }
+  }
+
+  packages.sort((a, b) => {
+    if (a._feedPriority !== b._feedPriority) return a._feedPriority - b._feedPriority;
+    return a.packageId.localeCompare(b.packageId);
+  });
+
+  return packages.map(({ _feedPriority, ...pkg }) => pkg);
+}
+
+async function getNugetPackageVersionsAcrossAllFeeds(packageId: string): Promise<string[]> {
+  const feeds = await listConfiguredFeeds();
+  if (feeds.length === 0) {
+    return [];
+  }
+
+  const versionResults = await Promise.allSettled(
+    feeds.map(async (feed) => {
+      try {
+        const result = await requestSidecar<FluentResult<string[]>>(
+          "GetNugetPackageVersionsAsync",
+          [packageId, feed.Url, feed.Name],
+        );
+        if (!result.IsSuccess || !result.Value) {
+          return [] as Array<{ version: string; _feedIsDefault: boolean }>;
+        }
+        return result.Value.map((v) => ({ version: v, _feedIsDefault: feed.IsDefault }));
+      } catch (error) {
+        console.warn(
+          `[getNugetPackageVersionsAcrossAllFeeds] feed "${feed.Name}" failed:`,
+          error instanceof Error ? error.message : error,
+        );
+        return [] as Array<{ version: string; _feedIsDefault: boolean }>;
+      }
+    }),
+  );
+
+  const seen = new Set<string>();
+  const versions: Array<{ version: string; _feedPriority: number }> = [];
+
+  for (const outcome of versionResults) {
+    if (outcome.status !== "fulfilled") continue;
+    for (const entry of outcome.value) {
+      if (seen.has(entry.version)) continue;
+      seen.add(entry.version);
+      versions.push({
+        version: entry.version,
+        _feedPriority: entry._feedIsDefault ? 1 : 0,
+      });
+    }
+  }
+
+  versions.sort((a, b) => {
+    if (a._feedPriority !== b._feedPriority) return a._feedPriority - b._feedPriority;
+    return a.version.localeCompare(b.version);
+  });
+
+  return versions.map(({ _feedPriority, ...rest }) => rest.version);
 }
 
 function mapNugetFeed(feed: BackendNugetFeed): NugetFeed {

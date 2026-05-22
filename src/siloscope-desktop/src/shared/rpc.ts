@@ -37,6 +37,10 @@ export type SiloScopeRPC = {
         params: { query: string; sourceUrl?: string; feedName?: string; take?: number };
         response: { packages: NugetPackage[] };
       };
+      getNugetPackageVersions: {
+        params: { packageId: string; sourceUrl?: string; feedName?: string };
+        response: { versions: string[] };
+      };
       addNugetPackageSource: {
         params: { packageId: string; version: string; gateway?: string; sourceUrl?: string; feedName?: string };
         response: { workspace: Workspace };
@@ -60,6 +64,12 @@ export type SiloScopeRPC = {
     messages: {
       connectionChanged: { isConnected: boolean };
       logEntry: { entry: LogEntry };
+      openFileDialog: {
+        allowedFileTypes?: string;
+        canChooseFiles?: boolean;
+        canChooseDirectories?: boolean;
+        allowsMultipleSelection?: boolean;
+      };
     };
   }>;
   webview: RPCSchema<{
@@ -70,6 +80,7 @@ export type SiloScopeRPC = {
       requestGrains: { workspaceId: string };
       applicationMenuAction: { action: ApplicationMenuAction };
       logEntry: { entry: LogEntry };
+      filePicked: { paths: string[] };
     };
   }>;
 };

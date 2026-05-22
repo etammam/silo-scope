@@ -433,6 +433,48 @@ public sealed class NugetConnectionManager : INugetConnectionManager
         }
     }
 
+    public async Task<Result<IReadOnlyList<string>>> GetPackageVersionsAsync(
+        string packageId,
+        string? sourceUrl = null,
+        string? feedName = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (string.IsNullOrWhiteSpace(packageId))
+        {
+            return Result.Ok<IReadOnlyList<string>>([]);
+        }
+
+        try
+        {
+            var credentials = !string.IsNullOrEmpty(feedName) ? GetCredentials(feedName) : null;
+            var source = CreatePackageSource(sourceUrl, credentials);
+            var repository = Repository.Factory.GetCoreV3(source);
+            var findPackageResource = await repository.GetResourceAsync<FindPackageByIdResource>(
+                cancellationToken
+            );
+
+            var versions = await findPackageResource.GetAllVersionsAsync(
+                packageId,
+                new SourceCacheContext(),
+                NullLogger.Instance,
+                cancellationToken
+            );
+
+            var versionStrings = versions
+                .OrderByDescending(v => v)
+                .Select(v => v.ToNormalizedString())
+                .ToList();
+
+            return Result.Ok<IReadOnlyList<string>>(versionStrings);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to get versions for {PackageId}", packageId);
+            return Result.Fail<IReadOnlyList<string>>(e.Message);
+        }
+    }
+
     private async Task<Result> RestorePackageGraphAsync(
         string packageId,
         string version,

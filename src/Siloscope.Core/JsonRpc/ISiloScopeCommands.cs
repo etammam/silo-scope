@@ -201,6 +201,22 @@ public interface ISiloScopeCommands
     );
 
     /// <summary>
+    /// Gets all available versions for a NuGet package.
+    /// </summary>
+    /// <param name="packageId">The NuGet package identifier.</param>
+    /// <param name="sourceUrl">An optional NuGet feed URL to query.</param>
+    /// <param name="feedName">An optional configured feed name to query.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> containing a read-only list of version strings.</returns>
+    [JsonRpcMethod("GetNugetPackageVersionsAsync")]
+    Task<Result<IReadOnlyList<string>>> GetNugetPackageVersionsAsync(
+        string packageId,
+        string? sourceUrl = null,
+        string? feedName = null,
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>
     /// Adds a NuGet package as a silo source to the current workspace.
     /// </summary>
     /// <param name="packageId">The NuGet package identifier.</param>

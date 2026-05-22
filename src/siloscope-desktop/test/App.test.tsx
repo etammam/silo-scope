@@ -19,6 +19,7 @@ const electrobunMock = vi.hoisted(() => {
     testNugetFeed: vi.fn(),
     updateNugetFeed: vi.fn(),
     searchNugetPackages: vi.fn(),
+    getNugetPackageVersions: vi.fn(),
     addNugetPackageSource: vi.fn(),
     invokeGrain: vi.fn(),
     getWorkspaces: vi.fn(),
@@ -26,17 +27,19 @@ const electrobunMock = vi.hoisted(() => {
   const send = {
     connectionChanged: vi.fn(),
     logEntry: vi.fn(),
+    openFileDialog: vi.fn(),
   };
+  const addMessageListener = vi.fn();
   const ElectroviewMock = Object.assign(
-    vi.fn(function (this: { rpc: { request: typeof request; send: typeof send } }) {
-      this.rpc = { request, send };
+    vi.fn(function (this: { rpc: { request: typeof request; send: typeof send; addMessageListener: typeof addMessageListener } }) {
+      this.rpc = { request, send, addMessageListener };
     }),
     {
       defineRPC: vi.fn((config) => config),
     },
   );
 
-  return { ElectroviewMock, request, send };
+  return { ElectroviewMock, request, send, addMessageListener };
 });
 
 vi.mock("electrobun/view", () => ({
@@ -73,6 +76,7 @@ describe("App shell", () => {
     electrobunMock.request.testNugetFeed.mockClear();
     electrobunMock.request.updateNugetFeed.mockClear();
     electrobunMock.request.searchNugetPackages.mockClear();
+    electrobunMock.request.getNugetPackageVersions.mockClear();
     electrobunMock.request.addNugetPackageSource.mockClear();
     electrobunMock.request.invokeGrain.mockClear();
     electrobunMock.request.getWorkspaces.mockClear();
@@ -118,6 +122,7 @@ describe("App shell", () => {
       ],
     });
     electrobunMock.request.searchNugetPackages.mockResolvedValue({ packages: [] });
+    electrobunMock.request.getNugetPackageVersions.mockResolvedValue({ versions: ["1.0.0", "2.0.0"] });
     electrobunMock.request.createNugetFeed.mockResolvedValue({
       feed: {
         name: "private",
@@ -235,56 +240,30 @@ describe("App shell", () => {
     expect(useAppStore.getState().sourceCatalog.sources[0]?.interfaces[0]?.methods[0]?.functionId).toBe("function-1");
   });
 
-  it("loads, saves, connects, disconnects, and discovers from the workspace menu", async () => {
-    electrobunMock.request.discoverGrains.mockResolvedValue({
-      grains: [
-        {
-          interfaceId: "grain-1",
-          interfaceName: "IPlayerGrain",
-          methods: [],
-        },
-      ],
-      sourceCatalog: {
-        sources: [
-          {
-            sourceId: "source-1",
-            sourceType: "DLL",
-            reference: "Game.Grains.dll",
-            label: "Game.Grains.dll",
-            enabled: true,
-            discoveryStatus: "ready",
-            interfaces: [],
-          },
-        ],
+  it("connects and disconnects the active cluster from the titlebar", async () => {
+    useAppStore.setState({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+        clusterId: "dev",
+        serviceId: "SiloScope",
+        gatewayEndpoints: ["127.0.0.1:30000"],
+        sources: [],
       },
     });
 
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "My Workspace" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Open workspace" }));
-    expect(await screen.findByRole("button", { name: "Local" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Local" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Save workspace" }));
     fireEvent.click(screen.getByRole("button", { name: "Connect cluster" }));
     await screen.findByText("Connected");
-    fireEvent.click(screen.getByRole("button", { name: "Local" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Discover grains" }));
     fireEvent.click(screen.getByRole("button", { name: "Disconnect cluster" }));
 
-    expect(electrobunMock.request.loadWorkspace).toHaveBeenCalledWith(undefined);
-    expect(electrobunMock.request.setActiveWorkspace).toHaveBeenCalledWith({
-      workspace: expect.objectContaining({ id: "workspace-1" }),
-    });
-    expect(electrobunMock.request.saveWorkspace).toHaveBeenCalledWith({
-      workspace: expect.objectContaining({ id: "workspace-1" }),
-      path: undefined,
-    });
     expect(electrobunMock.request.connectCluster).toHaveBeenCalledWith({
       workspace: expect.objectContaining({ id: "workspace-1" }),
     });
-    expect(electrobunMock.request.discoverGrains).toHaveBeenCalledWith({ workspaceId: "workspace-1" });
     expect(electrobunMock.request.disconnectCluster).toHaveBeenCalledWith();
   });
 
@@ -619,33 +598,7 @@ describe("App shell", () => {
     expect(screen.getAllByTestId("mock-editor")[0]).toHaveAttribute("data-theme", "light");
   });
 
-  it("opens the workspace creation popup when the File menu requests a new workspace", () => {
-    useAppStore.setState({
-      workspace: {
-        id: "workspace-1",
-        name: "Local",
-        siloAddress: "127.0.0.1",
-        gatewayPort: 30000,
-        orleansVersion: "10.0",
-      },
-      grains: [{ interfaceId: "grain-1", interfaceName: "IPlayerGrain", methods: [] }],
-      sourceCatalog: {
-        sources: [
-          {
-            sourceId: "source-1",
-            sourceType: "DLL",
-            reference: "Core.dll",
-            label: "Core.dll",
-            enabled: true,
-            discoveryStatus: "ready",
-            interfaces: [],
-          },
-        ],
-      },
-      selectedFunctionId: "function-1",
-      invocationResult: { isSuccess: false, error: "pending" },
-    });
-
+  it("navigates to the workspaces page when the File menu requests a new workspace", () => {
     const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
     render(<App />);
 
@@ -653,50 +606,23 @@ describe("App shell", () => {
       rpcConfig.handlers.messages.applicationMenuAction({ action: "newWorkspace" });
     });
 
-    expect(screen.getByRole("dialog", { name: "New workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Clusters" })).toBeInTheDocument();
   });
 
-  it("opens the workspace creation popup from the workspace menu", () => {
-    useAppStore.setState({
-      workspace: {
-        id: "workspace-1",
-        name: "Local",
-        siloAddress: "127.0.0.1",
-        gatewayPort: 30000,
-        orleansVersion: "10.0",
-      },
-      grains: [{ interfaceId: "grain-1", interfaceName: "IPlayerGrain", methods: [] }],
-      sourceCatalog: {
-        sources: [
-          {
-            sourceId: "source-1",
-            sourceType: "DLL",
-            reference: "Core.dll",
-            label: "Core.dll",
-            enabled: true,
-            discoveryStatus: "ready",
-            interfaces: [],
-          },
-        ],
-      },
-      selectedFunctionId: "function-1",
-      invocationResult: { isSuccess: false, error: "pending" },
-    });
-
+  it("navigates to the Clusters page from the ActivityBar", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Local" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Create workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clusters" }));
 
-    expect(screen.getByRole("dialog", { name: "New workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Clusters" })).toBeInTheDocument();
   });
 
   it("creates a workspace, configures cluster settings, references a DLL source, and connects", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "My Workspace" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Create workspace" }));
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.click(screen.getByRole("button", { name: "Clusters" }));
+    expect(screen.getByRole("heading", { name: "Clusters" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Cluster name"), {
       target: { value: "Tenant Workspace" },
     });
     fireEvent.change(screen.getByLabelText("Cluster ID"), {
@@ -708,11 +634,13 @@ describe("App shell", () => {
     fireEvent.change(screen.getByLabelText("Gateway endpoint"), {
       target: { value: "localhost:11111" },
     });
-    fireEvent.change(screen.getByLabelText("Source reference"), {
+    fireEvent.change(screen.getByLabelText("Silo reference"), {
       target: { value: "/tmp/Contracts.dll" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Source" }));
-    fireEvent.click(screen.getByRole("button", { name: "Create Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Silo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Cluster" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
     fireEvent.click(screen.getByRole("button", { name: "Connect cluster" }));
 
     await screen.findByText("Connected");
@@ -755,29 +683,27 @@ describe("App shell", () => {
   it("edits a workspace and keeps multiple referenced sources", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "My Workspace" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Create workspace" }));
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.click(screen.getByRole("button", { name: "Clusters" }));
+    fireEvent.change(screen.getByLabelText("Cluster name"), {
       target: { value: "Tenant Workspace" },
     });
-    fireEvent.change(screen.getByLabelText("Source reference"), {
+    fireEvent.change(screen.getByLabelText("Silo reference"), {
       target: { value: "/tmp/Contracts.dll" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Source" }));
-    fireEvent.click(screen.getByRole("button", { name: "Create Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Silo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Cluster" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Tenant Workspace" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Manage workspace" }));
-    expect(screen.getByRole("dialog", { name: "Edit workspace" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Tenant Workspace" }));
+    expect(screen.getByRole("heading", { name: "Edit cluster" })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.change(screen.getByLabelText("Cluster name"), {
       target: { value: "Tenant Workspace Edited" },
     });
-    fireEvent.change(screen.getByLabelText("Source reference"), {
+    fireEvent.change(screen.getByLabelText("Silo reference"), {
       target: { value: "/tmp/MoreContracts.dll" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Source" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save Workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Silo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Cluster" }));
 
     expect(useAppStore.getState().workspace).toEqual(
       expect.objectContaining({

@@ -266,7 +266,7 @@ function WorkspaceNavigator({
                 ? isConnected
                   ? "No functions discovered"
                   : "Connect to discover source functions"
-                : "No workspace loaded"}
+                : "No cluster loaded"}
             </div>
           )}
         </div>
@@ -607,6 +607,10 @@ function formatViewTitle(view: ActivityView): string {
 
   if (view === "nuget") {
     return "NuGet";
+  }
+
+  if (view === "workspaces") {
+    return "Clusters";
   }
 
   return view;

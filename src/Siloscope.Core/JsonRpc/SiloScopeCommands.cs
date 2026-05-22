@@ -577,6 +577,27 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         );
     }
 
+    public async Task<Result<IReadOnlyList<string>>> GetNugetPackageVersionsAsync(
+        string packageId,
+        string? sourceUrl = null,
+        string? feedName = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var result = await _nugetManager.GetPackageVersionsAsync(
+            packageId,
+            sourceUrl,
+            feedName,
+            cancellationToken
+        );
+        if (result.IsFailed)
+        {
+            return Result.Fail<IReadOnlyList<string>>(result.Errors.Select(e => e.Message));
+        }
+
+        return Result.Ok<IReadOnlyList<string>>(result.Value);
+    }
+
     public async Task<Result<WorkspaceInfo>> AddNugetPackageSourceAsync(
         string packageId,
         string version,
