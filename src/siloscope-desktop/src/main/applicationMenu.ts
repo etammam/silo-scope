@@ -1,4 +1,8 @@
-export type FileMenuAction = "newWorkspace" | "openWorkspace" | "saveWorkspace";
+export type FileMenuAction =
+  | "newWorkspace"
+  | "openWorkspace"
+  | "saveWorkspace"
+  | "quitApplication";
 export type ViewMenuAction =
   | "toggleActivityBar"
   | "toggleNavigationSidebar"
@@ -30,6 +34,7 @@ export const fileMenuActions = {
   newWorkspace: "file:new-workspace",
   openWorkspace: "file:open-workspace",
   saveWorkspace: "file:save-workspace",
+  quitApplication: "file:quit-application",
 } as const;
 
 export const viewMenuActions = {
@@ -54,7 +59,7 @@ export function createApplicationMenuTemplate(): ApplicationMenuItem[] {
         { label: "Open Workspace", action: fileMenuActions.openWorkspace, accelerator: "o" },
         { label: "Save Workspace", action: fileMenuActions.saveWorkspace, accelerator: "s" },
         { type: "separator" },
-        { label: "Exit", role: "quit" },
+        { label: "Exit", action: fileMenuActions.quitApplication, accelerator: "q" },
       ],
     },
     {
@@ -121,6 +126,10 @@ export function getApplicationMenuAction(event: unknown): ApplicationMenuAction 
 
   if (action === fileMenuActions.saveWorkspace) {
     return "saveWorkspace";
+  }
+
+  if (action === fileMenuActions.quitApplication) {
+    return "quitApplication";
   }
 
   if (action === viewMenuActions.toggleActivityBar) {

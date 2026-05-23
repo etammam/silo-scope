@@ -11,6 +11,7 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="Cluster">The cluster connection options.</param>
 /// <param name="Silos">The list of silo sources in the workspace.</param>
 /// <param name="EnvironmentVariables">The active environment variables for the workspace.</param>
+/// <param name="SavedContexts">The request contexts explicitly saved for workspace tabs.</param>
 public sealed record WorkspaceInfo(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("name")] string Name,
@@ -18,5 +19,6 @@ public sealed record WorkspaceInfo(
     [property: JsonPropertyName("cluster")] ClusterOptions Cluster,
     [property: JsonPropertyName("silos")] List<SiloSource> Silos,
     [property: JsonPropertyName("environmentVariables")]
-        Dictionary<string, string> EnvironmentVariables
+        Dictionary<string, string> EnvironmentVariables,
+    [property: JsonPropertyName("savedContexts")] List<SavedRequestContext> SavedContexts
 );

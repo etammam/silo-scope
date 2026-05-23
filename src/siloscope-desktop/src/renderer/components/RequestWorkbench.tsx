@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Play } from "lucide-react";
 import type {
   GrainInterfaceDescriptor,
@@ -20,6 +20,8 @@ type RequestWorkbenchProps = {
   onSelectGrain: (grainId: string | null) => void;
   onSelectFunction?: (functionId: string | null) => void;
   onSelectMethod: (methodName: string | null) => void;
+  requestState: RequestState;
+  onRequestStateChange: (nextState: RequestState) => void;
   onInvoke: (request: {
     grainType: string;
     grainKey: string;
@@ -33,6 +35,12 @@ type RequestWorkbenchProps = {
 
 type RequestTab = "payload" | "context" | "docs";
 
+export type RequestState = {
+  grainKey: string;
+  keyType: GrainKeyType;
+  payload: string;
+};
+
 export function RequestWorkbench({
   grains,
   sourceCatalog,
@@ -40,11 +48,10 @@ export function RequestWorkbench({
   selectedGrain,
   selectedMethod,
   theme,
+  requestState,
+  onRequestStateChange,
   onInvoke,
 }: RequestWorkbenchProps) {
-  const [grainKey, setGrainKey] = useState("");
-  const [keyType, setKeyType] = useState<GrainKeyType>("String");
-  const [payload, setPayload] = useState("{\n}");
   const [activeTab, setActiveTab] = useState<RequestTab>("payload");
   const activeFunction = useMemo(
     () => findCatalogFunction(sourceCatalog ?? { sources: [] }, selectedFunctionId ?? null),
@@ -72,38 +79,33 @@ export function RequestWorkbench({
   const activeMethod = activeFunction
     ? toGrainMethod(activeFunction)
     : methods.find((method) => method.name === selectedMethod) ?? null;
-  const payloadError = useMemo(() => validateJson(payload), [payload]);
+  const payloadError = useMemo(() => validateJson(requestState.payload), [requestState.payload]);
   const expectsSourceOwnedSelection = Boolean(sourceCatalog?.sources.some((source) => source.interfaces.length > 0));
   const canInvoke = Boolean(
     (activeFunction || activeGrain) &&
       activeMethod &&
       (!expectsSourceOwnedSelection || activeFunction) &&
-      grainKey.trim() &&
+      requestState.grainKey.trim() &&
       !payloadError,
   );
 
-  useEffect(() => {
-    if (!activeFunction) {
-      if (selectedFunctionId) {
-        setPayload("{\n}");
-        setKeyType("String");
-      }
-      return;
-    }
-
-    setKeyType(activeFunction.keyType);
-    setPayload(createPayloadTemplate(activeFunction));
-  }, [activeFunction, selectedFunctionId]);
-
   const insertEnvToken = (token: string) => {
-    setPayload((currentPayload) => {
+    updateRequestState((currentState) => {
+      const currentPayload = currentState.payload;
       const insertAt = Math.max(currentPayload.lastIndexOf("}"), 0);
       const prefix = currentPayload.slice(0, insertAt).trimEnd();
       const suffix = currentPayload.slice(insertAt);
       const separator = prefix.endsWith("{") ? "\n  " : ",\n  ";
 
-      return `${prefix}${separator}"${token}": "\${env:${token}}"\n${suffix}`;
+      return {
+        ...currentState,
+        payload: `${prefix}${separator}"${token}": "\${env:${token}}"\n${suffix}`,
+      };
     });
+  };
+
+  const updateRequestState = (updater: (currentState: RequestState) => RequestState) => {
+    onRequestStateChange(updater(requestState));
   };
 
   const handleInvoke = () => {
@@ -113,10 +115,10 @@ export function RequestWorkbench({
 
     const request = {
       grainType: activeFunction?.interfaceId ?? activeGrain!.interfaceName,
-      grainKey: grainKey.trim(),
-      keyType,
+      grainKey: requestState.grainKey.trim(),
+      keyType: requestState.keyType,
       method: activeFunction?.methodName ?? activeMethod.name,
-      payload,
+      payload: requestState.payload,
       ...(activeFunction
         ? {
             sourceId: activeFunction.sourceId,
@@ -137,15 +139,38 @@ export function RequestWorkbench({
           <span>Grain ID</span>
           <input
             placeholder="Primary key"
-            value={grainKey}
-            onChange={(event) => setGrainKey(event.target.value)}
+            value={requestState.grainKey}
+            onChange={(event) =>
+              onRequestStateChange({
+                ...requestState,
+                grainKey: event.target.value,
+              })
+            }
           />
+        </label>
+
+        <label>
+          <span>Key type</span>
+          <select
+            aria-label="Key type"
+            value={requestState.keyType}
+            onChange={(event) =>
+              onRequestStateChange({
+                ...requestState,
+                keyType: event.target.value as GrainKeyType,
+              })
+            }
+          >
+            <option value="String">String</option>
+            <option value="Guid">Guid</option>
+            <option value="Integer">Integer</option>
+          </select>
         </label>
 
         <div className="request-workbench__grain-summary" aria-label="Grain selection summary">
           <div>
             <span>Grain</span>
-            <small>{activeFunction?.keyType ?? activeMethod?.keyType ?? keyType} key</small>
+            <small>{requestState.keyType} key</small>
           </div>
           <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
           <small>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</small>
@@ -202,7 +227,11 @@ export function RequestWorkbench({
                 </button>
               </div>
             </div>
-            <MonacoEditor value={payload} onChange={setPayload} theme={theme} />
+            <MonacoEditor
+              value={requestState.payload}
+              onChange={(payload) => onRequestStateChange({ ...requestState, payload })}
+              theme={theme}
+            />
           </div>
 
           <div className="request-workbench__trigger-bar">
@@ -311,11 +340,11 @@ export function RequestWorkbench({
             <div className="context-grid">
               <div className="context-item">
                 <span className="context-label">Grain ID</span>
-                <span className="context-value code">{grainKey || "(enter grain key)"}</span>
+                <span className="context-value code">{requestState.grainKey || "(enter grain key)"}</span>
               </div>
               <div className="context-item">
                 <span className="context-label">Key Type</span>
-                <span className="context-value">{keyType}</span>
+                <span className="context-value">{requestState.keyType}</span>
               </div>
               <div className="context-item">
                 <span className="context-label">Interface</span>
@@ -381,7 +410,7 @@ function toGrainMethod(catalogFunction: SourceCatalogFunction): GrainMethodDescr
   };
 }
 
-function createPayloadTemplate(catalogFunction: SourceCatalogFunction): string {
+export function createPayloadTemplate(catalogFunction: SourceCatalogFunction): string {
   const parameters = visibleParameters(catalogFunction.parameters);
   if (parameters.length === 0) {
     return "{\n}";

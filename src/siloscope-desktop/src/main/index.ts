@@ -11,6 +11,7 @@ import type {
   NugetFeed,
   NugetPackage,
   SourceOwnedCatalog,
+  UnsavedRequestContextSummary,
   Workspace,
   WorkspaceSource,
 } from "../shared/types";
@@ -20,6 +21,11 @@ import { SidecarJsonRpcClient } from "./jsonRpcClient";
 const sidecar = new SidecarJsonRpcClient();
 sidecar.start();
 let pageZoom = 1;
+let closeWasConfirmed = false;
+let closeConfirmationRequestInFlight = false;
+let sidecarDisposeStarted = false;
+let latestUnsavedRequests: UnsavedRequestContextSummary[] = [];
+let mainWindow: BrowserWindow<any>;
 
 type FluentResult<T> = {
   IsSuccess: boolean;
@@ -74,6 +80,19 @@ type BackendWorkspaceInfo = {
     Gateway?: string | null;
     Enabled: boolean;
   }>;
+  SavedContexts?: BackendSavedRequestContext[];
+};
+
+type BackendSavedRequestContext = {
+  TabId: string;
+  IsDefaultActive: boolean;
+  TargetGrainClass: string;
+  TargetMethod: string;
+  KeyType: "Guid" | "String" | "Integer" | string;
+  GrainId: string;
+  Payload: string;
+  SourceId?: string | null;
+  FunctionId?: string | null;
 };
 
 type BackendNugetFeed = {
@@ -156,6 +175,7 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
           );
         }
 
+        latestUnsavedRequests = [];
         return { success: true };
       },
       connectCluster: async ({ workspace }) => {
@@ -458,7 +478,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         return { success: true, isMaximized: !isMaximized };
       },
       closeWindow: async (): Promise<{ success: boolean }> => {
-        mainWindow.close();
+        console.log("[close-guard:bun] renderer requested closeWindow");
+        closeWasConfirmed = true;
+        Utils.quit();
         return { success: true };
       },
     },
@@ -492,6 +514,15 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
           console.error("[openFileDialog] dialog failed:", error instanceof Error ? error.message : error);
           rpc.send.filePicked({ paths: [] });
         }
+      },
+      updateUnsavedRequestContexts: ({ requests, contexts }) => {
+        latestUnsavedRequests = requests;
+        console.log(
+          "[close-guard:bun] dirty request contexts updated",
+          requests.map((request) => request.label),
+          "contextCount=",
+          contexts.length,
+        );
       },
     },
   },
@@ -702,6 +733,7 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
       workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
     orleansVersion: "10.0",
     environmentVariables: {},
+    savedContexts: (workspace.SavedContexts ?? []).map(mapSavedRequestContext),
     sources: (workspace.Silos ?? []).map(
       (source): WorkspaceSource => ({
         sourceId: `${source.Source}:${source.Reference}:${source.Version ?? ""}:${source.Gateway ?? ""}`,
@@ -736,6 +768,39 @@ function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
       Enabled: source.enabled,
     })),
     EnvironmentVariables: workspace.environmentVariables ?? {},
+    SavedContexts: (workspace.savedContexts ?? []).map(mapBackendSavedRequestContext),
+  };
+}
+
+function mapSavedRequestContext(
+  context: BackendSavedRequestContext,
+): NonNullable<Workspace["savedContexts"]>[number] {
+  return {
+    tabId: context.TabId,
+    isDefaultActive: context.IsDefaultActive,
+    targetGrainClass: context.TargetGrainClass,
+    targetMethod: context.TargetMethod,
+    keyType: isGrainKeyType(context.KeyType) ? context.KeyType : "String",
+    grainId: context.GrainId,
+    payload: context.Payload,
+    sourceId: context.SourceId ?? null,
+    functionId: context.FunctionId ?? null,
+  };
+}
+
+function mapBackendSavedRequestContext(
+  context: NonNullable<Workspace["savedContexts"]>[number],
+): BackendSavedRequestContext {
+  return {
+    TabId: context.tabId,
+    IsDefaultActive: context.isDefaultActive,
+    TargetGrainClass: context.targetGrainClass,
+    TargetMethod: context.targetMethod,
+    KeyType: context.keyType,
+    GrainId: context.grainId,
+    Payload: context.payload,
+    SourceId: context.sourceId ?? null,
+    FunctionId: context.functionId ?? null,
   };
 }
 
@@ -887,22 +952,40 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-const mainWindow = new BrowserWindow({
-  title: "SiloScope",
-  url: "views://renderer/index.html",
-  rpc,
-  titleBarStyle: "hiddenInset",
-  trafficLightOffset: {
-    x: 12,
-    y: 10,
-  },
-  frame: {
-    x: 100,
-    y: 100,
-    width: 1200,
-    height: 800,
-  },
-});
+function createMainWindow() {
+  const window = new BrowserWindow({
+    title: "SiloScope",
+    url: "views://renderer/index.html",
+    rpc,
+    titleBarStyle: "hiddenInset",
+    trafficLightOffset: {
+      x: 12,
+      y: 10,
+    },
+    frame: {
+      x: 100,
+      y: 100,
+      width: 1200,
+      height: 800,
+    },
+  });
+
+  Electrobun.events.on(`close-${window.id}`, () => {
+    console.log(
+      "[close-guard:bun] window close event",
+      "confirmed=",
+      closeWasConfirmed,
+      "dirtyCount=",
+      latestUnsavedRequests.length,
+      "hasWebviewRpc=",
+      Boolean(window.webview?.rpc),
+    );
+  });
+
+  return window;
+}
+
+mainWindow = createMainWindow();
 
 sidecar.onNotification(({ method, params }) => {
   if (method !== "log") {
@@ -954,7 +1037,89 @@ installApplicationMenu({
 
 console.log("SiloScope app started!");
 
-Electrobun.events.on("before-quit", async () => {
+Electrobun.events.on("before-quit", async (event: { response?: { allow: boolean } }) => {
+  console.log(
+    "[close-guard:bun] before-quit",
+    "confirmed=",
+    closeWasConfirmed,
+    "dirtyCount=",
+    latestUnsavedRequests.length,
+  );
+  if (!closeWasConfirmed && latestUnsavedRequests.length > 0) {
+    const hasWebviewRpc = Boolean(mainWindow.webview?.rpc);
+    if (!hasWebviewRpc) {
+      console.warn(
+        "[close-guard:bun] renderer unavailable during before-quit; native window close already removed the webview, allowing shutdown",
+      );
+      console.log("App shutting down...");
+      await disposeSidecarOnce();
+      return;
+    }
+
+    event.response = { allow: false };
+    console.log(
+      "[close-guard:bun] preventing quit as fallback",
+      latestUnsavedRequests.map((request) => request.label),
+      "hasWebviewRpc=",
+      hasWebviewRpc,
+    );
+    if (!closeConfirmationRequestInFlight) {
+      requestRendererCloseConfirmation("before-quit", mainWindow);
+    }
+    return;
+  }
+
   console.log("App shutting down...");
-  await sidecar.dispose();
+  await disposeSidecarOnce();
 });
+
+function requestRendererCloseConfirmation(
+  source: "before-quit",
+  window: BrowserWindow<any>,
+): void {
+  if (closeConfirmationRequestInFlight) {
+    console.log(
+      "[close-guard:bun] renderer confirmation already requested",
+      "source=",
+      source,
+    );
+    return;
+  }
+
+  closeConfirmationRequestInFlight = true;
+  console.log(
+    "[close-guard:bun] requesting renderer close confirmation",
+    "source=",
+    source,
+    "dirtyCount=",
+    latestUnsavedRequests.length,
+    "hasWebviewRpc=",
+    Boolean(window.webview?.rpc),
+  );
+
+  try {
+    window.show();
+    window.activate();
+    window.webview.rpc?.send.applicationMenuAction({
+      action: "quitApplication",
+    });
+  } catch (error) {
+    console.error(
+      "[close-guard:bun] failed to request renderer confirmation",
+      error instanceof Error ? error.message : error,
+    );
+  } finally {
+    setTimeout(() => {
+      closeConfirmationRequestInFlight = false;
+    }, 500);
+  }
+}
+
+async function disposeSidecarOnce(): Promise<void> {
+  if (sidecarDisposeStarted) {
+    return;
+  }
+
+  sidecarDisposeStarted = true;
+  await sidecar.dispose();
+}

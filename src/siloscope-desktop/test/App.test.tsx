@@ -28,6 +28,7 @@ const electrobunMock = vi.hoisted(() => {
     connectionChanged: vi.fn(),
     logEntry: vi.fn(),
     openFileDialog: vi.fn(),
+    updateUnsavedRequestContexts: vi.fn(),
   };
   const addMessageListener = vi.fn();
   const ElectroviewMock = Object.assign(
@@ -82,6 +83,7 @@ describe("App shell", () => {
     electrobunMock.request.getWorkspaces.mockClear();
     electrobunMock.send.connectionChanged.mockClear();
     electrobunMock.send.logEntry.mockClear();
+    electrobunMock.send.updateUnsavedRequestContexts.mockClear();
     electrobunMock.request.loadWorkspace.mockResolvedValue({
       workspace: {
         id: "workspace-1",
@@ -430,6 +432,90 @@ describe("App shell", () => {
       "true",
     );
     expect(useAppStore.getState().selectedFunctionId).toBe("function-1");
+  });
+
+  it("reports and saves all unsaved request contexts for the close guard", async () => {
+    const rpcConfig = vi.mocked(Electroview.defineRPC).mock.calls[0][0] as any;
+    useAppStore.setState({
+      workspace: {
+        id: "workspace-1",
+        name: "Local",
+        siloAddress: "127.0.0.1",
+        gatewayPort: 30000,
+        orleansVersion: "10.0",
+      },
+      sourceCatalog: {
+        sources: [
+          {
+            sourceId: "source-1",
+            sourceType: "DLL",
+            reference: "Game.Grains.dll",
+            label: "Game.Grains.dll",
+            enabled: true,
+            discoveryStatus: "ready",
+            interfaces: [
+              {
+                interfaceId: "grain-1",
+                interfaceName: "IPlayerGrain",
+                namespace: "Game.Grains",
+                methods: [
+                  {
+                    functionId: "function-1",
+                    sourceId: "source-1",
+                    interfaceId: "grain-1",
+                    interfaceName: "IPlayerGrain",
+                    namespace: "Game.Grains",
+                    methodName: "GetScore",
+                    signature: "GetScore()",
+                    returnType: "int",
+                    keyType: "String",
+                    parameters: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      grains: [],
+      selectedGrain: null,
+      selectedMethod: null,
+      selectedFunctionId: null,
+    });
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "GetScore()" }));
+    fireEvent.change(screen.getByPlaceholderText("Primary key"), { target: { value: "player-1" } });
+
+    expect(rpcConfig.handlers.requests.getUnsavedRequestContexts()).toEqual({
+      requests: [
+        {
+          tabId: "function-1",
+          label: "IPlayerGrain.GetScore",
+          targetGrainClass: "IPlayerGrain",
+          targetMethod: "GetScore",
+        },
+      ],
+    });
+
+    await act(async () => {
+      await rpcConfig.handlers.requests.saveUnsavedRequestContexts();
+    });
+
+    expect(electrobunMock.request.saveWorkspace).toHaveBeenCalledWith({
+      path: undefined,
+      workspace: expect.objectContaining({
+        savedContexts: [
+          expect.objectContaining({
+            tabId: "function-1",
+            grainId: "player-1",
+            targetGrainClass: "IPlayerGrain",
+            targetMethod: "GetScore",
+          }),
+        ],
+      }),
+    });
   });
 
   it("opens package feeds as a full-page manager and tests then saves a feed", async () => {

@@ -7,6 +7,7 @@ import {
   PanelLeftClose,
   PanelRightClose,
   Play,
+  Save,
   Square,
   X,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
@@ -21,7 +23,9 @@ import {
 import type { SiloScopeRPC } from "../shared/rpc";
 import type {
   GrainKeyType,
+  SavedRequestContext,
   SourceCatalogFunction,
+  UnsavedRequestContextSummary,
   Workspace,
 } from "../shared/types";
 import {
@@ -34,7 +38,11 @@ import {
   NavigationSidebar,
   NuGetRegistryManager,
 } from "./components/NavigationSidebar";
-import { RequestWorkbench } from "./components/RequestWorkbench";
+import {
+  createPayloadTemplate,
+  RequestWorkbench,
+  type RequestState,
+} from "./components/RequestWorkbench";
 import {
   ResponseTelemetryPane,
   type ResponsePaneTab,
@@ -50,6 +58,17 @@ type WorkbenchTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
 const themeStorageKey = "siloscope.theme";
 const workbenchThemes = ["dark", "light", "vscode-dark", "vscode-light"] as const;
 const applicationMenuEventName = "siloscope:application-menu-action";
+const closeApplicationRequestEventName = "siloscope:request-application-close";
+const emptyRequestState: RequestState = {
+  grainKey: "",
+  keyType: "String",
+  payload: "{\n}",
+};
+let activeRequestContextProvider: (() => SavedRequestContext | null) | null = null;
+let unsavedRequestContextSummariesProvider:
+  | (() => UnsavedRequestContextSummary[])
+  | null = null;
+let unsavedRequestContextsProvider: (() => SavedRequestContext[]) | null = null;
 
 type GrainInvocationRequest = {
   grainType: string;
@@ -68,6 +87,15 @@ const rendererRpc = Electroview.defineRPC<SiloScopeRPC>({
         useAppStore.getState().setWorkspace(workspace);
         return true;
       },
+      getUnsavedRequestContexts: () => {
+        return {
+          requests: unsavedRequestContextSummariesProvider?.() ?? [],
+        };
+      },
+      saveUnsavedRequestContexts: async () => {
+        await saveAllUnsavedRequestContexts();
+        return { success: true };
+      },
     },
     messages: {
       requestGrains: ({ workspaceId }) => {
@@ -80,6 +108,11 @@ const rendererRpc = Electroview.defineRPC<SiloScopeRPC>({
         window.dispatchEvent(
           new CustomEvent(applicationMenuEventName, { detail: action }),
         );
+
+        if (action === "quitApplication") {
+          window.dispatchEvent(new Event(closeApplicationRequestEventName));
+          return;
+        }
 
         if (action === "openWorkspace") {
           void loadWorkspace();
@@ -134,9 +167,14 @@ function App() {
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
   const [navigationSize, setNavigationSize] = useState(280);
   const [functionTabs, setFunctionTabs] = useState<string[]>([]);
+  const [requestStates, setRequestStates] = useState<Record<string, RequestState>>({});
+  const [hydratedWorkspaceId, setHydratedWorkspaceId] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
+  const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
+  const [isSavingBeforeClose, setIsSavingBeforeClose] = useState(false);
+  const allowCloseRef = useRef(false);
   const platform = useMemo(() => {
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("mac")) return "mac";
@@ -150,9 +188,6 @@ function App() {
   const handleMaximize = useCallback(async () => {
     const result = await electroview.rpc?.request.maximizeWindow();
     setIsMaximized(result?.isMaximized ?? false);
-  }, []);
-  const handleClose = useCallback(async () => {
-    await electroview.rpc?.request.closeWindow();
   }, []);
   const handleTitleBarDoubleClick = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
@@ -271,6 +306,18 @@ function App() {
       const isMac = platform === "mac";
       const modifier = isMac ? event.metaKey : event.ctrlKey;
 
+      if (modifier && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveCurrentWorkspace();
+        return;
+      }
+
+      if (modifier && event.key.toLowerCase() === "q") {
+        event.preventDefault();
+        window.dispatchEvent(new Event(closeApplicationRequestEventName));
+        return;
+      }
+
       if (modifier && (event.key === "k" || event.key === "p")) {
         event.preventDefault();
         setIsQuickAccessOpen((open) => !open);
@@ -288,6 +335,111 @@ function App() {
       ? sourceCatalog
       : buildSourceCatalogFromGrains(grains, workspace);
   }, [grains, sourceCatalog, workspace]);
+  const activeRequestState = selectedFunctionId
+    ? requestStates[selectedFunctionId] ?? emptyRequestState
+    : emptyRequestState;
+  const activeFunction = useMemo(
+    () => findCatalogFunction(effectiveSourceCatalog, selectedFunctionId),
+    [effectiveSourceCatalog, selectedFunctionId],
+  );
+  const dirtyFunctionIds = useMemo(() => {
+    return new Set(
+      functionTabs.filter((functionId) => {
+        const tabFunction = findCatalogFunction(effectiveSourceCatalog, functionId);
+        const tabState = requestStates[functionId];
+        if (!tabFunction || !tabState) {
+          return false;
+        }
+
+        const savedContext = workspace?.savedContexts?.find(
+          (context) =>
+            context.tabId === functionId || context.functionId === functionId,
+        );
+        return !savedContext || !savedRequestContextMatches(savedContext, tabFunction, tabState);
+      }),
+    );
+  }, [effectiveSourceCatalog, functionTabs, requestStates, workspace]);
+  const dirtyRequestContexts = useMemo(() => {
+    return functionTabs.flatMap((functionId) => {
+      if (!dirtyFunctionIds.has(functionId)) {
+        return [];
+      }
+
+      const tabFunction = findCatalogFunction(effectiveSourceCatalog, functionId);
+      const tabState = requestStates[functionId];
+      if (!tabFunction || !tabState) {
+        return [];
+      }
+
+      return [createSavedRequestContext(functionId, tabFunction, tabState)];
+    });
+  }, [dirtyFunctionIds, effectiveSourceCatalog, functionTabs, requestStates]);
+  const dirtyRequestSummaries = useMemo(() => {
+    return dirtyRequestContexts.map((context) => ({
+      tabId: context.tabId,
+      label: `${context.targetGrainClass}.${context.targetMethod}`,
+      targetGrainClass: context.targetGrainClass,
+      targetMethod: context.targetMethod,
+    }));
+  }, [dirtyRequestContexts]);
+
+  useEffect(() => {
+    activeRequestContextProvider = () => {
+      if (!activeFunction || !selectedFunctionId) {
+        return null;
+      }
+
+      return createSavedRequestContext(
+        selectedFunctionId,
+        activeFunction,
+        activeRequestState,
+      );
+    };
+
+    return () => {
+      activeRequestContextProvider = null;
+    };
+  }, [activeFunction, activeRequestState, selectedFunctionId]);
+  useEffect(() => {
+    unsavedRequestContextSummariesProvider = () => dirtyRequestSummaries;
+    unsavedRequestContextsProvider = () => dirtyRequestContexts;
+    console.log(
+      "[close-guard:renderer] publishing dirty request contexts",
+      dirtyRequestSummaries.map((request) => request.label),
+    );
+    electroview.rpc?.send.updateUnsavedRequestContexts({
+      requests: dirtyRequestSummaries,
+      contexts: dirtyRequestContexts,
+    });
+
+    return () => {
+      unsavedRequestContextSummariesProvider = null;
+      unsavedRequestContextsProvider = null;
+    };
+  }, [dirtyRequestContexts, dirtyRequestSummaries]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      console.log(
+        "[close-guard:renderer] beforeunload",
+        "allowClose=",
+        allowCloseRef.current,
+        "dirtyCount=",
+        dirtyRequestSummaries.length,
+      );
+      if (allowCloseRef.current || dirtyRequestSummaries.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+      setIsCloseConfirmationOpen(true);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirtyRequestSummaries.length]);
+
   useEffect(() => {
     if (!workspace || !isConnected) {
       return;
@@ -315,6 +467,24 @@ function App() {
           ? current
           : [...current, selectedFunction.functionId],
       );
+      setRequestStates((current) => {
+        if (current[selectedFunction.functionId]) {
+          return current;
+        }
+
+        const savedContext = workspace?.savedContexts?.find(
+          (context) =>
+            context.tabId === selectedFunction.functionId ||
+            context.functionId === selectedFunction.functionId,
+        );
+
+        return {
+          ...current,
+          [selectedFunction.functionId]: savedContext
+            ? requestStateFromSavedContext(savedContext)
+            : createRequestState(selectedFunction),
+        };
+      });
       setSelectedGrain(selectedFunction.interfaceId);
       setSelectedMethod(selectedFunction.methodName);
       setSelectedFunction(selectedFunction.functionId);
@@ -324,8 +494,50 @@ function App() {
       setSelectedFunction,
       setSelectedGrain,
       setSelectedMethod,
+      workspace,
     ],
   );
+
+  useEffect(() => {
+    if (!workspace || hydratedWorkspaceId === workspace.id) {
+      return;
+    }
+
+    const savedContexts = workspace.savedContexts ?? [];
+    if (savedContexts.length === 0) {
+      setHydratedWorkspaceId(workspace.id);
+      return;
+    }
+
+    const hydratedEntries = savedContexts
+      .map((context) => ({
+        context,
+        functionId: resolveSavedContextFunctionId(context, effectiveSourceCatalog),
+      }))
+      .filter((entry): entry is { context: SavedRequestContext; functionId: string } =>
+        Boolean(entry.functionId),
+      );
+
+    if (hydratedEntries.length === 0) {
+      return;
+    }
+
+    const nextStates = Object.fromEntries(
+      hydratedEntries.map(({ context, functionId }) => [
+        functionId,
+        requestStateFromSavedContext(context),
+      ]),
+    );
+    const defaultContext = savedContexts.find((context) => context.isDefaultActive) ?? savedContexts[0];
+    const defaultFunctionId =
+      resolveSavedContextFunctionId(defaultContext, effectiveSourceCatalog) ??
+      hydratedEntries[0].functionId;
+
+    setRequestStates(nextStates);
+    setFunctionTabs(uniqueStrings(hydratedEntries.map((entry) => entry.functionId)));
+    handleSelectFunction(defaultFunctionId);
+    setHydratedWorkspaceId(workspace.id);
+  }, [effectiveSourceCatalog, handleSelectFunction, hydratedWorkspaceId, workspace]);
 
   const handleCloseFunctionTab = useCallback(
     (functionId: string) => {
@@ -447,6 +659,8 @@ function App() {
       useAppStore.getState().setInvocationResult(null);
       useAppStore.getState().setIsConnected(false);
       setFunctionTabs([]);
+      setRequestStates({});
+      setHydratedWorkspaceId(null);
     },
     [setWorkspace, workspaces],
   );
@@ -461,6 +675,8 @@ function App() {
       useAppStore.getState().setInvocationResult(null);
       useAppStore.getState().setIsConnected(false);
       setFunctionTabs([]);
+      setRequestStates({});
+      setHydratedWorkspaceId(null);
       void persistWorkspace(nextWorkspace);
     },
     [setWorkspace],
@@ -488,6 +704,8 @@ function App() {
         useAppStore.getState().setInvocationResult(null);
         useAppStore.getState().setIsConnected(false);
         setFunctionTabs([]);
+        setRequestStates({});
+        setHydratedWorkspaceId(null);
       }
     },
     [setWorkspace, workspace],
@@ -496,6 +714,51 @@ function App() {
   const handleEditWorkspace = useCallback(() => {
     setActiveView("workspaces");
   }, []);
+
+  const closeApplication = useCallback(async () => {
+    console.log("[close-guard:renderer] close confirmed, requesting native close");
+    allowCloseRef.current = true;
+    await electroview.rpc?.request.closeWindow();
+  }, []);
+
+  const handleClose = useCallback(async () => {
+    console.log(
+      "[close-guard:renderer] close button clicked",
+      "dirtyCount=",
+      dirtyRequestSummaries.length,
+    );
+    if (dirtyRequestSummaries.length > 0) {
+      setIsCloseConfirmationOpen(true);
+      return;
+    }
+
+    await closeApplication();
+  }, [closeApplication, dirtyRequestSummaries.length]);
+
+  const handleSaveAllAndClose = useCallback(async () => {
+    setIsSavingBeforeClose(true);
+    try {
+      await saveAllUnsavedRequestContexts();
+      await closeApplication();
+    } finally {
+      setIsSavingBeforeClose(false);
+    }
+  }, [closeApplication]);
+
+  useEffect(() => {
+    const handleCloseRequest = () => {
+      void handleClose();
+    };
+
+    window.addEventListener(closeApplicationRequestEventName, handleCloseRequest);
+    return () =>
+      window.removeEventListener(
+        closeApplicationRequestEventName,
+        handleCloseRequest,
+      );
+  }, [handleClose]);
+
+  const closeConfirmationItems = dirtyRequestSummaries;
 
   return (
     <div
@@ -803,6 +1066,7 @@ function App() {
                   aria-label={`${formatFunctionTabLabel(tabFunction, functionId)} ${formatFunctionTabContext(tabFunction, tabSource)}`}
                   aria-selected={selectedFunctionId === functionId}
                   className="workbench-tabs__tab"
+                  data-dirty={dirtyFunctionIds.has(functionId)}
                   key={functionId}
                   onClick={() => handleSelectFunction(functionId)}
                   role="tab"
@@ -822,6 +1086,20 @@ function App() {
                     </span>
                   </span>
                   <button
+                    aria-label={`Save ${formatFunctionTabLabel(tabFunction, functionId)} context`}
+                    className="workbench-tabs__save"
+                    disabled={selectedFunctionId !== functionId}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleSelectFunction(functionId);
+                      void saveCurrentWorkspace();
+                    }}
+                    title="Save request context"
+                    type="button"
+                  >
+                    <Save aria-hidden="true" width={12} height={12} />
+                  </button>
+                  <button
                     aria-label={`Close ${formatFunctionTabLabel(tabFunction, functionId)}`}
                     className="workbench-tabs__close"
                     onClick={(event) => {
@@ -832,6 +1110,9 @@ function App() {
                   >
                     <X aria-hidden="true" width={12} height={12} />
                   </button>
+                  {dirtyFunctionIds.has(functionId) && (
+                    <span className="workbench-tabs__dirty-dot" aria-label="Unsaved changes" />
+                  )}
                   <span className="workbench-tabs__meta">
                     {formatFunctionTabContext(tabFunction, tabSource)}
                   </span>
@@ -860,6 +1141,17 @@ function App() {
             selectedFunctionId={selectedFunctionId}
             selectedGrain={selectedGrain}
             selectedMethod={selectedMethod}
+            requestState={activeRequestState}
+            onRequestStateChange={(nextState) => {
+              if (!selectedFunctionId) {
+                return;
+              }
+
+              setRequestStates((current) => ({
+                ...current,
+                [selectedFunctionId]: nextState,
+              }));
+            }}
             sourceCatalog={effectiveSourceCatalog}
             theme={theme}
           />
@@ -915,6 +1207,59 @@ function App() {
           handleSelectFunction(functionId);
         }}
       />
+      {isCloseConfirmationOpen && (
+        <div className="close-confirmation" role="presentation">
+          <section
+            aria-labelledby="close-confirmation-title"
+            aria-modal="true"
+            className="close-confirmation__dialog"
+            role="dialog"
+          >
+            <div className="close-confirmation__header">
+              <h2 id="close-confirmation-title">Unsaved request contexts</h2>
+              <p>
+                {closeConfirmationItems.length} request context{closeConfirmationItems.length === 1 ? " has" : "s have"} unsaved changes.
+              </p>
+            </div>
+            <ul className="close-confirmation__list">
+              {closeConfirmationItems.map((request) => (
+                <li key={request.tabId}>
+                  <span>{request.targetMethod}</span>
+                  <small>{request.targetGrainClass}</small>
+                </li>
+              ))}
+            </ul>
+            <div className="close-confirmation__actions">
+              <button
+                className="close-confirmation__secondary"
+                disabled={isSavingBeforeClose}
+                onClick={() => {
+                  setIsCloseConfirmationOpen(false);
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="close-confirmation__secondary"
+                disabled={isSavingBeforeClose}
+                onClick={() => void closeApplication()}
+                type="button"
+              >
+                Close Without Saving
+              </button>
+              <button
+                className="close-confirmation__primary"
+                disabled={isSavingBeforeClose}
+                onClick={() => void handleSaveAllAndClose()}
+                type="button"
+              >
+                {isSavingBeforeClose ? "Saving..." : "Save All"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -940,6 +1285,120 @@ function formatFunctionTabContext(
 
   const sourceLabel = source?.label ? `${source.label} / ` : "";
   return `${sourceLabel}${catalogFunction.interfaceName}`;
+}
+
+function createRequestState(catalogFunction: SourceCatalogFunction): RequestState {
+  return {
+    grainKey: "",
+    keyType: catalogFunction.keyType,
+    payload: createPayloadTemplate(catalogFunction),
+  };
+}
+
+function requestStateFromSavedContext(context: SavedRequestContext): RequestState {
+  return {
+    grainKey: context.grainId,
+    keyType: context.keyType,
+    payload: context.payload,
+  };
+}
+
+function createSavedRequestContext(
+  tabId: string,
+  catalogFunction: SourceCatalogFunction,
+  requestState: RequestState,
+): SavedRequestContext {
+  return {
+    tabId,
+    isDefaultActive: true,
+    targetGrainClass: catalogFunction.interfaceName,
+    targetMethod: catalogFunction.methodName,
+    keyType: requestState.keyType,
+    grainId: requestState.grainKey,
+    payload: requestState.payload,
+    sourceId: catalogFunction.sourceId,
+    functionId: catalogFunction.functionId,
+  };
+}
+
+function savedRequestContextMatches(
+  context: SavedRequestContext,
+  catalogFunction: SourceCatalogFunction,
+  requestState: RequestState,
+): boolean {
+  return (
+    context.targetGrainClass === catalogFunction.interfaceName &&
+    context.targetMethod === catalogFunction.methodName &&
+    context.keyType === requestState.keyType &&
+    context.grainId === requestState.grainKey &&
+    context.payload === requestState.payload &&
+    (context.sourceId ?? null) === (catalogFunction.sourceId ?? null) &&
+    (context.functionId ?? null) === (catalogFunction.functionId ?? null)
+  );
+}
+
+function resolveSavedContextFunctionId(
+  context: SavedRequestContext,
+  sourceCatalog: ReturnType<typeof buildSourceCatalogFromGrains>,
+): string | null {
+  if (findCatalogFunction(sourceCatalog, context.functionId ?? null)) {
+    return context.functionId ?? null;
+  }
+
+  if (findCatalogFunction(sourceCatalog, context.tabId)) {
+    return context.tabId;
+  }
+
+  for (const source of sourceCatalog.sources) {
+    for (const catalogInterface of source.interfaces) {
+      const method = catalogInterface.methods.find(
+        (candidate) =>
+          candidate.interfaceName === context.targetGrainClass &&
+          candidate.methodName === context.targetMethod,
+      );
+
+      if (method) {
+        return method.functionId;
+      }
+    }
+  }
+
+  return null;
+}
+
+function workspaceWithSavedRequestContext(
+  workspace: Workspace,
+  context: SavedRequestContext,
+): Workspace {
+  return workspaceWithSavedRequestContexts(workspace, [context]);
+}
+
+function workspaceWithSavedRequestContexts(
+  workspace: Workspace,
+  contexts: SavedRequestContext[],
+): Workspace {
+  if (contexts.length === 0) {
+    return workspace;
+  }
+
+  const contextTabIds = new Set(contexts.map((context) => context.tabId));
+  const savedContexts = (workspace.savedContexts ?? [])
+    .filter((savedContext) => !contextTabIds.has(savedContext.tabId))
+    .map((savedContext) => ({ ...savedContext, isDefaultActive: false }));
+  const lastContext = contexts[contexts.length - 1];
+  const normalizedContexts = contexts.map((context) => ({
+    ...context,
+    isDefaultActive: context.tabId === lastContext.tabId,
+  }));
+
+  return {
+    ...workspace,
+    savedContexts: [...savedContexts, ...normalizedContexts],
+  };
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
 function readStoredTheme(): WorkbenchTheme {
@@ -1080,13 +1539,21 @@ async function saveCurrentWorkspace(path?: string) {
     return;
   }
 
+  const activeRequestContext = activeRequestContextProvider?.() ?? null;
+  const workspaceToSave = activeRequestContext
+    ? workspaceWithSavedRequestContext(workspace, activeRequestContext)
+    : workspace;
+
   try {
-    await electroview.rpc!.request.saveWorkspace({ workspace, path });
-    addWorkspaceToSession(workspace);
+    await electroview.rpc!.request.saveWorkspace({ workspace: workspaceToSave, path });
+    useAppStore.setState({ workspace: workspaceToSave });
+    addWorkspaceToSession(workspaceToSave);
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "info",
-      message: `Workspace saved: ${workspace.name}`,
+      message: activeRequestContext
+        ? `Request context saved: ${workspaceToSave.name}`
+        : `Workspace saved: ${workspaceToSave.name}`,
     });
   } catch (error) {
     useAppStore.getState().addLog({
@@ -1095,6 +1562,40 @@ async function saveCurrentWorkspace(path?: string) {
       message:
         error instanceof Error ? error.message : "Failed to save workspace.",
     });
+  }
+}
+
+async function saveAllUnsavedRequestContexts(path?: string) {
+  const workspace = useAppStore.getState().workspace;
+  const unsavedContexts = unsavedRequestContextsProvider?.() ?? [];
+  if (!workspace || unsavedContexts.length === 0) {
+    return;
+  }
+
+  const workspaceToSave = workspaceWithSavedRequestContexts(
+    workspace,
+    unsavedContexts,
+  );
+
+  try {
+    await electroview.rpc!.request.saveWorkspace({ workspace: workspaceToSave, path });
+    useAppStore.setState({ workspace: workspaceToSave });
+    addWorkspaceToSession(workspaceToSave);
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      message: `Saved ${unsavedContexts.length} request context${unsavedContexts.length === 1 ? "" : "s"}.`,
+    });
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to save request contexts.",
+    });
+    throw error;
   }
 }
 

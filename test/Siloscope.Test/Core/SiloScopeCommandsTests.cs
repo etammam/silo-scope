@@ -194,7 +194,8 @@ public sealed class SiloScopeCommandsTests
             "Local dev workspace",
             new ClusterOptions("dev", "SiloScope", ["127.0.0.1:30000"]),
             [new Siloscope.Core.JsonRpc.Models.SiloSource("missing.dll", "DLL", null, null, false)],
-            new Dictionary<string, string> { ["ASPNETCORE_ENVIRONMENT"] = "Development" }
+            new Dictionary<string, string> { ["ASPNETCORE_ENVIRONMENT"] = "Development" },
+            []
         );
 
         var setResult = await _commands.SetWorkspaceAsync(workspace);
@@ -478,6 +479,75 @@ public sealed class SiloScopeCommandsTests
         result.Value.Timing.SerializationMs.Should().Be(1);
         result.Value.Timing.ExecutionMs.Should().Be(10);
         result.Value.Timing.TotalMs.Should().Be(15);
+    }
+
+    [Fact]
+    public async Task SaveWorkspaceAsync_WithOnlySavedContextChange_PreservesCatalogForInvoke()
+    {
+        var methodInfo = typeof(ITestStringGrain).GetMethod("Echo")!;
+        var catalog = new InterfaceCatalog(
+            [
+                new GrainInterfaceDescriptor(
+                    "TestGrain",
+                    typeof(ITestStringGrain),
+                    [new GrainMethodDescriptor("string Echo()", methodInfo)],
+                    "localhost:30000"
+                ),
+            ],
+            ["/test/path.dll"]
+        );
+        SetWorkspace(CreateTestWorkspace());
+        SetCatalog(catalog);
+
+        _workspaceServiceMock
+            .Setup(service => service.GetWorkspacePath("test-workspace"))
+            .Returns("/tmp/test-workspace.workspace.json");
+        _workspaceServiceMock
+            .Setup(service =>
+                service.SaveAsync("/tmp/test-workspace.workspace.json", It.IsAny<Workspace>())
+            )
+            .Returns(Task.CompletedTask);
+        _grainInvocationServiceMock
+            .Setup(service =>
+                service.InvokeWithTimingAsync(
+                    It.IsAny<GrainInterfaceDescriptor>(),
+                    It.IsAny<GrainMethodDescriptor>(),
+                    "key123",
+                    "{}",
+                    It.IsAny<CancellationToken>()
+                )
+            )
+            .ReturnsAsync(
+                Result.Ok(("{\"result\": \"success\"}", new InvocationTiming(1, 10, 15)))
+            );
+
+        var saveResult = await _commands.SaveWorkspaceAsync(
+            new Siloscope.Core.JsonRpc.Models.WorkspaceInfo(
+                "test-workspace",
+                "Test",
+                "Test workspace",
+                new ClusterOptions("cluster", "service", ["localhost:30000"]),
+                [],
+                [],
+                [
+                    new Siloscope.Core.JsonRpc.Models.SavedRequestContext(
+                        "tab-1",
+                        true,
+                        "TestGrain",
+                        "Echo",
+                        "String",
+                        "key123",
+                        "{}",
+                        null,
+                        null
+                    ),
+                ]
+            )
+        );
+        var invokeResult = await _commands.InvokeGrainAsync("TestGrain", "Echo", "key123", "{}");
+
+        saveResult.IsSuccess.Should().BeTrue();
+        invokeResult.IsSuccess.Should().BeTrue();
     }
 
     [Fact]

@@ -18,4 +18,10 @@ public sealed record SessionConfig
     /// </summary>
     [JsonPropertyName("lastWorkspaceId")]
     public string? LastWorkspaceId { get; init; }
+
+    /// <summary>
+    /// Gets the request contexts explicitly saved by the user.
+    /// </summary>
+    [JsonPropertyName("savedContexts")]
+    public List<SavedRequestContext> SavedContexts { get; init; } = [];
 }

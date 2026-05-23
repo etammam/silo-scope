@@ -7,13 +7,16 @@ import type {
   CreateNugetFeedRequest,
   NugetFeed,
   NugetPackage,
+  SavedRequestContext,
   SourceOwnedCatalog,
+  UnsavedRequestContextSummary,
 } from "./types";
 
 export type ApplicationMenuAction =
   | "newWorkspace"
   | "openWorkspace"
   | "saveWorkspace"
+  | "quitApplication"
   | "toggleActivityBar"
   | "toggleNavigationSidebar"
   | "toggleTelemetryPane";
@@ -70,11 +73,23 @@ export type SiloScopeRPC = {
         canChooseDirectories?: boolean;
         allowsMultipleSelection?: boolean;
       };
+      updateUnsavedRequestContexts: {
+        requests: UnsavedRequestContextSummary[];
+        contexts: SavedRequestContext[];
+      };
     };
   }>;
   webview: RPCSchema<{
     requests: {
       setWorkspace: { params: { workspace: Workspace | null }; response: boolean };
+      getUnsavedRequestContexts: {
+        params: void;
+        response: { requests: UnsavedRequestContextSummary[] };
+      };
+      saveUnsavedRequestContexts: {
+        params: void;
+        response: { success: boolean };
+      };
     };
     messages: {
       requestGrains: { workspaceId: string };

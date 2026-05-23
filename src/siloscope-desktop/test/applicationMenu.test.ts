@@ -9,7 +9,7 @@ import {
 } from "@/main/applicationMenu";
 
 describe("application menu", () => {
-  it("creates the File menu with workspace operations and native exit", () => {
+  it("creates the File menu with workspace operations and app-owned exit", () => {
     const menu = createApplicationMenuTemplate();
 
     expect(menu).toEqual([
@@ -20,7 +20,7 @@ describe("application menu", () => {
           { label: "Open Workspace", action: fileMenuActions.openWorkspace, accelerator: "o" },
           { label: "Save Workspace", action: fileMenuActions.saveWorkspace, accelerator: "s" },
           { type: "separator" },
-          { label: "Exit", role: "quit" },
+          { label: "Exit", action: fileMenuActions.quitApplication, accelerator: "q" },
         ],
       },
       {
@@ -61,6 +61,7 @@ describe("application menu", () => {
     expect(getApplicationMenuAction({ data: { action: fileMenuActions.newWorkspace } })).toBe("newWorkspace");
     expect(getApplicationMenuAction({ data: { action: fileMenuActions.openWorkspace } })).toBe("openWorkspace");
     expect(getApplicationMenuAction({ data: { action: fileMenuActions.saveWorkspace } })).toBe("saveWorkspace");
+    expect(getApplicationMenuAction({ data: { action: fileMenuActions.quitApplication } })).toBe("quitApplication");
     expect(getApplicationMenuAction({ data: { action: viewMenuActions.toggleTelemetryPane } })).toBe(
       "toggleTelemetryPane",
     );

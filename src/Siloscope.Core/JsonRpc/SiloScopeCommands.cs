@@ -86,7 +86,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                 workspace.WorkspaceInfo.Description,
                 clusterOptions,
                 siloSources,
-                envVars
+                envVars,
+                workspace.Session.SavedContexts.Select(ToJsonRpcSavedContext).ToList()
             );
 
             _logger.LogInformation(
@@ -119,10 +120,15 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         try
         {
             var workspaceModel = ToWorkspaceModel(workspace);
+            var shouldInvalidateCatalog =
+                _currentWorkspace is null || !CatalogInputsEqual(_currentWorkspace, workspaceModel);
 
             await _workspaceService.SaveAsync(path, workspaceModel);
             _currentWorkspace = workspaceModel;
-            _catalog = null;
+            if (shouldInvalidateCatalog)
+            {
+                _catalog = null;
+            }
 
             _logger.LogInformation("Workspace saved: {WorkspaceName}", workspace.Name);
             return Result.Ok();
@@ -838,7 +844,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
             workspace.WorkspaceInfo.Description,
             clusterOptions,
             siloSources,
-            activeEnv?.Variables ?? new Dictionary<string, string>()
+            activeEnv?.Variables ?? new Dictionary<string, string>(),
+            workspace.Session.SavedContexts.Select(ToJsonRpcSavedContext).ToList()
         );
     }
 
@@ -880,7 +887,59 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                     Variables = workspace.EnvironmentVariables,
                 },
             ],
-            Session = new Workspaces.SessionConfig { ActiveEnvironment = "default" },
+            Session = new Workspaces.SessionConfig
+            {
+                ActiveEnvironment = "default",
+                SavedContexts = workspace.SavedContexts.Select(ToWorkspaceSavedContext).ToList(),
+            },
+        };
+    }
+
+    private static bool CatalogInputsEqual(Workspaces.Workspace left, Workspaces.Workspace right)
+    {
+        return left.Silos.Count == right.Silos.Count
+            && left.Silos.Zip(right.Silos).All(pair => SiloSourceEqual(pair.First, pair.Second));
+    }
+
+    private static bool SiloSourceEqual(Workspaces.SiloSource left, Workspaces.SiloSource right)
+    {
+        return StringComparer.Ordinal.Equals(left.Reference, right.Reference)
+            && StringComparer.OrdinalIgnoreCase.Equals(left.Source, right.Source)
+            && StringComparer.Ordinal.Equals(left.Version, right.Version)
+            && StringComparer.Ordinal.Equals(left.Gateway, right.Gateway)
+            && left.Enabled == right.Enabled;
+    }
+
+    private static SavedRequestContext ToJsonRpcSavedContext(Workspaces.SavedRequestContext context)
+    {
+        return new SavedRequestContext(
+            context.TabId,
+            context.IsDefaultActive,
+            context.TargetGrainClass,
+            context.TargetMethod,
+            context.KeyType,
+            context.GrainId,
+            context.Payload,
+            context.SourceId,
+            context.FunctionId
+        );
+    }
+
+    private static Workspaces.SavedRequestContext ToWorkspaceSavedContext(
+        SavedRequestContext context
+    )
+    {
+        return new Workspaces.SavedRequestContext
+        {
+            TabId = context.TabId,
+            IsDefaultActive = context.IsDefaultActive,
+            TargetGrainClass = context.TargetGrainClass,
+            TargetMethod = context.TargetMethod,
+            KeyType = context.KeyType,
+            GrainId = context.GrainId,
+            Payload = context.Payload,
+            SourceId = context.SourceId,
+            FunctionId = context.FunctionId,
         };
     }
 

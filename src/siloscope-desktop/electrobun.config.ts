@@ -6,6 +6,9 @@ export default {
 		identifier: "siloscope.app",
 		version: "0.0.1",
 	},
+	runtime: {
+		exitOnLastWindowClosed: true,
+	},
 	build: {
 		bun: {
 			entrypoint: "src/main/index.ts",

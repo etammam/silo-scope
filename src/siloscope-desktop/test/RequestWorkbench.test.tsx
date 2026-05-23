@@ -1,6 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { RequestWorkbench } from "@/renderer/components/RequestWorkbench";
+import {
+  RequestWorkbench,
+  type RequestState,
+} from "@/renderer/components/RequestWorkbench";
+import type { ComponentProps } from "react";
 
 vi.mock("@/renderer/components/MonacoEditor", () => ({
   MonacoEditor: ({
@@ -95,10 +100,38 @@ const sourceCatalog = {
   ],
 };
 
+type RequestWorkbenchTestProps = Omit<
+  ComponentProps<typeof RequestWorkbench>,
+  "requestState" | "onRequestStateChange"
+> & {
+  initialRequestState?: RequestState;
+};
+
+function StatefulRequestWorkbench({
+  initialRequestState,
+  ...props
+}: RequestWorkbenchTestProps) {
+  const [requestState, setRequestState] = useState<RequestState>(
+    initialRequestState ?? {
+      grainKey: "",
+      keyType: "String",
+      payload: "{\n}",
+    },
+  );
+
+  return (
+    <RequestWorkbench
+      {...props}
+      requestState={requestState}
+      onRequestStateChange={setRequestState}
+    />
+  );
+}
+
 describe("RequestWorkbench", () => {
   it("requires a selected grain, method, and grain id before invocation", () => {
     render(
-      <RequestWorkbench
+      <StatefulRequestWorkbench
         grains={grains}
         onInvoke={vi.fn()}
         onSelectGrain={vi.fn()}
@@ -116,7 +149,7 @@ describe("RequestWorkbench", () => {
     const onInvoke = vi.fn();
 
     render(
-      <RequestWorkbench
+      <StatefulRequestWorkbench
         grains={grains}
         onInvoke={onInvoke}
         onSelectGrain={vi.fn()}
@@ -131,7 +164,7 @@ describe("RequestWorkbench", () => {
     expect(screen.getByText("name: System.String")).toBeInTheDocument();
     expect(screen.queryByLabelText("Grain")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Method")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Key type")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Key type")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Grain ID"), {
       target: { value: "player-1" },
@@ -154,7 +187,12 @@ describe("RequestWorkbench", () => {
     const onInvoke = vi.fn();
 
     render(
-      <RequestWorkbench
+      <StatefulRequestWorkbench
+        initialRequestState={{
+          grainKey: "",
+          keyType: "String",
+          payload: '{\n  "name": ""\n}',
+        }}
         grains={grains}
         onInvoke={onInvoke}
         onSelectGrain={vi.fn()}
@@ -196,7 +234,12 @@ describe("RequestWorkbench", () => {
     const onInvoke = vi.fn();
 
     render(
-      <RequestWorkbench
+      <StatefulRequestWorkbench
+        initialRequestState={{
+          grainKey: "",
+          keyType: "String",
+          payload: '{\n  "name": ""\n}',
+        }}
         grains={[]}
         onInvoke={onInvoke}
         onSelectGrain={vi.fn()}
@@ -229,7 +272,7 @@ describe("RequestWorkbench", () => {
 
   it("prevents invocation until the payload is valid JSON", () => {
     render(
-      <RequestWorkbench
+      <StatefulRequestWorkbench
         grains={grains}
         onInvoke={vi.fn()}
         onSelectGrain={vi.fn()}
@@ -253,7 +296,7 @@ describe("RequestWorkbench", () => {
 
   it("inserts environment token placeholders into the payload", () => {
     render(
-      <RequestWorkbench
+      <StatefulRequestWorkbench
         grains={grains}
         onInvoke={vi.fn()}
         onSelectGrain={vi.fn()}
@@ -273,7 +316,7 @@ describe("RequestWorkbench", () => {
 
   it("keeps function selection read-only in the request line", () => {
     render(
-      <RequestWorkbench
+      <StatefulRequestWorkbench
         grains={grains}
         onInvoke={vi.fn()}
         onSelectGrain={vi.fn()}
@@ -285,8 +328,8 @@ describe("RequestWorkbench", () => {
     );
 
     expect(screen.getByLabelText("Grain ID")).toBeInTheDocument();
+    expect(screen.getByLabelText("Key type")).toBeInTheDocument();
     expect(screen.queryByLabelText("Grain")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Method")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Key type")).not.toBeInTheDocument();
   });
 });

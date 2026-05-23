@@ -45,6 +45,26 @@ export interface Workspace {
   gatewayEndpoints?: string[];
   environmentVariables?: Record<string, string>;
   sources?: WorkspaceSource[];
+  savedContexts?: SavedRequestContext[];
+}
+
+export interface SavedRequestContext {
+  tabId: string;
+  isDefaultActive: boolean;
+  targetGrainClass: string;
+  targetMethod: string;
+  keyType: GrainKeyType;
+  grainId: string;
+  payload: string;
+  sourceId?: string | null;
+  functionId?: string | null;
+}
+
+export interface UnsavedRequestContextSummary {
+  tabId: string;
+  label: string;
+  targetGrainClass: string;
+  targetMethod: string;
 }
 
 export interface NugetFeed {

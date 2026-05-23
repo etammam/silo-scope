@@ -1601,6 +1601,7 @@ textarea,
 	bottom: 0;
 }
 
+.workbench-tabs__save,
 .workbench-tabs__close {
 	align-items: center;
 	appearance: none;
@@ -1618,6 +1619,37 @@ textarea,
 	width: 18px;
 }
 
+.workbench-tabs__save {
+	opacity: 0;
+}
+
+.workbench-tabs__tab:hover .workbench-tabs__save,
+.workbench-tabs__tab:focus-within .workbench-tabs__save,
+.workbench-tabs__tab[data-dirty="true"] .workbench-tabs__save {
+	opacity: 1;
+}
+
+.workbench-tabs__save:disabled {
+	cursor: default;
+	opacity: 0.3;
+}
+
+.workbench-tabs__dirty-dot {
+	background: var(--accent);
+	border-radius: 999px;
+	box-shadow: 0 0 0 1px var(--ui-1);
+	flex: 0 0 auto;
+	height: 7px;
+	margin-left: 1px;
+	width: 7px;
+}
+
+.workbench-tabs__tab[data-dirty="true"] .workbench-tabs__close {
+	margin-left: 4px;
+}
+
+.workbench-tabs__save:not(:disabled):hover,
+.workbench-tabs__save:not(:disabled):focus-visible,
 .workbench-tabs__close:hover,
 .workbench-tabs__close:focus-visible {
 	background: var(--ui-3);
@@ -1642,6 +1674,143 @@ textarea,
 	max-width: 36px !important;
 	min-width: 36px !important;
 	padding: 0 !important;
+}
+
+.close-confirmation {
+	align-items: center;
+	background: color-mix(in srgb, var(--ui-0) 42%, transparent);
+	bottom: 0;
+	display: flex;
+	justify-content: center;
+	left: 0;
+	padding: 24px;
+	position: fixed;
+	right: 0;
+	top: 0;
+	z-index: 1000;
+}
+
+.close-confirmation__dialog {
+	background: var(--ui-0);
+	border: 1px solid var(--ui-3);
+	border-radius: 8px;
+	box-shadow: 0 18px 60px color-mix(in srgb, #000 26%, transparent);
+	color: var(--ui-7);
+	display: grid;
+	gap: 16px;
+	max-height: min(560px, calc(100vh - 48px));
+	max-width: 520px;
+	min-width: min(440px, calc(100vw - 48px));
+	padding: 20px;
+}
+
+.close-confirmation__header {
+	display: grid;
+	gap: 6px;
+}
+
+.close-confirmation__header h2 {
+	font-size: 18px;
+	font-weight: 800;
+	line-height: 1.2;
+	margin: 0;
+}
+
+.close-confirmation__header p {
+	color: var(--ui-6);
+	font-size: 13px;
+	line-height: 1.4;
+	margin: 0;
+}
+
+.close-confirmation__list {
+	border: 1px solid var(--ui-3);
+	border-radius: 6px;
+	display: grid;
+	list-style: none;
+	margin: 0;
+	max-height: 210px;
+	overflow: auto;
+	padding: 0;
+}
+
+.close-confirmation__list li {
+	border-bottom: 1px solid var(--ui-3);
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+	padding: 10px 12px;
+}
+
+.close-confirmation__list li:last-child {
+	border-bottom: 0;
+}
+
+.close-confirmation__list span,
+.close-confirmation__list small {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.close-confirmation__list span {
+	font-size: 13px;
+	font-weight: 750;
+}
+
+.close-confirmation__list small {
+	color: var(--ui-5);
+	font-size: 11px;
+}
+
+.close-confirmation__actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	min-width: 0;
+}
+
+.close-confirmation__actions button {
+	appearance: none;
+	border-radius: 5px;
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	font-weight: 750;
+	height: 32px;
+	padding: 0 12px;
+}
+
+.close-confirmation__actions button:disabled {
+	cursor: wait;
+	opacity: 0.6;
+}
+
+.close-confirmation__primary {
+	background: var(--accent);
+	border: 1px solid var(--accent);
+	color: var(--accent-contrast);
+}
+
+.close-confirmation__secondary {
+	background: var(--ui-1);
+	border: 1px solid var(--ui-3);
+	color: var(--ui-6);
+}
+
+.close-confirmation__primary:not(:disabled):hover,
+.close-confirmation__primary:not(:disabled):focus-visible {
+	background: var(--accent-strong);
+	border-color: var(--accent-strong);
+	outline: none;
+}
+
+.close-confirmation__secondary:not(:disabled):hover,
+.close-confirmation__secondary:not(:disabled):focus-visible {
+	background: var(--ui-2);
+	color: var(--ui-7);
+	outline: none;
 }
 
 .workbench-tabs__empty {
@@ -2144,7 +2313,7 @@ textarea,
 	gap: 10px;
 	grid-column: 1 / -1;
 	grid-row: 1;
-	grid-template-columns: minmax(220px, 1fr) minmax(200px, 0.76fr) max-content;
+	grid-template-columns: minmax(180px, 1fr) minmax(112px, 0.35fr) minmax(200px, 0.76fr) max-content;
 	min-width: 0;
 	padding: 8px 12px 9px;
 }
