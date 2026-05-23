@@ -39,6 +39,7 @@ import {
   ResponseTelemetryPane,
   type ResponsePaneTab,
 } from "./components/ResponseTelemetryPane";
+import { QuickAccessPanel } from "./components/QuickAccessPanel";
 import { SettingsPage } from "./components/SettingsPage";
 import { WorkspacesPage } from "./components/WorkspacesPage";
 import { useAppStore } from "./store";
@@ -135,6 +136,7 @@ function App() {
   const [functionTabs, setFunctionTabs] = useState<string[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
+  const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const platform = useMemo(() => {
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("mac")) return "mac";
@@ -263,6 +265,21 @@ function App() {
         handleApplicationMenuAction,
       );
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isMac = platform === "mac";
+      const modifier = isMac ? event.metaKey : event.ctrlKey;
+
+      if (modifier && (event.key === "k" || event.key === "p")) {
+        event.preventDefault();
+        setIsQuickAccessOpen((open) => !open);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [platform]);
 
   const responseSize =
     paneLayout === "horizontal" ? horizontalResponseSize : verticalResponseSize;
@@ -582,7 +599,13 @@ function App() {
             </div>
           )}
         </div>
-        <div className="app-titlebar__command">Siloscope Workbench</div>
+        <button
+          className="app-titlebar__command electrobun-webkit-app-region-no-drag"
+          onClick={() => setIsQuickAccessOpen(true)}
+          type="button"
+        >
+          Siloscope Workbench
+        </button>
         <div className="app-titlebar__actions">
           <button
             aria-label={
@@ -867,6 +890,31 @@ function App() {
         </>
         )}
       </main>
+
+      <QuickAccessPanel
+        isOpen={isQuickAccessOpen}
+        onClose={() => setIsQuickAccessOpen(false)}
+        workspaces={workspaces}
+        feeds={nugetFeeds}
+        sourceCatalog={effectiveSourceCatalog}
+        onSelectWorkspace={(workspaceId) => {
+          setActiveView("workspace");
+          handleSelectWorkspace(workspaceId);
+        }}
+        onSelectFeed={() => {
+          setActiveView("nuget");
+        }}
+        onSelectInterface={(interfaceId) => {
+          setActiveView("workspace");
+          setSelectedGrain(interfaceId);
+          setSelectedMethod(null);
+          setSelectedFunction(null);
+        }}
+        onSelectFunction={(functionId) => {
+          setActiveView("workspace");
+          handleSelectFunction(functionId);
+        }}
+      />
     </div>
   );
 }
