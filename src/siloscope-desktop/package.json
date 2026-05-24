@@ -1,8 +1,9 @@
 {
-  "name": "electrobun-hello-world",
-  "version": "1.0.0",
+  "name": "siloscope-desktop",
+  "version": "0.0.1",
+  "private": true,
   "type": "module",
-  "description": "A simple Electrobun app showcasing core features",
+  "description": "Siloscope desktop application for exploring and invoking Microsoft Orleans grains.",
   "scripts": {
     "start": "electrobun run",
     "dev": "electrobun dev",
