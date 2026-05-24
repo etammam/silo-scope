@@ -181,6 +181,7 @@ function App() {
     if (ua.includes("win")) return "win";
     return "linux";
   }, []);
+  const usesNativeWindowFrame = platform === "win";
   const [isMaximized, setIsMaximized] = useState(false);
   const handleMinimize = useCallback(async () => {
     await electroview.rpc?.request.minimizeWindow();
@@ -191,13 +192,17 @@ function App() {
   }, []);
   const handleTitleBarDoubleClick = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
+      if (usesNativeWindowFrame) {
+        return;
+      }
+
       const target = event.target as HTMLElement;
       if (target.closest(".electrobun-webkit-app-region-no-drag")) {
         return;
       }
       void handleMaximize();
     },
-    [handleMaximize],
+    [handleMaximize, usesNativeWindowFrame],
   );
   const handleNewWorkspace = useCallback(() => {
     setActiveView("workspaces");
@@ -759,6 +764,9 @@ function App() {
   }, [handleClose]);
 
   const closeConfirmationItems = dirtyRequestSummaries;
+  const titlebarClassName = usesNativeWindowFrame
+    ? "app-titlebar app-titlebar--toolbar"
+    : "app-titlebar electrobun-webkit-app-region-drag";
 
   return (
     <div
@@ -779,7 +787,7 @@ function App() {
       )}
 
       <header
-        className="app-titlebar electrobun-webkit-app-region-drag"
+        className={titlebarClassName}
         onDoubleClick={handleTitleBarDoubleClick}
       >
         <div className="app-titlebar__workspace electrobun-webkit-app-region-no-drag">
@@ -944,7 +952,7 @@ function App() {
             />
           </button>
         </div>
-        {platform !== "mac" && (
+        {platform === "linux" && (
           <div className="app-titlebar__window-controls electrobun-webkit-app-region-no-drag">
             <button
               aria-label="Minimize window"

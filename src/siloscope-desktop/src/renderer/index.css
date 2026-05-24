@@ -508,10 +508,17 @@ textarea,
 	height: 26px;
 }
 
-[data-platform="win"] .app-titlebar__actions,
 [data-platform="linux"] .app-titlebar__actions {
 	right: 96px;
 	padding-right: 8px;
+	top: 50%;
+	transform: translateY(-50%);
+	height: 36px;
+}
+
+[data-platform="win"] .app-titlebar__actions {
+	right: 12px;
+	padding-right: 0;
 	top: 50%;
 	transform: translateY(-50%);
 	height: 36px;

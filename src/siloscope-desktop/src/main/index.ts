@@ -953,15 +953,20 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function createMainWindow() {
+  const useMacNativeTrafficLights = process.platform === "darwin";
   const window = new BrowserWindow({
     title: "SiloScope",
     url: "views://renderer/index.html",
     rpc,
-    titleBarStyle: "hiddenInset",
-    trafficLightOffset: {
-      x: 12,
-      y: 10,
-    },
+    titleBarStyle: useMacNativeTrafficLights ? "hiddenInset" : "default",
+    ...(useMacNativeTrafficLights
+      ? {
+          trafficLightOffset: {
+            x: 12,
+            y: 10,
+          },
+        }
+      : {}),
     frame: {
       x: 100,
       y: 100,
