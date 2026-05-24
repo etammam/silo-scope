@@ -12,6 +12,7 @@ import type {
   AppUpdateLocalInfo,
   AppUpdateState,
   AppUpdateStatusEntry,
+  ClusterConnectionProvider,
   ClusterType,
   LogEntry,
   NugetFeed,
@@ -80,16 +81,24 @@ type BackendWorkspaceInfo = {
     Type?: "Homogenous" | "Heterogeneous" | string;
     GatewayEndpoints?: string[];
     Clustering?: {
-      Provider?: "Redis" | number | string;
-      Redis?: {
-        ConnectionString?: string;
-        connectionString?: string;
-      } | null;
-      provider?: "Redis" | number | string;
-      redis?: {
-        ConnectionString?: string;
-        connectionString?: string;
-      } | null;
+      Provider?: ClusterConnectionProvider | number | string;
+      provider?: ClusterConnectionProvider | number | string;
+      Redis?: BackendConnectionStringOptions | null;
+      redis?: BackendConnectionStringOptions | null;
+      AdoNet?: BackendConnectionStringOptions | null;
+      adoNet?: BackendConnectionStringOptions | null;
+      AzureStorage?: BackendConnectionStringOptions | null;
+      azureStorage?: BackendConnectionStringOptions | null;
+      Cosmos?: BackendConnectionStringOptions | null;
+      cosmos?: BackendConnectionStringOptions | null;
+      Consul?: BackendConnectionStringOptions | null;
+      consul?: BackendConnectionStringOptions | null;
+      DynamoDB?: BackendConnectionStringOptions | null;
+      dynamoDB?: BackendConnectionStringOptions | null;
+      ZooKeeper?: BackendConnectionStringOptions | null;
+      zooKeeper?: BackendConnectionStringOptions | null;
+      Cassandra?: BackendConnectionStringOptions | null;
+      cassandra?: BackendConnectionStringOptions | null;
     } | null;
   };
   Silos?: Array<{
@@ -100,6 +109,13 @@ type BackendWorkspaceInfo = {
     Enabled: boolean;
   }>;
   SavedContexts?: BackendSavedRequestContext[];
+};
+
+type BackendConnectionStringOptions = {
+  ConnectionString?: string;
+  connectionString?: string;
+  Invariant?: string | null;
+  invariant?: string | null;
 };
 
 type BackendSavedRequestContext = {
@@ -781,10 +797,9 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
   const [siloAddress, gatewayPortRaw] = gateway.split(":");
   const gatewayPort = Number(gatewayPortRaw);
   const clustering = workspace.Cluster?.Clustering;
-  const clusteringProvider = clustering?.Provider ?? clustering?.provider;
-  const redis = clustering?.Redis ?? clustering?.redis;
-  const redisConnectionString =
-    redis?.ConnectionString ?? redis?.connectionString ?? "";
+  const clusteringProvider = normalizeClusterConnectionProvider(
+    clustering?.Provider ?? clustering?.provider,
+  );
 
   // Backend sends Type as number: 0 = Homogenous, 1 = Heterogeneous
   const clusterTypeNum = workspace.Cluster?.Type as number | undefined;
@@ -803,13 +818,9 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
     clusterId: workspace.Cluster?.ClusterId ?? "dev",
     serviceId: workspace.Cluster?.ServiceId ?? "SiloScope",
     clusterType,
-    clustering:
-      clusteringProvider === "Redis" || clusteringProvider === 2
-        ? {
-            provider: "Redis",
-            redis: { connectionString: redisConnectionString },
-          }
-        : null,
+    clustering: clusteringProvider
+      ? buildWorkspaceClustering(clusteringProvider, clustering)
+      : null,
     gatewayEndpoints:
       workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
     orleansVersion: "10.0",
@@ -888,8 +899,10 @@ function mapBackendSavedRequestContext(
 }
 
 function mapBackendCluster(workspace: Workspace) {
-  const isRedis = workspace.clustering?.provider === "Redis";
-  const gatewayEndpoints = isRedis
+  const clustering = workspace.clustering;
+  const provider = clustering?.provider;
+  const hasRemoteClustering = Boolean(provider);
+  const gatewayEndpoints = hasRemoteClustering
     ? []
     : workspace.gatewayEndpoints?.length
       ? workspace.gatewayEndpoints
@@ -900,16 +913,104 @@ function mapBackendCluster(workspace: Workspace) {
     ServiceId: workspace.serviceId ?? "SiloScope",
     Type: workspace.clusterType ?? "Homogenous",
     GatewayEndpoints: gatewayEndpoints,
-    Clustering: isRedis
-      ? {
-          Provider: "Redis",
-          Redis: {
-            ConnectionString:
-              workspace.clustering?.redis?.connectionString ?? "",
-          },
-        }
-      : null,
+    Clustering: provider && clustering ? buildBackendClustering(clustering) : null,
   };
+}
+
+const clusterConnectionProviderByEnumValue: Record<number, ClusterConnectionProvider> = {
+  2: "Redis",
+  3: "AdoNet",
+  4: "AzureStorage",
+  5: "Cosmos",
+  6: "Consul",
+  7: "DynamoDB",
+  8: "ZooKeeper",
+  9: "Cassandra",
+};
+
+const clusterConnectionOptionKeys = {
+  Redis: { backend: "Redis", workspace: "redis" },
+  AdoNet: { backend: "AdoNet", workspace: "adoNet" },
+  AzureStorage: { backend: "AzureStorage", workspace: "azureStorage" },
+  Cosmos: { backend: "Cosmos", workspace: "cosmos" },
+  Consul: { backend: "Consul", workspace: "consul" },
+  DynamoDB: { backend: "DynamoDB", workspace: "dynamoDB" },
+  ZooKeeper: { backend: "ZooKeeper", workspace: "zooKeeper" },
+  Cassandra: { backend: "Cassandra", workspace: "cassandra" },
+} as const satisfies Record<
+  ClusterConnectionProvider,
+  { backend: string; workspace: string }
+>;
+
+function normalizeClusterConnectionProvider(
+  provider: ClusterConnectionProvider | number | string | undefined,
+): ClusterConnectionProvider | null {
+  if (typeof provider === "number") {
+    return clusterConnectionProviderByEnumValue[provider] ?? null;
+  }
+
+  if (!provider) return null;
+
+  const normalized = Object.keys(clusterConnectionOptionKeys).find(
+    (candidate) => candidate.toLowerCase() === provider.toLowerCase(),
+  );
+
+  return (normalized as ClusterConnectionProvider | undefined) ?? null;
+}
+
+function buildWorkspaceClustering(
+  provider: ClusterConnectionProvider,
+  clustering: NonNullable<BackendWorkspaceInfo["Cluster"]>["Clustering"],
+): NonNullable<Workspace["clustering"]> {
+  const keys = clusterConnectionOptionKeys[provider];
+  const backendOptions = clustering?.[keys.backend as keyof NonNullable<typeof clustering>]
+    ?? clustering?.[keys.workspace as keyof NonNullable<typeof clustering>];
+  const connectionString = isBackendConnectionStringOptions(backendOptions)
+    ? backendOptions.ConnectionString ?? backendOptions.connectionString ?? ""
+    : "";
+
+  return {
+    provider,
+    [keys.workspace]: {
+      connectionString,
+      invariant: isBackendConnectionStringOptions(backendOptions)
+        ? backendOptions.Invariant ?? backendOptions.invariant ?? null
+        : null,
+    },
+  };
+}
+
+function buildBackendClustering(
+  clustering: NonNullable<Workspace["clustering"]>,
+): Record<string, unknown> {
+  const provider = clustering.provider;
+  const keys = clusterConnectionOptionKeys[provider];
+  const workspaceOptions = clustering[keys.workspace as keyof typeof clustering];
+  const connectionString =
+    typeof workspaceOptions === "object"
+      && workspaceOptions !== null
+      && "connectionString" in workspaceOptions
+      && typeof workspaceOptions.connectionString === "string"
+      ? workspaceOptions.connectionString
+      : "";
+  const invariant =
+    typeof workspaceOptions === "object"
+      && workspaceOptions !== null
+      && "invariant" in workspaceOptions
+      && typeof workspaceOptions.invariant === "string"
+      ? workspaceOptions.invariant
+      : null;
+
+  return {
+    Provider: provider,
+    [keys.backend]: { ConnectionString: connectionString, Invariant: invariant },
+  };
+}
+
+function isBackendConnectionStringOptions(
+  value: unknown,
+): value is BackendConnectionStringOptions {
+  return typeof value === "object" && value !== null;
 }
 
 function mapSourceCatalog(

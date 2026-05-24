@@ -10,8 +10,17 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="FluentResults" />
     <PackageReference Include="Microsoft.Orleans.Client" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Cassandra" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Consul" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Cosmos" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.DynamoDB" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.ZooKeeper" />
     <PackageReference Include="Microsoft.Orleans.Serialization.MessagePack" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Npgsql" />
     <PackageReference Include="NuGet.Protocol" />
     <PackageReference Include="Serilog" />
     <PackageReference Include="Serilog.Extensions.Logging" />

@@ -9,8 +9,17 @@
     <PackageVersion Include="StreamJsonRpc" Version="2.20.17" />
     <PackageVersion Include="Terminal.Gui" Version="2.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.1.0" />
-    <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.Orleans.Serialization.MessagePack" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.Cassandra" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.Consul" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.Cosmos" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.DynamoDB" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.ZooKeeper" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Serialization.MessagePack" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.1" />
+    <PackageVersion Include="Npgsql" Version="10.0.2" />
     <!-- Test dependencies -->
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

@@ -19,4 +19,39 @@ public enum ToolClusteringProvider
     /// Uses Redis for cluster membership discovery.
     /// </summary>
     Redis,
+
+    /// <summary>
+    /// Uses ADO.NET for cluster membership discovery.
+    /// </summary>
+    AdoNet,
+
+    /// <summary>
+    /// Uses Azure Storage for cluster membership discovery.
+    /// </summary>
+    AzureStorage,
+
+    /// <summary>
+    /// Uses Azure Cosmos DB for cluster membership discovery.
+    /// </summary>
+    Cosmos,
+
+    /// <summary>
+    /// Uses Consul for cluster membership discovery.
+    /// </summary>
+    Consul,
+
+    /// <summary>
+    /// Uses Amazon DynamoDB for cluster membership discovery.
+    /// </summary>
+    DynamoDB,
+
+    /// <summary>
+    /// Uses Apache ZooKeeper for cluster membership discovery.
+    /// </summary>
+    ZooKeeper,
+
+    /// <summary>
+    /// Uses Apache Cassandra for cluster membership discovery.
+    /// </summary>
+    Cassandra,
 }

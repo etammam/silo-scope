@@ -1,8 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, ChevronDown, Plus, X } from "lucide-react";
-import type { ClusterType, NugetFeed, NugetPackage, Workspace, WorkspaceSource } from "../../shared/types";
+import type { ClusterConnectionProvider, ClusterType, NugetFeed, NugetPackage, Workspace, WorkspaceSource } from "../../shared/types";
 
-type ClusterConnectionMode = "Local" | "Redis";
+type ClusterConnectionMode = "Local" | ClusterConnectionProvider;
+
+const clusterConnectionOptions: Array<{
+  value: ClusterConnectionMode;
+  label: string;
+  placeholder: string;
+}> = [
+  { value: "Local", label: "Local gateways", placeholder: "127.0.0.1:30000" },
+  { value: "Redis", label: "Redis", placeholder: "127.0.0.1:6379,defaultDatabase=0" },
+  { value: "AdoNet", label: "ADO.NET", placeholder: "Server=.;Database=Orleans;Integrated Security=true" },
+  { value: "AzureStorage", label: "Azure Storage", placeholder: "UseDevelopmentStorage=true" },
+  { value: "Cosmos", label: "Cosmos DB", placeholder: "AccountEndpoint=https://...;AccountKey=..." },
+  { value: "Consul", label: "Consul", placeholder: "http://127.0.0.1:8500" },
+  { value: "DynamoDB", label: "DynamoDB", placeholder: "ServiceURL=http://localhost:8000" },
+  { value: "ZooKeeper", label: "ZooKeeper", placeholder: "127.0.0.1:2181" },
+  { value: "Cassandra", label: "Cassandra", placeholder: "Contact Points=127.0.0.1;Port=9042" },
+];
+
+const providerOptionKeys = {
+  Redis: "redis",
+  AdoNet: "adoNet",
+  AzureStorage: "azureStorage",
+  Cosmos: "cosmos",
+  Consul: "consul",
+  DynamoDB: "dynamoDB",
+  ZooKeeper: "zooKeeper",
+  Cassandra: "cassandra",
+} as const satisfies Record<ClusterConnectionProvider, keyof NonNullable<Workspace["clustering"]>>;
 
 type WorkspacesPageProps = {
   workspaces: Workspace[];
@@ -161,6 +188,34 @@ export function WorkspacesPage({
   );
 }
 
+function getClusterConnectionString(workspace: Workspace | null): string {
+  const provider = workspace?.clustering?.provider;
+  if (!provider) return "127.0.0.1:6379,defaultDatabase=0";
+
+  const key = providerOptionKeys[provider];
+  const options = workspace.clustering?.[key];
+  return options?.connectionString ?? "";
+}
+
+function getAdoNetInvariant(workspace: Workspace | null): string {
+  return workspace?.clustering?.adoNet?.invariant ?? "Npgsql";
+}
+
+function buildClusterConnection(
+  provider: ClusterConnectionProvider,
+  connectionString: string,
+  adoNetInvariant: string,
+): NonNullable<Workspace["clustering"]> {
+  const key = providerOptionKeys[provider];
+  return {
+    provider,
+    [key]: {
+      connectionString,
+      invariant: provider === "AdoNet" ? adoNetInvariant || "Npgsql" : null,
+    },
+  };
+}
+
 function WorkspaceForm({
   initialWorkspace,
   isCreating,
@@ -183,11 +238,15 @@ function WorkspaceForm({
   const [clusterType, setClusterType] = useState<ClusterType>(
     initialWorkspace?.clusterType ?? "Homogenous",
   );
+  const initialClusterConnection = initialWorkspace?.clustering?.provider ?? "Local";
   const [clusterConnection, setClusterConnection] = useState<ClusterConnectionMode>(
-    initialWorkspace?.clustering?.provider === "Redis" ? "Redis" : "Local",
+    initialClusterConnection,
   );
-  const [redisConnectionString, setRedisConnectionString] = useState(
-    initialWorkspace?.clustering?.redis?.connectionString ?? "127.0.0.1:6379,defaultDatabase=0",
+  const [clusterConnectionString, setClusterConnectionString] = useState(
+    getClusterConnectionString(initialWorkspace),
+  );
+  const [adoNetInvariant, setAdoNetInvariant] = useState(
+    getAdoNetInvariant(initialWorkspace),
   );
   const [clusterId, setClusterId] = useState(initialWorkspace?.clusterId ?? "dev");
   const [serviceId, setServiceId] = useState(initialWorkspace?.serviceId ?? "SiloScope");
@@ -207,8 +266,9 @@ function WorkspaceForm({
     setName(initialWorkspace?.name ?? "Untitled Cluster");
     setDescription(initialWorkspace?.description ?? "");
     setClusterType(initialWorkspace?.clusterType ?? "Homogenous");
-    setClusterConnection(initialWorkspace?.clustering?.provider === "Redis" ? "Redis" : "Local");
-    setRedisConnectionString(initialWorkspace?.clustering?.redis?.connectionString ?? "127.0.0.1:6379,defaultDatabase=0");
+    setClusterConnection(initialWorkspace?.clustering?.provider ?? "Local");
+    setClusterConnectionString(getClusterConnectionString(initialWorkspace));
+    setAdoNetInvariant(getAdoNetInvariant(initialWorkspace));
     setClusterId(initialWorkspace?.clusterId ?? "dev");
     setServiceId(initialWorkspace?.serviceId ?? "SiloScope");
     setGatewayEndpoint(initialWorkspace?.gatewayEndpoints?.[0] ?? "127.0.0.1:30000");
@@ -233,6 +293,9 @@ function WorkspaceForm({
 
   const requiresSourceGateways =
     clusterConnection === "Local" && clusterType === "Heterogeneous";
+  const selectedConnectionOption =
+    clusterConnectionOptions.find((option) => option.value === clusterConnection)
+    ?? clusterConnectionOptions[0];
   const canAddSource = Boolean(sourceReference.trim()) && (!requiresSourceGateways || Boolean(sourceGateway.trim()));
   const hasMissingSourceGateways =
     requiresSourceGateways && sources.some((source) => !source.gateway?.trim());
@@ -275,11 +338,12 @@ function WorkspaceForm({
       serviceId: serviceId.trim() || "SiloScope",
       clusterType,
       clustering:
-        clusterConnection === "Redis"
-          ? {
-              provider: "Redis",
-              redis: { connectionString: redisConnectionString.trim() },
-            }
+        clusterConnection !== "Local"
+          ? buildClusterConnection(
+              clusterConnection,
+              clusterConnectionString.trim(),
+              adoNetInvariant.trim(),
+            )
           : null,
       gatewayEndpoints:
         clusterConnection === "Local" && clusterType === "Homogenous" && gatewayEndpoint.trim()
@@ -350,19 +414,35 @@ function WorkspaceForm({
               value={clusterConnection}
               onChange={(e) => setClusterConnection(e.target.value as ClusterConnectionMode)}
             >
-              <option value="Local">Local gateways</option>
-              <option value="Redis">Redis</option>
-              <option value="PostgreSQL" disabled>PostgreSQL</option>
+              {clusterConnectionOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </label>
-          {clusterConnection === "Redis" && (
+          {clusterConnection !== "Local" && (
             <label className="workspace-form__field">
-              <span>Redis connection</span>
+              <span>Connection string</span>
               <input
-                aria-label="Redis connection string"
-                value={redisConnectionString}
-                onChange={(e) => setRedisConnectionString(e.target.value)}
+                aria-label={`${selectedConnectionOption.label} connection string`}
+                placeholder={selectedConnectionOption.placeholder}
+                value={clusterConnectionString}
+                onChange={(e) => setClusterConnectionString(e.target.value)}
               />
+            </label>
+          )}
+          {clusterConnection === "AdoNet" && (
+            <label className="workspace-form__field">
+              <span>ADO.NET invariant</span>
+              <select
+                aria-label="ADO.NET invariant"
+                value={adoNetInvariant}
+                onChange={(e) => setAdoNetInvariant(e.target.value)}
+              >
+                <option value="Npgsql">PostgreSQL</option>
+                <option value="Microsoft.Data.SqlClient">SQL Server</option>
+              </select>
             </label>
           )}
           <label className="workspace-form__field">
@@ -510,7 +590,7 @@ function WorkspaceForm({
           className="workspace-form__save-button"
           disabled={
             !name.trim()
-            || (clusterConnection === "Redis" && !redisConnectionString.trim())
+            || (clusterConnection !== "Local" && !clusterConnectionString.trim())
             || hasMissingSourceGateways
           }
           onClick={handleSave}

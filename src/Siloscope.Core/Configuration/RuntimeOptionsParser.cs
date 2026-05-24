@@ -423,6 +423,12 @@ Notes:
             );
         }
 
+        var connectionStringProvider = ParseConnectionStringClustering(clustering);
+        if (connectionStringProvider is { } providerResult)
+        {
+            return providerResult;
+        }
+
         if (clustering.Provider.Equals("static", StringComparison.OrdinalIgnoreCase))
         {
             return ParseResult<ToolClusteringOptions?>.Success(
@@ -438,7 +444,101 @@ Notes:
         }
 
         return ParseResult<ToolClusteringOptions?>.Failure(
-            $"Unsupported clustering provider '{clustering.Provider}'. Allowed values: localhost, static, redis"
+            $"Unsupported clustering provider '{clustering.Provider}'. Allowed values: localhost, static, redis, adoNet, azureStorage, cosmos, consul, dynamoDB, zooKeeper, cassandra"
+        );
+    }
+
+    private static ParseResult<ToolClusteringOptions?>? ParseConnectionStringClustering(
+        RuntimeClusteringFile clustering
+    )
+    {
+        return clustering.Provider?.ToLowerInvariant() switch
+        {
+            "adonet" => BuildConnectionStringClustering(
+                ToolClusteringProvider.AdoNet,
+                "adoNet",
+                clustering.AdoNet,
+                adoNet => new ToolClusteringOptions(
+                    AdoNet: adoNet,
+                    Provider: ToolClusteringProvider.AdoNet
+                )
+            ),
+            "azurestorage" => BuildConnectionStringClustering(
+                ToolClusteringProvider.AzureStorage,
+                "azureStorage",
+                clustering.AzureStorage,
+                azureStorage => new ToolClusteringOptions(
+                    AzureStorage: azureStorage,
+                    Provider: ToolClusteringProvider.AzureStorage
+                )
+            ),
+            "cosmos" => BuildConnectionStringClustering(
+                ToolClusteringProvider.Cosmos,
+                "cosmos",
+                clustering.Cosmos,
+                cosmos => new ToolClusteringOptions(
+                    Cosmos: cosmos,
+                    Provider: ToolClusteringProvider.Cosmos
+                )
+            ),
+            "consul" => BuildConnectionStringClustering(
+                ToolClusteringProvider.Consul,
+                "consul",
+                clustering.Consul,
+                consul => new ToolClusteringOptions(
+                    Consul: consul,
+                    Provider: ToolClusteringProvider.Consul
+                )
+            ),
+            "dynamodb" => BuildConnectionStringClustering(
+                ToolClusteringProvider.DynamoDB,
+                "dynamoDB",
+                clustering.DynamoDB,
+                dynamoDB => new ToolClusteringOptions(
+                    DynamoDB: dynamoDB,
+                    Provider: ToolClusteringProvider.DynamoDB
+                )
+            ),
+            "zookeeper" => BuildConnectionStringClustering(
+                ToolClusteringProvider.ZooKeeper,
+                "zooKeeper",
+                clustering.ZooKeeper,
+                zooKeeper => new ToolClusteringOptions(
+                    ZooKeeper: zooKeeper,
+                    Provider: ToolClusteringProvider.ZooKeeper
+                )
+            ),
+            "cassandra" => BuildConnectionStringClustering(
+                ToolClusteringProvider.Cassandra,
+                "cassandra",
+                clustering.Cassandra,
+                cassandra => new ToolClusteringOptions(
+                    Cassandra: cassandra,
+                    Provider: ToolClusteringProvider.Cassandra
+                )
+            ),
+            _ => null,
+        };
+    }
+
+    private static ParseResult<ToolClusteringOptions?> BuildConnectionStringClustering(
+        ToolClusteringProvider provider,
+        string jsonPropertyName,
+        RuntimeConnectionStringClusteringFile? options,
+        Func<ConnectionStringClusteringOptions, ToolClusteringOptions> create
+    )
+    {
+        if (options is null || string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            return ParseResult<ToolClusteringOptions?>.Failure(
+                $"{provider} clustering requires clustering.{jsonPropertyName}.connectionString."
+            );
+        }
+
+        return ParseResult<ToolClusteringOptions?>.Success(
+            create(
+                new ConnectionStringClusteringOptions(options.ConnectionString, options.Invariant)
+            )
         );
     }
 
@@ -510,11 +610,41 @@ Notes:
 
         [JsonPropertyName("redis")]
         public RuntimeRedisClusteringFile? Redis { get; init; }
+
+        [JsonPropertyName("adoNet")]
+        public RuntimeConnectionStringClusteringFile? AdoNet { get; init; }
+
+        [JsonPropertyName("azureStorage")]
+        public RuntimeConnectionStringClusteringFile? AzureStorage { get; init; }
+
+        [JsonPropertyName("cosmos")]
+        public RuntimeConnectionStringClusteringFile? Cosmos { get; init; }
+
+        [JsonPropertyName("consul")]
+        public RuntimeConnectionStringClusteringFile? Consul { get; init; }
+
+        [JsonPropertyName("dynamoDB")]
+        public RuntimeConnectionStringClusteringFile? DynamoDB { get; init; }
+
+        [JsonPropertyName("zooKeeper")]
+        public RuntimeConnectionStringClusteringFile? ZooKeeper { get; init; }
+
+        [JsonPropertyName("cassandra")]
+        public RuntimeConnectionStringClusteringFile? Cassandra { get; init; }
     }
 
     private sealed class RuntimeRedisClusteringFile
     {
         [JsonPropertyName("connectionString")]
         public string? ConnectionString { get; init; }
+    }
+
+    private sealed class RuntimeConnectionStringClusteringFile
+    {
+        [JsonPropertyName("connectionString")]
+        public string? ConnectionString { get; init; }
+
+        [JsonPropertyName("invariant")]
+        public string? Invariant { get; init; }
     }
 }

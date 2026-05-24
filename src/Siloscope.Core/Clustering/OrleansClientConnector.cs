@@ -1,11 +1,13 @@
 using System.Net;
 using System.Reflection;
 using System.Runtime.Loader;
+using Azure.Data.Tables;
 using FluentResults;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Clustering.Cassandra.Hosting;
 using Orleans.Serialization;
 using Orleans.Serialization.Configuration;
 using Siloscope.Core.Configuration;
@@ -153,15 +155,11 @@ public sealed class OrleansClientConnector(
                 {
                     case ToolClusteringProvider.Redis:
                     {
-                        var redis = options.Clustering?.Redis;
-                        if (redis is null || string.IsNullOrWhiteSpace(redis.ConnectionString))
-                        {
-                            throw new InvalidOperationException(
-                                "Redis clustering selected but options.Clustering.Redis.ConnectionString is missing."
-                            );
-                        }
-
-                        var config = ConfigurationOptions.Parse(redis.ConnectionString);
+                        var connectionString = GetRequiredConnectionString(
+                            options.Clustering?.Redis,
+                            ToolClusteringProvider.Redis
+                        );
+                        var config = ConfigurationOptions.Parse(connectionString);
 
                         client.UseRedisClustering(redisOptions =>
                         {
@@ -176,6 +174,114 @@ public sealed class OrleansClientConnector(
                                 config.EndPoints.Select(static endpoint => endpoint.ToString())
                             )
                         );
+                        break;
+                    }
+                    case ToolClusteringProvider.AdoNet:
+                    {
+                        var adoNet = options.Clustering?.AdoNet;
+                        var connectionString = GetRequiredConnectionString(
+                            adoNet,
+                            ToolClusteringProvider.AdoNet
+                        );
+                        client.UseAdoNetClustering(adoNetOptions =>
+                        {
+                            adoNetOptions.Invariant = string.IsNullOrWhiteSpace(adoNet?.Invariant)
+                                ? "Npgsql"
+                                : adoNet.Invariant;
+                            adoNetOptions.ConnectionString = connectionString;
+                        });
+                        _logger.LogInformation("Gateway mode: ADO.NET clustering discovery.");
+                        break;
+                    }
+                    case ToolClusteringProvider.AzureStorage:
+                    {
+                        var connectionString = GetRequiredConnectionString(
+                            options.Clustering?.AzureStorage,
+                            ToolClusteringProvider.AzureStorage
+                        );
+                        client.UseAzureStorageClustering(azureOptions =>
+                        {
+                            azureOptions.TableServiceClient = new TableServiceClient(
+                                connectionString
+                            );
+                        });
+                        _logger.LogInformation("Gateway mode: Azure Storage clustering discovery.");
+                        break;
+                    }
+                    case ToolClusteringProvider.Cosmos:
+                    {
+                        var connectionString = GetRequiredConnectionString(
+                            options.Clustering?.Cosmos,
+                            ToolClusteringProvider.Cosmos
+                        );
+                        client.UseCosmosGatewayListProvider(cosmosOptions =>
+                        {
+                            cosmosOptions.ConfigureCosmosClient(connectionString);
+                            cosmosOptions.DatabaseName = "Orleans";
+                            cosmosOptions.ContainerName = "OrleansClusterMembership";
+                        });
+                        _logger.LogInformation("Gateway mode: Cosmos clustering discovery.");
+                        break;
+                    }
+                    case ToolClusteringProvider.Consul:
+                    {
+                        var connectionString = GetRequiredConnectionString(
+                            options.Clustering?.Consul,
+                            ToolClusteringProvider.Consul
+                        );
+                        client.UseConsulClientClustering(consulOptions =>
+                        {
+                            consulOptions.ConfigureConsulClient(
+                                new Uri(connectionString),
+                                string.Empty
+                            );
+                        });
+                        _logger.LogInformation("Gateway mode: Consul clustering discovery.");
+                        break;
+                    }
+                    case ToolClusteringProvider.DynamoDB:
+                    {
+                        var connectionString = GetRequiredConnectionString(
+                            options.Clustering?.DynamoDB,
+                            ToolClusteringProvider.DynamoDB
+                        );
+                        client.UseDynamoDBClustering(dynamoOptions =>
+                        {
+                            var values = ParseConnectionStringValues(connectionString);
+                            dynamoOptions.Service =
+                                GetConnectionStringValue(values, "Service")
+                                ?? GetConnectionStringValue(values, "Region")
+                                ?? connectionString;
+                            dynamoOptions.AccessKey =
+                                GetConnectionStringValue(values, "AccessKey") ?? string.Empty;
+                            dynamoOptions.SecretKey =
+                                GetConnectionStringValue(values, "SecretKey") ?? string.Empty;
+                            dynamoOptions.TableName = "OrleansClustering";
+                        });
+                        _logger.LogInformation("Gateway mode: DynamoDB clustering discovery.");
+                        break;
+                    }
+                    case ToolClusteringProvider.ZooKeeper:
+                    {
+                        var connectionString = GetRequiredConnectionString(
+                            options.Clustering?.ZooKeeper,
+                            ToolClusteringProvider.ZooKeeper
+                        );
+                        client.UseZooKeeperClustering(zooKeeperOptions =>
+                        {
+                            zooKeeperOptions.ConnectionString = connectionString;
+                        });
+                        _logger.LogInformation("Gateway mode: ZooKeeper clustering discovery.");
+                        break;
+                    }
+                    case ToolClusteringProvider.Cassandra:
+                    {
+                        var connectionString = GetRequiredConnectionString(
+                            options.Clustering?.Cassandra,
+                            ToolClusteringProvider.Cassandra
+                        );
+                        client.UseCassandraClustering(connectionString, "orleans");
+                        _logger.LogInformation("Gateway mode: Cassandra clustering discovery.");
                         break;
                     }
                     case ToolClusteringProvider.Localhost when options.GatewayEndpoints.Count == 0:
@@ -351,6 +457,55 @@ public sealed class OrleansClientConnector(
         return options.GatewayEndpoints.Count > 0
             ? ToolClusteringProvider.Static
             : ToolClusteringProvider.Localhost;
+    }
+
+    private static string GetRequiredConnectionString(
+        RedisClusteringOptions? options,
+        ToolClusteringProvider provider
+    )
+    {
+        if (options is null || string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            throw new InvalidOperationException(
+                $"{provider} clustering selected but the connection string is missing."
+            );
+        }
+
+        return options.ConnectionString;
+    }
+
+    private static string GetRequiredConnectionString(
+        ConnectionStringClusteringOptions? options,
+        ToolClusteringProvider provider
+    )
+    {
+        if (options is null || string.IsNullOrWhiteSpace(options.ConnectionString))
+        {
+            throw new InvalidOperationException(
+                $"{provider} clustering selected but the connection string is missing."
+            );
+        }
+
+        return options.ConnectionString;
+    }
+
+    private static Dictionary<string, string> ParseConnectionStringValues(string connectionString)
+    {
+        return connectionString
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part => part.Split('=', 2, StringSplitOptions.TrimEntries))
+            .Where(parts => parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[0]))
+            .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string? GetConnectionStringValue(
+        IReadOnlyDictionary<string, string> values,
+        string key
+    )
+    {
+        return values.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
     }
 
     private static IReadOnlyList<Assembly> ResolveInterfaceAssemblies(

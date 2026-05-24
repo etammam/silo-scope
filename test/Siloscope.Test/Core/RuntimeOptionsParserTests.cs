@@ -391,6 +391,46 @@ public sealed class RuntimeOptionsParserTests
     }
 
     [Fact]
+    public void Parse_AdoNetClusteringConfig_Succeeds()
+    {
+        using var scope = CurrentDirectoryScope.Create();
+        var configPath = Path.Combine(scope.Path, "default.json");
+
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "clusterId": "interlink",
+              "serviceId": "interlink",
+              "clustering": {
+                "provider": "adoNet",
+                "adoNet": {
+                  "connectionString": "Host=localhost;Database=orleans"
+                }
+              },
+              "interfaces": [
+                {
+                  "source": "dll",
+                  "dll": "contracts/interlink.dll"
+                }
+              ]
+            }
+            """
+        );
+
+        var result = RuntimeOptionsParser.Parse([]);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value!.Cluster.Clustering.Should().NotBeNull();
+        result.Value.Cluster.Clustering!.Provider.Should().Be(ToolClusteringProvider.AdoNet);
+        result.Value.Cluster.Clustering.AdoNet.Should().NotBeNull();
+        result
+            .Value.Cluster.Clustering.AdoNet!.ConnectionString.Should()
+            .Be("Host=localhost;Database=orleans");
+    }
+
+    [Fact]
     public void Parse_RedisClusteringWithoutConnectionString_Fails()
     {
         using var scope = CurrentDirectoryScope.Create();

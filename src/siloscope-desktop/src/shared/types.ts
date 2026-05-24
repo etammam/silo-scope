@@ -20,16 +20,32 @@ export interface ParameterInfo {
 export type GrainKeyType = "Guid" | "String" | "Integer";
 export type SourceType = "DLL" | "NuGet";
 export type ClusterType = "Homogenous" | "Heterogeneous";
-export type ClusterConnectionProvider = "Redis";
+export type ClusterConnectionProvider =
+  | "Redis"
+  | "AdoNet"
+  | "AzureStorage"
+  | "Cosmos"
+  | "Consul"
+  | "DynamoDB"
+  | "ZooKeeper"
+  | "Cassandra";
 export type SourceDiscoveryStatus = "idle" | "discovering" | "ready" | "error";
 
 export interface RedisClusteringOptions {
   connectionString: string;
+  invariant?: string | null;
 }
 
 export interface ClusterConnectionOptions {
   provider: ClusterConnectionProvider;
   redis?: RedisClusteringOptions | null;
+  adoNet?: RedisClusteringOptions | null;
+  azureStorage?: RedisClusteringOptions | null;
+  cosmos?: RedisClusteringOptions | null;
+  consul?: RedisClusteringOptions | null;
+  dynamoDB?: RedisClusteringOptions | null;
+  zooKeeper?: RedisClusteringOptions | null;
+  cassandra?: RedisClusteringOptions | null;
 }
 
 export interface WorkspaceSource {
