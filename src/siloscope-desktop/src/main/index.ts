@@ -2,10 +2,16 @@ import Electrobun, {
   ApplicationMenu,
   BrowserView,
   BrowserWindow,
+  Updater,
   Utils,
+  type UpdateStatusEntry,
 } from "electrobun/bun";
 import type { SiloScopeRPC } from "../shared/rpc";
 import type {
+  AppUpdateInfo,
+  AppUpdateLocalInfo,
+  AppUpdateState,
+  AppUpdateStatusEntry,
   ClusterType,
   LogEntry,
   NugetFeed,
@@ -26,6 +32,7 @@ let closeConfirmationRequestInFlight = false;
 let sidecarDisposeStarted = false;
 let latestUnsavedRequests: UnsavedRequestContextSummary[] = [];
 let mainWindow: BrowserWindow<any>;
+let latestUpdateInfo: AppUpdateInfo | null = null;
 
 type FluentResult<T> = {
   IsSuccess: boolean;
@@ -463,6 +470,21 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         }
 
         return { workspaces: (result.Value ?? []).map(mapWorkspace) };
+      },
+      getAppUpdateState: async (): Promise<AppUpdateState> => getAppUpdateState(),
+      checkForAppUpdate: async (): Promise<AppUpdateState> => {
+        latestUpdateInfo = mapUpdateInfo(await Updater.checkForUpdate());
+        return getAppUpdateState();
+      },
+      downloadAppUpdate: async (): Promise<AppUpdateState> => {
+        await Updater.downloadUpdate();
+        latestUpdateInfo = mapUpdateInfo(Updater.updateInfo());
+        return getAppUpdateState();
+      },
+      applyAppUpdate: async (): Promise<{ success: boolean }> => {
+        closeWasConfirmed = true;
+        await Updater.applyUpdate();
+        return { success: true };
       },
       minimizeWindow: async (): Promise<{ success: boolean }> => {
         mainWindow.minimize();
@@ -948,6 +970,48 @@ function mapLogLevel(level?: string): LogEntry["level"] {
   }
 }
 
+async function getAppUpdateState(): Promise<AppUpdateState> {
+  return {
+    localInfo: mapUpdateLocalInfo(await Updater.getLocalInfo()),
+    updateInfo: latestUpdateInfo,
+    statusHistory: Updater.getStatusHistory().map(mapUpdateStatusEntry),
+  };
+}
+
+function mapUpdateLocalInfo(info: Partial<AppUpdateLocalInfo>): AppUpdateLocalInfo {
+  return {
+    version: info.version ?? "",
+    hash: info.hash ?? "",
+    baseUrl: info.baseUrl ?? "",
+    channel: info.channel ?? "",
+    name: info.name ?? "",
+    identifier: info.identifier ?? "",
+  };
+}
+
+function mapUpdateInfo(info: Partial<AppUpdateInfo> | undefined): AppUpdateInfo | null {
+  if (!info) {
+    return null;
+  }
+
+  return {
+    version: info.version ?? "",
+    hash: info.hash ?? "",
+    updateAvailable: Boolean(info.updateAvailable),
+    updateReady: Boolean(info.updateReady),
+    error: info.error ?? "",
+  };
+}
+
+function mapUpdateStatusEntry(entry: UpdateStatusEntry): AppUpdateStatusEntry {
+  return {
+    status: entry.status,
+    message: entry.message,
+    timestamp: entry.timestamp,
+    progress: entry.details?.progress,
+  };
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -991,6 +1055,16 @@ function createMainWindow() {
 }
 
 mainWindow = createMainWindow();
+Updater.onStatusChange((entry) => {
+  latestUpdateInfo = mapUpdateInfo(Updater.updateInfo()) ?? latestUpdateInfo;
+  void getAppUpdateState().then((state) => {
+    mainWindow.webview.rpc?.send.appUpdateStatusChanged({
+      state,
+      entry: mapUpdateStatusEntry(entry),
+    });
+  });
+});
+void checkForAppUpdateOnLaunch();
 
 sidecar.onNotification(({ method, params }) => {
   if (method !== "log") {
@@ -1041,6 +1115,22 @@ installApplicationMenu({
 });
 
 console.log("SiloScope app started!");
+
+async function checkForAppUpdateOnLaunch(): Promise<void> {
+  const localInfo = await Updater.getLocalInfo();
+  if (localInfo.channel === "dev" || !localInfo.baseUrl) {
+    return;
+  }
+
+  try {
+    latestUpdateInfo = mapUpdateInfo(await Updater.checkForUpdate());
+  } catch (error) {
+    console.warn(
+      "[updater] automatic update check failed",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
 
 Electrobun.events.on("before-quit", async (event: { response?: { allow: boolean } }) => {
   console.log(

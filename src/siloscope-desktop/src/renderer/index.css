@@ -5743,6 +5743,163 @@ button:not(:disabled) {
 	width: 100%;
 }
 
+.settings-page__update-panel {
+	display: grid;
+	gap: 8px;
+	max-width: 820px;
+	min-width: 0;
+}
+
+.settings-page__update-summary {
+	align-items: center;
+	background: var(--ui-0);
+	border: 1px solid var(--ui-3);
+	border-radius: var(--radius-md);
+	display: grid;
+	gap: 12px;
+	grid-template-columns: minmax(0, 1fr) auto;
+	min-height: 58px;
+	min-width: 0;
+	padding: 9px 10px 9px 12px;
+}
+
+.settings-page__update-summary[data-kind="ready"] {
+	border-color: color-mix(in srgb, var(--success) 38%, var(--ui-3));
+	box-shadow: inset 2px 0 0 var(--success);
+}
+
+.settings-page__update-summary[data-kind="error"] {
+	border-color: color-mix(in srgb, var(--danger) 44%, var(--ui-3));
+	box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.settings-page__update-copy {
+	display: grid;
+	gap: 3px;
+	min-width: 0;
+}
+
+.settings-page__update-channel {
+	background: var(--ui-1);
+	border: 1px solid var(--ui-3);
+	border-radius: 999px;
+	color: var(--ui-5);
+	font-size: 10px;
+	font-weight: 750;
+	justify-self: start;
+	line-height: 1;
+	max-width: 180px;
+	min-width: 0;
+	overflow: hidden;
+	padding: 4px 7px;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.settings-page__update-summary strong,
+.settings-page__update-summary span {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings-page__update-summary strong {
+	color: var(--ui-7);
+	font-size: 13px;
+	font-weight: 750;
+	line-height: 1.2;
+}
+
+.settings-page__update-summary .settings-page__update-copy > span:last-child {
+	color: var(--ui-5);
+	font-size: 12px;
+	line-height: 1.35;
+}
+
+.settings-page__update-summary progress {
+	accent-color: var(--accent);
+	grid-column: 1 / -1;
+	inline-size: 100%;
+}
+
+.settings-page__update-facts {
+	display: grid;
+	gap: 14px;
+	grid-template-columns: repeat(3, minmax(0, auto));
+	justify-content: start;
+	margin: 0;
+	min-width: 0;
+	padding: 0 2px;
+}
+
+.settings-page__update-facts div {
+	align-items: baseline;
+	display: grid;
+	gap: 5px;
+	grid-template-columns: auto minmax(0, auto);
+	min-width: 0;
+}
+
+.settings-page__update-facts dt {
+	color: var(--ui-5);
+	font-size: 10px;
+	font-weight: 750;
+	line-height: 1;
+	margin: 0;
+	text-transform: uppercase;
+}
+
+.settings-page__update-facts dd {
+	color: var(--ui-5);
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.25;
+	margin: 0;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings-page__update-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	justify-content: flex-end;
+	min-width: 0;
+}
+
+.settings-page__update-actions button {
+	align-items: center;
+	background: var(--ui-1);
+	border: 1px solid var(--ui-3);
+	border-radius: var(--radius-md);
+	color: var(--ui-7);
+	display: inline-flex;
+	font-size: 12px;
+	font-weight: 700;
+	gap: 6px;
+	height: 30px;
+	justify-content: center;
+	min-width: 88px;
+	padding: 0 10px;
+}
+
+.settings-page__update-actions button:not(:disabled):hover,
+.settings-page__update-actions button:not(:disabled):focus-visible {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-contrast);
+	outline: none;
+}
+
+.settings-page__update-actions button:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
 /* Cluster management redesign */
 .workspaces-page {
 	grid-template-rows: 52px minmax(0, 1fr);

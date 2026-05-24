@@ -21,6 +21,7 @@ import {
 } from "react";
 import type { SiloScopeRPC } from "../shared/rpc";
 import type {
+  AppUpdateState,
   GrainKeyType,
   SavedRequestContext,
   SourceCatalogFunction,
@@ -58,6 +59,7 @@ const themeStorageKey = "siloscope.theme";
 const workbenchThemes = ["dark", "light", "vscode-dark", "vscode-light"] as const;
 const applicationMenuEventName = "siloscope:application-menu-action";
 const closeApplicationRequestEventName = "siloscope:request-application-close";
+const appUpdateStatusEventName = "siloscope:app-update-status";
 const emptyRequestState: RequestState = {
   grainKey: "",
   keyType: "String",
@@ -126,6 +128,11 @@ const rendererRpc = Electroview.defineRPC<SiloScopeRPC>({
       filePicked: ({ paths }) => {
         window.dispatchEvent(new CustomEvent("filePicked", { detail: { paths } }));
       },
+      appUpdateStatusChanged: ({ state }) => {
+        window.dispatchEvent(
+          new CustomEvent(appUpdateStatusEventName, { detail: state }),
+        );
+      },
     },
   },
 });
@@ -173,6 +180,8 @@ function App() {
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
   const [isSavingBeforeClose, setIsSavingBeforeClose] = useState(false);
+  const [appUpdateState, setAppUpdateState] = useState<AppUpdateState | null>(null);
+  const [updateAction, setUpdateAction] = useState<"checking" | "downloading" | "applying" | null>(null);
   const allowCloseRef = useRef(false);
   const platform = useMemo(() => {
     const ua = navigator.userAgent.toLowerCase();
@@ -208,6 +217,17 @@ function App() {
   useEffect(() => {
     void refreshNugetFeeds();
     void refreshPersistedWorkspaces();
+    void refreshAppUpdateState();
+  }, []);
+
+  useEffect(() => {
+    const handleUpdateStatus = (event: Event) => {
+      setAppUpdateState((event as CustomEvent<AppUpdateState>).detail);
+    };
+
+    window.addEventListener(appUpdateStatusEventName, handleUpdateStatus);
+    return () =>
+      window.removeEventListener(appUpdateStatusEventName, handleUpdateStatus);
   }, []);
 
   useEffect(() => {
@@ -744,6 +764,36 @@ function App() {
     }
   }, [closeApplication]);
 
+  const refreshAppUpdateState = useCallback(async () => {
+    const state = await electroview.rpc!.request.getAppUpdateState();
+    setAppUpdateState(state);
+  }, []);
+
+  const handleCheckForUpdate = useCallback(async () => {
+    setUpdateAction("checking");
+    try {
+      const state = await electroview.rpc!.request.checkForAppUpdate();
+      setAppUpdateState(state);
+    } finally {
+      setUpdateAction(null);
+    }
+  }, []);
+
+  const handleDownloadUpdate = useCallback(async () => {
+    setUpdateAction("downloading");
+    try {
+      const state = await electroview.rpc!.request.downloadAppUpdate();
+      setAppUpdateState(state);
+    } finally {
+      setUpdateAction(null);
+    }
+  }, []);
+
+  const handleApplyUpdate = useCallback(async () => {
+    setUpdateAction("applying");
+    await electroview.rpc!.request.applyAppUpdate();
+  }, []);
+
   useEffect(() => {
     const handleCloseRequest = () => {
       void handleClose();
@@ -997,6 +1047,11 @@ function App() {
             onFontFamilyChange={setFontFamily}
             fontSize={fontSize}
             onFontSizeChange={setFontSize}
+            updateState={appUpdateState}
+            updateAction={updateAction}
+            onCheckForUpdate={handleCheckForUpdate}
+            onDownloadUpdate={handleDownloadUpdate}
+            onApplyUpdate={handleApplyUpdate}
           />
         ) : activeView === "workspaces" ? (
           <WorkspacesPage

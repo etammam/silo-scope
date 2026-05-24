@@ -6,6 +6,9 @@ export default {
 		identifier: "siloscope.app",
 		version: "0.0.1",
 	},
+	release: {
+		baseUrl: "https://github.com/etammam/silo-scope/releases/latest/download",
+	},
 	runtime: {
 		exitOnLastWindowClosed: true,
 	},

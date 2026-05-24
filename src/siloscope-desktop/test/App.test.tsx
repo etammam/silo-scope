@@ -23,11 +23,16 @@ const electrobunMock = vi.hoisted(() => {
     addNugetPackageSource: vi.fn(),
     invokeGrain: vi.fn(),
     getWorkspaces: vi.fn(),
+    getAppUpdateState: vi.fn(),
+    checkForAppUpdate: vi.fn(),
+    downloadAppUpdate: vi.fn(),
+    applyAppUpdate: vi.fn(),
   };
   const send = {
     connectionChanged: vi.fn(),
     logEntry: vi.fn(),
     openFileDialog: vi.fn(),
+    appUpdateStatusChanged: vi.fn(),
     updateUnsavedRequestContexts: vi.fn(),
   };
   const addMessageListener = vi.fn();
@@ -81,6 +86,10 @@ describe("App shell", () => {
     electrobunMock.request.addNugetPackageSource.mockClear();
     electrobunMock.request.invokeGrain.mockClear();
     electrobunMock.request.getWorkspaces.mockClear();
+    electrobunMock.request.getAppUpdateState.mockClear();
+    electrobunMock.request.checkForAppUpdate.mockClear();
+    electrobunMock.request.downloadAppUpdate.mockClear();
+    electrobunMock.request.applyAppUpdate.mockClear();
     electrobunMock.send.connectionChanged.mockClear();
     electrobunMock.send.logEntry.mockClear();
     electrobunMock.send.updateUnsavedRequestContexts.mockClear();
@@ -153,6 +162,43 @@ describe("App shell", () => {
       },
     });
     electrobunMock.request.getWorkspaces.mockResolvedValue({ workspaces: [] });
+    electrobunMock.request.getAppUpdateState.mockResolvedValue({
+      localInfo: {
+        version: "0.0.1",
+        hash: "abcdef123456",
+        baseUrl: "https://github.com/etammam/silo-scope/releases/latest/download",
+        channel: "dev",
+        name: "siloscope",
+        identifier: "siloscope.app",
+      },
+      updateInfo: null,
+      statusHistory: [],
+    });
+    electrobunMock.request.checkForAppUpdate.mockResolvedValue({
+      localInfo: {
+        version: "0.0.1",
+        hash: "abcdef123456",
+        baseUrl: "https://github.com/etammam/silo-scope/releases/latest/download",
+        channel: "dev",
+        name: "siloscope",
+        identifier: "siloscope.app",
+      },
+      updateInfo: null,
+      statusHistory: [],
+    });
+    electrobunMock.request.downloadAppUpdate.mockResolvedValue({
+      localInfo: {
+        version: "0.0.1",
+        hash: "abcdef123456",
+        baseUrl: "https://github.com/etammam/silo-scope/releases/latest/download",
+        channel: "dev",
+        name: "siloscope",
+        identifier: "siloscope.app",
+      },
+      updateInfo: null,
+      statusHistory: [],
+    });
+    electrobunMock.request.applyAppUpdate.mockResolvedValue({ success: true });
     electrobunMock.request.invokeGrain.mockResolvedValue({
       isSuccess: true,
       result: "{}",

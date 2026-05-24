@@ -4,6 +4,8 @@ import type {
   GrainInterfaceDescriptor,
   InvocationResult,
   LogEntry,
+  AppUpdateState,
+  AppUpdateStatusEntry,
   CreateNugetFeedRequest,
   NugetFeed,
   NugetPackage,
@@ -60,6 +62,10 @@ export type SiloScopeRPC = {
         response: InvocationResult;
       };
       getWorkspaces: { params: void; response: { workspaces: Workspace[] } };
+      getAppUpdateState: { params: void; response: AppUpdateState };
+      checkForAppUpdate: { params: void; response: AppUpdateState };
+      downloadAppUpdate: { params: void; response: AppUpdateState };
+      applyAppUpdate: { params: void; response: { success: boolean } };
       minimizeWindow: { params: void; response: { success: boolean } };
       maximizeWindow: { params: void; response: { success: boolean; isMaximized: boolean } };
       closeWindow: { params: void; response: { success: boolean } };
@@ -96,6 +102,7 @@ export type SiloScopeRPC = {
       applicationMenuAction: { action: ApplicationMenuAction };
       logEntry: { entry: LogEntry };
       filePicked: { paths: string[] };
+      appUpdateStatusChanged: { state: AppUpdateState; entry: AppUpdateStatusEntry };
     };
   }>;
 };

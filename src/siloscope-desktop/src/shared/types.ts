@@ -109,6 +109,67 @@ export interface LogEntry {
   message: string;
 }
 
+export interface AppUpdateLocalInfo {
+  version: string;
+  hash: string;
+  baseUrl: string;
+  channel: string;
+  name: string;
+  identifier: string;
+}
+
+export interface AppUpdateInfo {
+  version: string;
+  hash: string;
+  updateAvailable: boolean;
+  updateReady: boolean;
+  error: string;
+}
+
+export type AppUpdateStatusType =
+  | "idle"
+  | "checking"
+  | "check-complete"
+  | "no-update"
+  | "update-available"
+  | "download-starting"
+  | "downloading"
+  | "checking-local-tar"
+  | "local-tar-found"
+  | "local-tar-missing"
+  | "fetching-patch"
+  | "patch-found"
+  | "patch-not-found"
+  | "downloading-patch"
+  | "applying-patch"
+  | "patch-applied"
+  | "patch-failed"
+  | "extracting-version"
+  | "patch-chain-complete"
+  | "downloading-full-bundle"
+  | "download-progress"
+  | "decompressing"
+  | "download-complete"
+  | "applying"
+  | "extracting"
+  | "replacing-app"
+  | "launching-new-version"
+  | "complete"
+  | "error";
+
+export interface AppUpdateStatusEntry {
+  status: AppUpdateStatusType;
+  message: string;
+  timestamp: number;
+  progress?: number;
+}
+
+export interface AppUpdateState {
+  localInfo: AppUpdateLocalInfo;
+  updateInfo: AppUpdateInfo | null;
+  statusHistory: AppUpdateStatusEntry[];
+}
+
 export interface InterfaceCatalog {
   interfaces: GrainInterfaceDescriptor[];
 }
