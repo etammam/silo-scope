@@ -6176,9 +6176,24 @@ button:not(:disabled) {
 	border: 0;
 	display: grid;
 	gap: 8px;
-	grid-template-columns: 112px minmax(260px, 1fr) minmax(140px, 0.38fr) minmax(140px, 0.38fr) max-content;
 	min-width: 0;
 	padding: 0;
+}
+
+.workspace-form__source-form--dll {
+	grid-template-columns: 112px minmax(0, 1fr) max-content;
+}
+
+.workspace-form__source-form--nuget {
+	grid-template-columns: 112px minmax(320px, 1fr) minmax(180px, 220px) max-content;
+}
+
+.workspace-form__source-form--dll.workspace-form__source-form--gateway {
+	grid-template-columns: 112px minmax(260px, 1fr) minmax(160px, 220px) max-content;
+}
+
+.workspace-form__source-form--nuget.workspace-form__source-form--gateway {
+	grid-template-columns: 100px minmax(260px, 1fr) minmax(160px, 200px) minmax(160px, 220px) max-content;
 }
 
 .workspace-form__field input,
@@ -6194,6 +6209,10 @@ button:not(:disabled) {
 .workspace-form__field select,
 .nuget-search__row > input {
 	border-radius: var(--radius-md);
+}
+
+.nuget-search--version .nuget-search__row > input {
+	padding-right: 12px;
 }
 
 .workspace-form__add-button {
@@ -6313,18 +6332,36 @@ button:not(:disabled) {
 		grid-template-columns: 136px minmax(0, 1fr);
 	}
 
-	.workspace-form__source-form {
-		grid-template-columns: minmax(96px, 0.5fr) minmax(180px, 1fr) minmax(120px, 0.65fr) max-content;
+	.workspace-form__source-form--dll {
+		grid-template-columns: 104px minmax(0, 1fr) max-content;
 	}
 
-	.workspace-form__source-form .workspace-form__field:nth-of-type(4) {
-		grid-column: 2 / 4;
+	.workspace-form__source-form--nuget {
+		grid-template-columns: 104px minmax(220px, 1fr) minmax(150px, 190px) max-content;
+	}
+
+	.workspace-form__source-form--dll.workspace-form__source-form--gateway {
+		grid-template-columns: 104px minmax(200px, 1fr) minmax(140px, 190px) max-content;
+	}
+
+	.workspace-form__source-form--nuget.workspace-form__source-form--gateway {
+		grid-template-columns: 92px minmax(200px, 1fr) minmax(140px, 180px) minmax(140px, 190px) max-content;
 	}
 }
 
 @media (max-width: 1180px) {
-	.workspace-form__source-form {
-		grid-template-columns: minmax(96px, 0.45fr) minmax(180px, 1fr) minmax(120px, 0.7fr);
+	.workspace-form__source-form--dll,
+	.workspace-form__source-form--dll.workspace-form__source-form--gateway {
+		grid-template-columns: minmax(96px, 0.4fr) minmax(180px, 1fr);
+	}
+
+	.workspace-form__source-form--nuget,
+	.workspace-form__source-form--nuget.workspace-form__source-form--gateway {
+		grid-template-columns: minmax(96px, 0.4fr) minmax(180px, 1fr) minmax(140px, 0.62fr);
+	}
+
+	.workspace-form__source-form--gateway .workspace-form__field:nth-of-type(4) {
+		grid-column: 2 / -1;
 	}
 
 	.workspace-form__source-form .workspace-form__add-button {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, ChevronDown, Plus, X } from "lucide-react";
+import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, Plus, X } from "lucide-react";
 import type { ClusterConnectionProvider, ClusterType, NugetFeed, NugetPackage, Workspace, WorkspaceSource } from "../../shared/types";
 
 type ClusterConnectionMode = "Local" | ClusterConnectionProvider;
@@ -299,6 +299,11 @@ function WorkspaceForm({
   const canAddSource = Boolean(sourceReference.trim()) && (!requiresSourceGateways || Boolean(sourceGateway.trim()));
   const hasMissingSourceGateways =
     requiresSourceGateways && sources.some((source) => !source.gateway?.trim());
+  const sourceFormClassName = [
+    "workspace-form__source-form",
+    sourceType === "NuGet" ? "workspace-form__source-form--nuget" : "workspace-form__source-form--dll",
+    requiresSourceGateways ? "workspace-form__source-form--gateway" : "",
+  ].filter(Boolean).join(" ");
 
   const addSource = () => {
     const reference = sourceReference.trim();
@@ -476,7 +481,7 @@ function WorkspaceForm({
 
         <section className="workspace-form__section workspace-form__section--sources">
           <h4>Silos</h4>
-          <div className="workspace-form__source-form">
+          <div className={sourceFormClassName}>
             <label className="workspace-form__field">
               <span>Type</span>
               <select
@@ -532,7 +537,6 @@ function WorkspaceForm({
                   feedName={sourceFeed}
                   value={sourceVersion}
                   onChange={setSourceVersion}
-                  feeds={nugetFeeds}
                   getNugetPackageVersions={getNugetPackageVersions}
                 />
               </label>
@@ -776,7 +780,6 @@ function NuGetVersionSearch({
   feedName?: string;
   value: string;
   onChange: (value: string) => void;
-  feeds: NugetFeed[];
   getNugetPackageVersions: (packageId: string, feedName?: string) => Promise<string[]>;
 }) {
   const [versions, setVersions] = useState<string[]>([]);
@@ -819,25 +822,36 @@ function NuGetVersionSearch({
     setIsOpen(false);
   };
 
+  const filteredVersions = versions.filter((version) =>
+    version.toLowerCase().includes(value.trim().toLowerCase()),
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const selectableVersions = value.trim() ? filteredVersions : versions;
     if (!isOpen) {
-      if (e.key === "ArrowDown" && versions.length > 0) {
+      if (e.key === "ArrowDown" && selectableVersions.length > 0) {
         e.preventDefault();
         setIsOpen(true);
         setSelectedIndex(0);
       }
       return;
     }
+    if (selectableVersions.length === 0) {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+      }
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((i) => (i + 1) % versions.length);
+      setSelectedIndex((i) => (i + 1) % selectableVersions.length);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex((i) => (i - 1 + versions.length) % versions.length);
+      setSelectedIndex((i) => (i - 1 + selectableVersions.length) % selectableVersions.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (selectedIndex >= 0 && versions[selectedIndex]) {
-        selectVersion(versions[selectedIndex]);
+      if (selectedIndex >= 0 && selectableVersions[selectedIndex]) {
+        selectVersion(selectableVersions[selectedIndex]);
       }
     } else if (e.key === "Escape") {
       setIsOpen(false);
@@ -845,11 +859,19 @@ function NuGetVersionSearch({
   };
 
   const hasVersions = versions.length > 0;
-  const showEmpty = !isLoading && !hasVersions && !fetchError && packageId.trim().length > 0;
+  const visibleVersions = value.trim() ? filteredVersions : versions;
+  const showEmpty = !isLoading && visibleVersions.length === 0 && !fetchError && packageId.trim().length > 0;
 
   return (
-    <div ref={wrapperRef} className="nuget-search">
+    <div ref={wrapperRef} className="nuget-search nuget-search--version">
       <div className="nuget-search__row">
+        <div className="nuget-search__icon">
+          {isLoading ? (
+            <Loader2 aria-hidden="true" width={14} height={14} className="nuget-search__spinner" />
+          ) : (
+            <Search aria-hidden="true" width={14} height={14} />
+          )}
+        </div>
         <input
           aria-label="Package version"
           aria-autocomplete="list"
@@ -857,23 +879,15 @@ function NuGetVersionSearch({
           aria-expanded={isOpen}
           placeholder="1.0.0"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => { if (hasVersions) setIsOpen(true); }}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setIsOpen(true);
+            setSelectedIndex(-1);
+          }}
+          onFocus={() => { if (hasVersions || packageId.trim()) setIsOpen(true); }}
           onKeyDown={handleKeyDown}
           role="combobox"
         />
-        <button
-          aria-label="Show versions"
-          className="nuget-search__chevron"
-          onClick={() => setIsOpen((o) => !o)}
-          type="button"
-        >
-          {isLoading ? (
-            <Loader2 aria-hidden="true" width={14} height={14} className="nuget-search__spinner" />
-          ) : (
-            <ChevronDown aria-hidden="true" width={14} height={14} />
-          )}
-        </button>
       </div>
       {isOpen && (
         <ul
@@ -881,7 +895,7 @@ function NuGetVersionSearch({
           className="nuget-search__dropdown"
           role="listbox"
         >
-          {versions.map((version, index) => (
+          {visibleVersions.map((version, index) => (
             <li
               key={version}
               aria-selected={index === selectedIndex}
@@ -895,12 +909,12 @@ function NuGetVersionSearch({
           ))}
           {showEmpty && (
             <li className="nuget-search__item nuget-search__item--empty">
-              No versions found — type one manually
+              No matching versions. Type one manually
             </li>
           )}
           {fetchError && (
             <li className="nuget-search__item nuget-search__item--empty">
-              Could not load versions — type one manually
+              Could not load versions. Type one manually
             </li>
           )}
         </ul>
