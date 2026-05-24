@@ -20,7 +20,17 @@ export interface ParameterInfo {
 export type GrainKeyType = "Guid" | "String" | "Integer";
 export type SourceType = "DLL" | "NuGet";
 export type ClusterType = "Homogenous" | "Heterogeneous";
+export type ClusterConnectionProvider = "Redis";
 export type SourceDiscoveryStatus = "idle" | "discovering" | "ready" | "error";
+
+export interface RedisClusteringOptions {
+  connectionString: string;
+}
+
+export interface ClusterConnectionOptions {
+  provider: ClusterConnectionProvider;
+  redis?: RedisClusteringOptions | null;
+}
 
 export interface WorkspaceSource {
   sourceId: string;
@@ -42,6 +52,7 @@ export interface Workspace {
   clusterId?: string;
   serviceId?: string;
   clusterType?: ClusterType;
+  clustering?: ClusterConnectionOptions | null;
   gatewayEndpoints?: string[];
   environmentVariables?: Record<string, string>;
   sources?: WorkspaceSource[];

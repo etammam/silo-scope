@@ -79,6 +79,18 @@ type BackendWorkspaceInfo = {
     ServiceId?: string;
     Type?: "Homogenous" | "Heterogeneous" | string;
     GatewayEndpoints?: string[];
+    Clustering?: {
+      Provider?: "Redis" | number | string;
+      Redis?: {
+        ConnectionString?: string;
+        connectionString?: string;
+      } | null;
+      provider?: "Redis" | number | string;
+      redis?: {
+        ConnectionString?: string;
+        connectionString?: string;
+      } | null;
+    } | null;
   };
   Silos?: Array<{
     Reference: string;
@@ -339,7 +351,8 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
       },
       searchNugetPackages: async ({ query, sourceUrl, feedName, take }) => {
         if (feedName || sourceUrl) {
-          const resolvedSourceUrl = sourceUrl ?? (await resolveFeedUrlByName(feedName));
+          const resolvedSourceUrl =
+            sourceUrl ?? (await resolveFeedUrlByName(feedName));
           const result = await requestSidecar<
             FluentResult<BackendNugetPackage[]>
           >(
@@ -357,19 +370,23 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
           return { packages: (result.Value ?? []).map(mapNugetPackage) };
         }
 
-        return { packages: await searchNugetPackagesAcrossAllFeeds(query, take ?? 20) };
+        return {
+          packages: await searchNugetPackagesAcrossAllFeeds(query, take ?? 20),
+        };
       },
       getNugetPackageVersions: async ({ packageId, sourceUrl, feedName }) => {
         if (feedName || sourceUrl) {
           try {
-            const resolvedSourceUrl = sourceUrl ?? (await resolveFeedUrlByName(feedName));
+            const resolvedSourceUrl =
+              sourceUrl ?? (await resolveFeedUrlByName(feedName));
             const result = await requestSidecar<FluentResult<string[]>>(
               "GetNugetPackageVersionsAsync",
               [packageId, resolvedSourceUrl ?? null, feedName ?? null],
             );
             if (!result.IsSuccess) {
               throw new Error(
-                result.Errors?.[0]?.Message ?? "Failed to get NuGet package versions.",
+                result.Errors?.[0]?.Message ??
+                  "Failed to get NuGet package versions.",
               );
             }
             return { versions: result.Value ?? [] };
@@ -382,7 +399,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
           }
         }
 
-        return { versions: await getNugetPackageVersionsAcrossAllFeeds(packageId) };
+        return {
+          versions: await getNugetPackageVersionsAcrossAllFeeds(packageId),
+        };
       },
       addNugetPackageSource: async ({
         packageId,
@@ -471,7 +490,8 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
 
         return { workspaces: (result.Value ?? []).map(mapWorkspace) };
       },
-      getAppUpdateState: async (): Promise<AppUpdateState> => getAppUpdateState(),
+      getAppUpdateState: async (): Promise<AppUpdateState> =>
+        getAppUpdateState(),
       checkForAppUpdate: async (): Promise<AppUpdateState> => {
         latestUpdateInfo = mapUpdateInfo(await Updater.checkForUpdate());
         return getAppUpdateState();
@@ -490,7 +510,10 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         mainWindow.minimize();
         return { success: true };
       },
-      maximizeWindow: async (): Promise<{ success: boolean; isMaximized: boolean }> => {
+      maximizeWindow: async (): Promise<{
+        success: boolean;
+        isMaximized: boolean;
+      }> => {
         const isMaximized = Boolean(mainWindow.isMaximized());
         if (isMaximized) {
           mainWindow.unmaximize();
@@ -513,7 +536,12 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
       logEntry: ({ entry }) => {
         console.log("logEntry", entry);
       },
-      openFileDialog: async ({ allowedFileTypes, canChooseFiles, canChooseDirectories, allowsMultipleSelection }) => {
+      openFileDialog: async ({
+        allowedFileTypes,
+        canChooseFiles,
+        canChooseDirectories,
+        allowsMultipleSelection,
+      }) => {
         try {
           const dialogOpts: {
             canChooseFiles: boolean;
@@ -528,12 +556,21 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
           if (allowedFileTypes !== undefined && allowedFileTypes.length > 0) {
             dialogOpts.allowedFileTypes = allowedFileTypes;
           }
-          console.log("[openFileDialog] opening dialog with opts:", JSON.stringify(dialogOpts));
+          console.log(
+            "[openFileDialog] opening dialog with opts:",
+            JSON.stringify(dialogOpts),
+          );
           const result = await Utils.openFileDialog(dialogOpts);
-          console.log("[openFileDialog] dialog result:", JSON.stringify(result));
+          console.log(
+            "[openFileDialog] dialog result:",
+            JSON.stringify(result),
+          );
           rpc.send.filePicked({ paths: result });
         } catch (error) {
-          console.error("[openFileDialog] dialog failed:", error instanceof Error ? error.message : error);
+          console.error(
+            "[openFileDialog] dialog failed:",
+            error instanceof Error ? error.message : error,
+          );
           rpc.send.filePicked({ paths: [] });
         }
       },
@@ -612,7 +649,10 @@ async function listConfiguredFeeds(): Promise<BackendNugetFeed[]> {
   return result.Value;
 }
 
-async function searchNugetPackagesAcrossAllFeeds(query: string, take: number): Promise<NugetPackage[]> {
+async function searchNugetPackagesAcrossAllFeeds(
+  query: string,
+  take: number,
+): Promise<NugetPackage[]> {
   const feeds = await listConfiguredFeeds();
   if (feeds.length === 0) {
     return [];
@@ -653,14 +693,17 @@ async function searchNugetPackagesAcrossAllFeeds(query: string, take: number): P
   }
 
   packages.sort((a, b) => {
-    if (a._feedPriority !== b._feedPriority) return a._feedPriority - b._feedPriority;
+    if (a._feedPriority !== b._feedPriority)
+      return a._feedPriority - b._feedPriority;
     return a.packageId.localeCompare(b.packageId);
   });
 
   return packages.map(({ _feedPriority, ...pkg }) => pkg);
 }
 
-async function getNugetPackageVersionsAcrossAllFeeds(packageId: string): Promise<string[]> {
+async function getNugetPackageVersionsAcrossAllFeeds(
+  packageId: string,
+): Promise<string[]> {
   const feeds = await listConfiguredFeeds();
   if (feeds.length === 0) {
     return [];
@@ -676,7 +719,10 @@ async function getNugetPackageVersionsAcrossAllFeeds(packageId: string): Promise
         if (!result.IsSuccess || !result.Value) {
           return [] as Array<{ version: string; _feedIsDefault: boolean }>;
         }
-        return result.Value.map((v) => ({ version: v, _feedIsDefault: feed.IsDefault }));
+        return result.Value.map((v) => ({
+          version: v,
+          _feedIsDefault: feed.IsDefault,
+        }));
       } catch (error) {
         console.warn(
           `[getNugetPackageVersionsAcrossAllFeeds] feed "${feed.Name}" failed:`,
@@ -703,7 +749,8 @@ async function getNugetPackageVersionsAcrossAllFeeds(packageId: string): Promise
   }
 
   versions.sort((a, b) => {
-    if (a._feedPriority !== b._feedPriority) return a._feedPriority - b._feedPriority;
+    if (a._feedPriority !== b._feedPriority)
+      return a._feedPriority - b._feedPriority;
     return a.version.localeCompare(b.version);
   });
 
@@ -733,6 +780,11 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
   const gateway = workspace.Cluster?.GatewayEndpoints?.[0] ?? "";
   const [siloAddress, gatewayPortRaw] = gateway.split(":");
   const gatewayPort = Number(gatewayPortRaw);
+  const clustering = workspace.Cluster?.Clustering;
+  const clusteringProvider = clustering?.Provider ?? clustering?.provider;
+  const redis = clustering?.Redis ?? clustering?.redis;
+  const redisConnectionString =
+    redis?.ConnectionString ?? redis?.connectionString ?? "";
 
   // Backend sends Type as number: 0 = Homogenous, 1 = Heterogeneous
   const clusterTypeNum = workspace.Cluster?.Type as number | undefined;
@@ -751,6 +803,13 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
     clusterId: workspace.Cluster?.ClusterId ?? "dev",
     serviceId: workspace.Cluster?.ServiceId ?? "SiloScope",
     clusterType,
+    clustering:
+      clusteringProvider === "Redis" || clusteringProvider === 2
+        ? {
+            provider: "Redis",
+            redis: { connectionString: redisConnectionString },
+          }
+        : null,
     gatewayEndpoints:
       workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
     orleansVersion: "10.0",
@@ -790,7 +849,9 @@ function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
       Enabled: source.enabled,
     })),
     EnvironmentVariables: workspace.environmentVariables ?? {},
-    SavedContexts: (workspace.savedContexts ?? []).map(mapBackendSavedRequestContext),
+    SavedContexts: (workspace.savedContexts ?? []).map(
+      mapBackendSavedRequestContext,
+    ),
   };
 }
 
@@ -827,15 +888,27 @@ function mapBackendSavedRequestContext(
 }
 
 function mapBackendCluster(workspace: Workspace) {
-  const gatewayEndpoints = workspace.gatewayEndpoints?.length
-    ? workspace.gatewayEndpoints
-    : [`${workspace.siloAddress}:${workspace.gatewayPort}`];
+  const isRedis = workspace.clustering?.provider === "Redis";
+  const gatewayEndpoints = isRedis
+    ? []
+    : workspace.gatewayEndpoints?.length
+      ? workspace.gatewayEndpoints
+      : [`${workspace.siloAddress}:${workspace.gatewayPort}`];
 
   return {
     ClusterId: workspace.clusterId ?? "dev",
     ServiceId: workspace.serviceId ?? "SiloScope",
     Type: workspace.clusterType ?? "Homogenous",
     GatewayEndpoints: gatewayEndpoints,
+    Clustering: isRedis
+      ? {
+          Provider: "Redis",
+          Redis: {
+            ConnectionString:
+              workspace.clustering?.redis?.connectionString ?? "",
+          },
+        }
+      : null,
   };
 }
 
@@ -978,7 +1051,9 @@ async function getAppUpdateState(): Promise<AppUpdateState> {
   };
 }
 
-function mapUpdateLocalInfo(info: Partial<AppUpdateLocalInfo>): AppUpdateLocalInfo {
+function mapUpdateLocalInfo(
+  info: Partial<AppUpdateLocalInfo>,
+): AppUpdateLocalInfo {
   return {
     version: info.version ?? "",
     hash: info.hash ?? "",
@@ -989,7 +1064,9 @@ function mapUpdateLocalInfo(info: Partial<AppUpdateLocalInfo>): AppUpdateLocalIn
   };
 }
 
-function mapUpdateInfo(info: Partial<AppUpdateInfo> | undefined): AppUpdateInfo | null {
+function mapUpdateInfo(
+  info: Partial<AppUpdateInfo> | undefined,
+): AppUpdateInfo | null {
   if (!info) {
     return null;
   }
@@ -1132,41 +1209,44 @@ async function checkForAppUpdateOnLaunch(): Promise<void> {
   }
 }
 
-Electrobun.events.on("before-quit", async (event: { response?: { allow: boolean } }) => {
-  console.log(
-    "[close-guard:bun] before-quit",
-    "confirmed=",
-    closeWasConfirmed,
-    "dirtyCount=",
-    latestUnsavedRequests.length,
-  );
-  if (!closeWasConfirmed && latestUnsavedRequests.length > 0) {
-    const hasWebviewRpc = Boolean(mainWindow.webview?.rpc);
-    if (!hasWebviewRpc) {
-      console.warn(
-        "[close-guard:bun] renderer unavailable during before-quit; native window close already removed the webview, allowing shutdown",
+Electrobun.events.on(
+  "before-quit",
+  async (event: { response?: { allow: boolean } }) => {
+    console.log(
+      "[close-guard:bun] before-quit",
+      "confirmed=",
+      closeWasConfirmed,
+      "dirtyCount=",
+      latestUnsavedRequests.length,
+    );
+    if (!closeWasConfirmed && latestUnsavedRequests.length > 0) {
+      const hasWebviewRpc = Boolean(mainWindow.webview?.rpc);
+      if (!hasWebviewRpc) {
+        console.warn(
+          "[close-guard:bun] renderer unavailable during before-quit; native window close already removed the webview, allowing shutdown",
+        );
+        console.log("App shutting down...");
+        await disposeSidecarOnce();
+        return;
+      }
+
+      event.response = { allow: false };
+      console.log(
+        "[close-guard:bun] preventing quit as fallback",
+        latestUnsavedRequests.map((request) => request.label),
+        "hasWebviewRpc=",
+        hasWebviewRpc,
       );
-      console.log("App shutting down...");
-      await disposeSidecarOnce();
+      if (!closeConfirmationRequestInFlight) {
+        requestRendererCloseConfirmation("before-quit", mainWindow);
+      }
       return;
     }
 
-    event.response = { allow: false };
-    console.log(
-      "[close-guard:bun] preventing quit as fallback",
-      latestUnsavedRequests.map((request) => request.label),
-      "hasWebviewRpc=",
-      hasWebviewRpc,
-    );
-    if (!closeConfirmationRequestInFlight) {
-      requestRendererCloseConfirmation("before-quit", mainWindow);
-    }
-    return;
-  }
-
-  console.log("App shutting down...");
-  await disposeSidecarOnce();
-});
+    console.log("App shutting down...");
+    await disposeSidecarOnce();
+  },
+);
 
 function requestRendererCloseConfirmation(
   source: "before-quit",

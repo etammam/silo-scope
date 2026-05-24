@@ -62,7 +62,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                 string.IsNullOrEmpty(workspace.Cluster.DefaultGateway)
                     ? []
                     : [workspace.Cluster.DefaultGateway],
-                workspace.Cluster.Type
+                workspace.Cluster.Type,
+                workspace.Cluster.Clustering
             );
 
             var siloSources = workspace
@@ -204,7 +205,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         var toolOptions = new ToolClusterOptions(
             options.ClusterId,
             options.ServiceId,
-            options.GatewayEndpoints
+            options.GatewayEndpoints,
+            options.Clustering
         );
 
         _connectorPool.Configure(toolOptions, catalog, entries);
@@ -821,7 +823,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
             string.IsNullOrEmpty(workspace.Cluster.DefaultGateway)
                 ? []
                 : [workspace.Cluster.DefaultGateway],
-            workspace.Cluster.Type
+            workspace.Cluster.Type,
+            workspace.Cluster.Clustering
         );
 
         var siloSources = workspace
@@ -867,6 +870,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                 ServiceId = workspace.Cluster.ServiceId,
                 DefaultGateway =
                     workspace.Cluster.GatewayEndpoints.FirstOrDefault() ?? string.Empty,
+                Clustering = workspace.Cluster.Clustering,
             },
             Silos = workspace
                 .Silos.Select(s => new Workspaces.SiloSource

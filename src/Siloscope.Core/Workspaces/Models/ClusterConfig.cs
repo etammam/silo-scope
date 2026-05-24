@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Siloscope.Core.Configuration;
 
 namespace Siloscope.Core.Workspaces;
 
@@ -30,4 +31,10 @@ public sealed record ClusterConfig
     /// </summary>
     [JsonPropertyName("defaultGateway")]
     public string DefaultGateway { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the optional clustering provider configuration.
+    /// </summary>
+    [JsonPropertyName("clustering")]
+    public ToolClusteringOptions? Clustering { get; init; }
 }

@@ -118,6 +118,40 @@ public sealed class SiloScopeCommandsTests
     }
 
     [Fact]
+    public async Task ConnectClusterAsync_RedisClustering_PassesClusteringToConnector()
+    {
+        var clustering = new ToolClusteringOptions(
+            ToolClusteringProvider.Redis,
+            new RedisClusteringOptions("127.0.0.1:6379,defaultDatabase=0")
+        );
+        var options = new ClusterOptions(
+            "test-cluster",
+            "test-service",
+            [],
+            Clustering: clustering
+        );
+
+        ToolClusterOptions? capturedOptions = null;
+        _connectorPoolMock
+            .Setup(p =>
+                p.Configure(It.IsAny<ToolClusterOptions>(), It.IsAny<InterfaceCatalog>(), null)
+            )
+            .Callback<ToolClusterOptions, InterfaceCatalog, IReadOnlyList<InterfaceEntry>?>(
+                (opts, _, _) => capturedOptions = opts
+            );
+        _connectorPoolMock
+            .Setup(p => p.ConnectAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Ok("Connected."));
+
+        var result = await _commands.ConnectClusterAsync(options);
+
+        result.IsSuccess.Should().BeTrue();
+        capturedOptions.Should().NotBeNull();
+        capturedOptions!.GatewayEndpoints.Should().BeEmpty();
+        capturedOptions.Clustering.Should().Be(clustering);
+    }
+
+    [Fact]
     public async Task ConnectClusterAsync_WithWorkspaceSources_ConfiguresDiscoveredGatewayConnectors()
     {
         var assemblyPath = typeof(ITestStringGrain).Assembly.Location;

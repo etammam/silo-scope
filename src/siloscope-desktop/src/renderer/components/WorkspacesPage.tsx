@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, ChevronDown, Plus, X } from "lucide-react";
 import type { ClusterType, NugetFeed, NugetPackage, Workspace, WorkspaceSource } from "../../shared/types";
 
+type ClusterConnectionMode = "Local" | "Redis";
+
 type WorkspacesPageProps = {
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
@@ -181,6 +183,12 @@ function WorkspaceForm({
   const [clusterType, setClusterType] = useState<ClusterType>(
     initialWorkspace?.clusterType ?? "Homogenous",
   );
+  const [clusterConnection, setClusterConnection] = useState<ClusterConnectionMode>(
+    initialWorkspace?.clustering?.provider === "Redis" ? "Redis" : "Local",
+  );
+  const [redisConnectionString, setRedisConnectionString] = useState(
+    initialWorkspace?.clustering?.redis?.connectionString ?? "127.0.0.1:6379,defaultDatabase=0",
+  );
   const [clusterId, setClusterId] = useState(initialWorkspace?.clusterId ?? "dev");
   const [serviceId, setServiceId] = useState(initialWorkspace?.serviceId ?? "SiloScope");
   const [gatewayEndpoint, setGatewayEndpoint] = useState(
@@ -199,6 +207,8 @@ function WorkspaceForm({
     setName(initialWorkspace?.name ?? "Untitled Cluster");
     setDescription(initialWorkspace?.description ?? "");
     setClusterType(initialWorkspace?.clusterType ?? "Homogenous");
+    setClusterConnection(initialWorkspace?.clustering?.provider === "Redis" ? "Redis" : "Local");
+    setRedisConnectionString(initialWorkspace?.clustering?.redis?.connectionString ?? "127.0.0.1:6379,defaultDatabase=0");
     setClusterId(initialWorkspace?.clusterId ?? "dev");
     setServiceId(initialWorkspace?.serviceId ?? "SiloScope");
     setGatewayEndpoint(initialWorkspace?.gatewayEndpoints?.[0] ?? "127.0.0.1:30000");
@@ -221,9 +231,16 @@ function WorkspaceForm({
     return () => window.removeEventListener("filePicked", handler as EventListener);
   }, []);
 
+  const requiresSourceGateways =
+    clusterConnection === "Local" && clusterType === "Heterogeneous";
+  const canAddSource = Boolean(sourceReference.trim()) && (!requiresSourceGateways || Boolean(sourceGateway.trim()));
+  const hasMissingSourceGateways =
+    requiresSourceGateways && sources.some((source) => !source.gateway?.trim());
+
   const addSource = () => {
     const reference = sourceReference.trim();
     if (!reference) return;
+    if (requiresSourceGateways && !sourceGateway.trim()) return;
 
     const source: WorkspaceSource = {
       sourceId: `${sourceType}:${reference}:${sourceVersion.trim()}:${sourceGateway.trim()}`,
@@ -231,7 +248,10 @@ function WorkspaceForm({
       reference,
       label: sourceType === "DLL" ? reference.split(/[\\/]/).pop() || reference : reference,
       version: sourceType === "NuGet" ? sourceVersion.trim() || null : null,
-      gateway: clusterType === "Heterogeneous" ? sourceGateway.trim() || null : null,
+      gateway:
+        requiresSourceGateways
+          ? sourceGateway.trim() || null
+          : null,
       enabled: true,
     };
 
@@ -254,12 +274,22 @@ function WorkspaceForm({
       clusterId: clusterId.trim() || "dev",
       serviceId: serviceId.trim() || "SiloScope",
       clusterType,
+      clustering:
+        clusterConnection === "Redis"
+          ? {
+              provider: "Redis",
+              redis: { connectionString: redisConnectionString.trim() },
+            }
+          : null,
       gatewayEndpoints:
-        clusterType === "Homogenous" && gatewayEndpoint.trim()
+        clusterConnection === "Local" && clusterType === "Homogenous" && gatewayEndpoint.trim()
           ? [gatewayEndpoint.trim()]
           : [],
       environmentVariables: {},
-      sources,
+      sources: sources.map((source) => ({
+        ...source,
+        gateway: clusterConnection === "Local" ? source.gateway : null,
+      })),
     };
 
     onSave(workspace);
@@ -314,6 +344,28 @@ function WorkspaceForm({
             </select>
           </label>
           <label className="workspace-form__field">
+            <span>Cluster connection</span>
+            <select
+              aria-label="Cluster connection"
+              value={clusterConnection}
+              onChange={(e) => setClusterConnection(e.target.value as ClusterConnectionMode)}
+            >
+              <option value="Local">Local gateways</option>
+              <option value="Redis">Redis</option>
+              <option value="PostgreSQL" disabled>PostgreSQL</option>
+            </select>
+          </label>
+          {clusterConnection === "Redis" && (
+            <label className="workspace-form__field">
+              <span>Redis connection</span>
+              <input
+                aria-label="Redis connection string"
+                value={redisConnectionString}
+                onChange={(e) => setRedisConnectionString(e.target.value)}
+              />
+            </label>
+          )}
+          <label className="workspace-form__field">
             <span>Cluster ID</span>
             <input
               aria-label="Cluster ID"
@@ -329,7 +381,7 @@ function WorkspaceForm({
               onChange={(e) => setServiceId(e.target.value)}
             />
           </label>
-          {clusterType === "Homogenous" && (
+          {clusterConnection === "Local" && clusterType === "Homogenous" && (
             <label className="workspace-form__field">
               <span>Gateway</span>
               <input
@@ -404,7 +456,7 @@ function WorkspaceForm({
                 />
               </label>
             )}
-            {clusterType === "Heterogeneous" && (
+            {requiresSourceGateways && (
               <label className="workspace-form__field">
                 <span>Gateway</span>
                 <input
@@ -416,7 +468,7 @@ function WorkspaceForm({
             )}
             <button
               className="workspace-form__add-button"
-              disabled={!sourceReference.trim()}
+              disabled={!canAddSource}
               onClick={addSource}
               type="button"
             >
@@ -456,7 +508,11 @@ function WorkspaceForm({
       <div className="workspace-form__footer">
         <button
           className="workspace-form__save-button"
-          disabled={!name.trim()}
+          disabled={
+            !name.trim()
+            || (clusterConnection === "Redis" && !redisConnectionString.trim())
+            || hasMissingSourceGateways
+          }
           onClick={handleSave}
           type="button"
         >
