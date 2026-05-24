@@ -72,7 +72,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                     s.Source,
                     s.Version,
                     s.Gateway,
-                    s.Enabled
+                    s.Enabled,
+                    s.FeedName
                 ))
                 .ToList();
 
@@ -409,7 +410,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         var nugetPackages = silos
             .Where(s => s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase))
             .Where(s => !string.IsNullOrEmpty(s.Reference) && !string.IsNullOrEmpty(s.Version))
-            .Select(s => (s.Reference, s.Version!))
+            .Select(s => (Id: s.Reference, Version: s.Version!, s.FeedName))
             .ToList();
 
         if (nugetPackages.Count == 0)
@@ -419,27 +420,30 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
 
         _logger.LogInformation("Restoring {Count} NuGet packages", nugetPackages.Count);
 
-        var result = await _nugetManager.RestorePackagesAsync(
-            nugetPackages,
-            sourceUrl,
-            null,
-            cancellationToken
-        );
-
-        if (result.IsFailed)
+        foreach (var group in nugetPackages.GroupBy(package => package.FeedName))
         {
-            return Result.Fail<RestoreResult>(
-                result.Errors.FirstOrDefault()?.Message ?? "Restore failed"
+            var result = await _nugetManager.RestorePackagesAsync(
+                group.Select(package => (package.Id, package.Version)).ToList(),
+                sourceUrl,
+                group.Key,
+                cancellationToken
             );
-        }
 
-        _logger.LogInformation("Restore complete: {Message}", result.Value);
+            if (result.IsFailed)
+            {
+                return Result.Fail<RestoreResult>(
+                    result.Errors.FirstOrDefault()?.Message ?? "Restore failed"
+                );
+            }
+
+            _logger.LogInformation("Restore complete: {Message}", result.Value);
+        }
 
         return Result.Ok(
             new RestoreResult(
                 nugetPackages.Count,
                 0,
-                nugetPackages.Select(p => $"{p.Reference} {p.Item2}").ToList(),
+                nugetPackages.Select(p => $"{p.Id} {p.Version}").ToList(),
                 []
             )
         );
@@ -664,6 +668,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                         Source = "nuget",
                         Version = version,
                         Gateway = gateway,
+                        FeedName = feedName,
                         Enabled = true,
                     },
                 ],
@@ -676,6 +681,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
             {
                 Enabled = true,
                 Gateway = !string.IsNullOrWhiteSpace(gateway) ? gateway : existing.Gateway,
+                FeedName = !string.IsNullOrWhiteSpace(feedName) ? feedName : existing.FeedName,
             };
             var newSilos = _currentWorkspace.Silos.ToList();
             newSilos[existingIndex] = updated;
@@ -810,7 +816,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                 s.Source.Equals("nuget", StringComparison.OrdinalIgnoreCase) ? s.Version : null,
                 null,
                 null,
-                BuildSourceId(s)
+                BuildSourceId(s),
+                s.FeedName
             ))
             .ToList();
     }
@@ -833,7 +840,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                 s.Source,
                 s.Version,
                 s.Gateway,
-                s.Enabled
+                s.Enabled,
+                s.FeedName
             ))
             .ToList();
 

@@ -10,10 +10,12 @@ namespace Siloscope.Core.JsonRpc.Models;
 /// <param name="Version">The optional version of the source.</param>
 /// <param name="Gateway">The optional gateway endpoint associated with the source.</param>
 /// <param name="Enabled"><see langword="true" /> if the source is enabled; otherwise, <see langword="false" />.</param>
+/// <param name="FeedName">The optional configured NuGet feed name used to restore package sources.</param>
 public sealed record SiloSource(
     [property: JsonPropertyName("reference")] string Reference,
     [property: JsonPropertyName("source")] string Source,
     [property: JsonPropertyName("version")] string? Version,
     [property: JsonPropertyName("gateway")] string? Gateway,
-    [property: JsonPropertyName("enabled")] bool Enabled
+    [property: JsonPropertyName("enabled")] bool Enabled,
+    [property: JsonPropertyName("feedName")] string? FeedName = null
 );

@@ -11,5 +11,6 @@ public readonly record struct InterfaceEntry(
     [property: JsonPropertyName("packageVersion")] string? PackageVersion,
     [property: JsonPropertyName("packageRoot")] string? PackageRoot,
     [property: JsonPropertyName("nugetConfigPath")] string? NugetConfigPath,
-    [property: JsonPropertyName("sourceId")] string? SourceId = null
+    [property: JsonPropertyName("sourceId")] string? SourceId = null,
+    [property: JsonPropertyName("feedName")] string? FeedName = null
 );

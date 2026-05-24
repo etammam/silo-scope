@@ -106,6 +106,7 @@ type BackendWorkspaceInfo = {
     Source: string;
     Version?: string | null;
     Gateway?: string | null;
+    FeedName?: string | null;
     Enabled: boolean;
   }>;
   SavedContexts?: BackendSavedRequestContext[];
@@ -837,6 +838,7 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
             : source.Reference,
         version: source.Version ?? null,
         gateway: source.Gateway ?? null,
+        feedName: source.FeedName ?? null,
         enabled: source.Enabled,
       }),
     ),
@@ -857,6 +859,7 @@ function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
       Source: source.sourceType === "NuGet" ? "nuget" : "DLL",
       Version: source.version ?? null,
       Gateway: source.gateway ?? null,
+      FeedName: source.feedName ?? null,
       Enabled: source.enabled,
     })),
     EnvironmentVariables: workspace.environmentVariables ?? {},

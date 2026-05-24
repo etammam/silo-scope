@@ -311,6 +311,7 @@ function WorkspaceForm({
       reference,
       label: sourceType === "DLL" ? reference.split(/[\\/]/).pop() || reference : reference,
       version: sourceType === "NuGet" ? sourceVersion.trim() || null : null,
+      feedName: sourceType === "NuGet" ? sourceFeed || null : null,
       gateway:
         requiresSourceGateways
           ? sourceGateway.trim() || null

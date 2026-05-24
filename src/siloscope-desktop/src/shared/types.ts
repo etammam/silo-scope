@@ -55,6 +55,7 @@ export interface WorkspaceSource {
   label: string;
   version?: string | null;
   gateway?: string | null;
+  feedName?: string | null;
   enabled: boolean;
 }
 

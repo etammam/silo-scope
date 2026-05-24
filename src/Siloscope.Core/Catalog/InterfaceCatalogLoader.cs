@@ -41,7 +41,8 @@ public sealed class InterfaceCatalogLoader(
                 entry.PackageId,
                 entry.PackageVersion,
                 entry.PackageRoot,
-                entry.NugetConfigPath
+                entry.NugetConfigPath,
+                entry.FeedName
             );
 
             var assemblyPathResult = ResolveAssemblyPath(legacySource);
@@ -146,7 +147,8 @@ public sealed class InterfaceCatalogLoader(
                     sourceOptions.PackageId,
                     sourceOptions.PackageVersion,
                     sourceOptions.PackageRoot,
-                    sourceOptions.NugetConfigPath
+                    sourceOptions.NugetConfigPath,
+                    FeedName: sourceOptions.FeedName
                 ),
                 0
             );
@@ -181,7 +183,7 @@ public sealed class InterfaceCatalogLoader(
         }
     }
 
-    private static Result<string> ResolveAssemblyPath(InterfaceSourceOptions options)
+    private Result<string> ResolveAssemblyPath(InterfaceSourceOptions options)
     {
         if (options.SourceType == InterfaceSourceType.Dll)
         {
@@ -216,9 +218,22 @@ public sealed class InterfaceCatalogLoader(
 
         if (!Directory.Exists(packageFolder))
         {
-            return Result.Fail(
-                $"Package not found in local NuGet cache: {packageFolder}. Restore it first."
+            var restoreResult = RestorePackage(
+                options.PackageId,
+                options.PackageVersion,
+                options.FeedName
             );
+            if (restoreResult.IsFailed)
+            {
+                return Result.Fail(restoreResult.Errors.Select(e => new Error(e.Message)));
+            }
+
+            if (!Directory.Exists(packageFolder))
+            {
+                return Result.Fail(
+                    $"Package not found in local NuGet cache after restore: {packageFolder}."
+                );
+            }
         }
 
         var dll = FindPackageDll(packageFolder, options.PackageId);
@@ -228,6 +243,41 @@ public sealed class InterfaceCatalogLoader(
         }
 
         return Result.Ok(dll);
+    }
+
+    private Result RestorePackage(string packageId, string packageVersion, string? feedName)
+    {
+        if (_nugetManager is null)
+        {
+            return Result.Fail(
+                $"Package not found in local NuGet cache. Restore {packageId} {packageVersion} first."
+            );
+        }
+
+        try
+        {
+            _logger?.LogInformation(
+                "Restoring NuGet package {PackageId} {PackageVersion} before catalog load",
+                packageId,
+                packageVersion
+            );
+
+            var restoreResult = _nugetManager
+                .RestorePackagesAsync([(packageId, packageVersion)], feedName: feedName)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
+
+            return restoreResult.IsSuccess
+                ? Result.Ok()
+                : Result.Fail(restoreResult.Errors.Select(e => e.Message));
+        }
+        catch (Exception ex)
+        {
+            return Result.Fail(
+                $"Failed to restore NuGet package {packageId} {packageVersion}: {ex.Message}"
+            );
+        }
     }
 
     private static string ResolveNuGetRoot(string? packageRoot)

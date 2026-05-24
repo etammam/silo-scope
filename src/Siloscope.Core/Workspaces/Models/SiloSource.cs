@@ -32,6 +32,12 @@ public sealed record SiloSource
     public string? Gateway { get; init; }
 
     /// <summary>
+    /// Gets the optional configured NuGet feed name used to restore package sources.
+    /// </summary>
+    [JsonPropertyName("feedName")]
+    public string? FeedName { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether the source is enabled. The default is <see langword="true" />.
     /// </summary>
     [JsonPropertyName("enabled")]

@@ -9,5 +9,6 @@ public readonly record struct InterfaceSourceOptions(
     [property: JsonPropertyName("packageId")] string? PackageId,
     [property: JsonPropertyName("packageVersion")] string? PackageVersion,
     [property: JsonPropertyName("packageRoot")] string? PackageRoot,
-    [property: JsonPropertyName("nugetConfigPath")] string? NugetConfigPath
+    [property: JsonPropertyName("nugetConfigPath")] string? NugetConfigPath,
+    [property: JsonPropertyName("feedName")] string? FeedName = null
 );
