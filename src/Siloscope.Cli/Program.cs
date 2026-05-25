@@ -1,27 +1,12 @@
-﻿using Terminal.Gui.App;
-using Terminal.Gui.Drawing;
-using Terminal.Gui.ViewBase;
-using Terminal.Gui.Views;
+﻿using Microsoft.Extensions.Hosting;
 
 internal class Program
 {
-    private static void Main(string[] args)
+    private static async Task Main(string[] args)
     {
-        using var app = Application.Create();
-        app.Init();
-        using var window = new Window()
-        {
-            Title = "Siloscope (Esc to quit)",
-            BorderStyle = LineStyle.Rounded,
-        };
-        var label = new Label()
-        {
-            Text = "Hello, Terminal.Gui v2!",
-            X = Pos.Center(),
-            Y = Pos.Center(),
-        };
-        window.Add(label);
+        var builder = Host.CreateApplicationBuilder(args);
 
-        app.Run(window);
+        var app = builder.Build();
+        await app.RunAsync();
     }
 }

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <ExcludeByFile>
+            **/*.g.cs,
+            **/*.g.*.cs,
+            **/Generated/**/*,*Generated*.cs,
+            **/*GlobalUsings*.g.cs,
+            **/*AssemblyInfo*.cs,
+            **/obj/**,
+            **/bin/**,
+            **/Generated/**,
+            **.Designer.cs,
+            **/test/**
+            **/EntityConfigurations/**.cs
+            **/Migrations/**
+          </ExcludeByFile>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

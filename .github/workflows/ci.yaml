@@ -1,26 +1,43 @@
-name: Continues Integration
+name: Continuous Integration
+
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 env:
   DOTNET_VERSION: "10.0.x"
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-test:
-    name: Build and Test
+    name: Build and Test (.NET)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
       cache-key: ${{ steps.cache-keys.outputs.cache-key }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Generate cache keys
         id: cache-keys
@@ -29,7 +46,7 @@ jobs:
           echo "tools-cache-key=${{ runner.os }}-dotnet-tools-${{ hashFiles('**/.config/dotnet-tools.json', '**/*.csproj') }}" >> $GITHUB_OUTPUT
 
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.nuget/packages
@@ -39,7 +56,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Cache dotnet tools
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             /home/runner/.dotnet/tools
@@ -52,47 +69,180 @@ jobs:
         run: |
           dotnet tool restore --verbosity minimal
           echo ".NET tools restored successfully"
+
       - name: Restore dependencies
-        run: |
-          dotnet restore --locked-mode --verbosity minimal
+        run: dotnet restore --verbosity minimal
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check formatting
-        run: |
-          dotnet csharpier check .
-        continue-on-error: false
+        run: dotnet csharpier check .
 
       - name: Build
-        run: |
-          dotnet build --configuration Release --no-restore --verbosity minimal
+        run: dotnet build --configuration Release --no-restore --verbosity minimal
 
       - name: Check for outdated dependencies
         run: |
           dotnet list package --outdated --format json > outdated-packages.json || echo '{"projects":[]}' > outdated-packages.json
 
       - name: Upload outdated package list
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4
         with:
           name: outdated-packages
           path: outdated-packages.json
 
       - name: Unit Testing with Coverage
-        id: test
         run: |
-          # Install dotnet-coverage tool for consistent coverage collection
           dotnet tool install -g dotnet-coverage --verbosity minimal
-
-          # Collect coverage and output in Cobertura format for SonarQube
-
-          dotnet test --no-build --no-restore --verbosity normal --configuration Release  --settings coverage.runsettings \
-          --collect:"XPlat Code Coverage" --results-directory ./TestResults/coverage
+          dotnet test --no-build --no-restore --verbosity normal --configuration Release \
+            --settings coverage.runsettings \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults/coverage
 
       - name: Upload test and coverage results
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4
         with:
           name: test-coverage-results-${{ github.run_number }}
+          path: ./TestResults/coverage
+          retention-days: 30
+
+  publish-core:
+    name: Publish Core (${{ matrix.runtime }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-and-test
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          - linux-x64
+          - osx-x64
+          - osx-arm64
+          - win-x64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore src/Siloscope.Core/Siloscope.Core.csproj --runtime ${{ matrix.runtime }} --verbosity minimal
+
+      - name: Publish self-contained sidecar
+        run: >
+          dotnet publish src/Siloscope.Core/Siloscope.Core.csproj
+          --configuration Release
+          --runtime ${{ matrix.runtime }}
+          --self-contained true
+          --no-restore
+          --output artifacts/core/${{ matrix.runtime }}
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Upload Core sidecar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: siloscope-core-${{ matrix.runtime }}
+          path: artifacts/core/${{ matrix.runtime }}
+          retention-days: 30
+
+  test-desktop:
+    name: Test Desktop (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
           path: |
-            ./TestResults/coverage
+            ~/.bun/install/cache
+            src/siloscope-desktop/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('src/siloscope-desktop/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install desktop dependencies
+        working-directory: src/siloscope-desktop
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck desktop
+        working-directory: src/siloscope-desktop
+        run: bun run typecheck
+
+      - name: Test desktop
+        working-directory: src/siloscope-desktop
+        run: bun run test:run
+
+  build-desktop:
+    name: Build Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    needs:
+      - build-and-test
+      - test-desktop
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x64
+            artifact: siloscope-desktop-linux-x64
+          - os: macos-latest
+            name: macos-arm64
+            artifact: siloscope-desktop-macos-arm64
+          - os: windows-latest
+            name: win-x64
+            artifact: siloscope-desktop-win-x64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            src/siloscope-desktop/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('src/siloscope-desktop/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install desktop dependencies
+        working-directory: src/siloscope-desktop
+        run: bun install --frozen-lockfile
+
+      - name: Build stable desktop app
+        working-directory: src/siloscope-desktop
+        run: bun run build:stable
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            src/siloscope-desktop/build/
+            src/siloscope-desktop/artifacts/
           retention-days: 30
