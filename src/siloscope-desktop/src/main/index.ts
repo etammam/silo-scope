@@ -148,10 +148,15 @@ type BackendNugetPackage = {
 
 type BackendLogEntry = {
   Timestamp?: string;
+  timestamp?: string;
   Level?: string;
+  level?: string;
   Category?: string;
+  category?: string;
   Message?: string;
+  message?: string;
   Exception?: string | null;
+  exception?: string | null;
 };
 
 type BackendInvocationResult = {
@@ -506,6 +511,32 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         }
 
         return { workspaces: (result.Value ?? []).map(mapWorkspace) };
+      },
+      getBackendLogs: async () => {
+        const result = await requestSidecar<FluentResult<BackendLogEntry[]>>(
+          "GetLogsAsync",
+        );
+
+        if (!result.IsSuccess) {
+          throw new Error(result.Errors?.[0]?.Message ?? "Failed to load backend logs.");
+        }
+
+        return {
+          entries: (result.Value ?? [])
+            .map(mapLogEntry)
+            .filter((entry): entry is LogEntry => entry !== null),
+        };
+      },
+      openBackendLogDirectory: async () => {
+        const result = await requestSidecar<FluentResult<string>>(
+          "GetLogDirectoryAsync",
+        );
+
+        if (!result.IsSuccess || !result.Value) {
+          throw new Error(result.Errors?.[0]?.Message ?? "Failed to locate backend logs.");
+        }
+
+        return { success: Utils.openPath(result.Value), path: result.Value };
       },
       getAppUpdateState: async (): Promise<AppUpdateState> =>
         getAppUpdateState(),
@@ -1117,17 +1148,17 @@ function mapLogEntry(params: unknown): LogEntry | null {
   }
 
   const entry = params as BackendLogEntry;
-  if (!entry.Message) {
+  const message = entry.Message ?? entry.message;
+  if (!message) {
     return null;
   }
 
-  const categoryPrefix = entry.Category ? `[${entry.Category}] ` : "";
-  const exceptionSuffix = entry.Exception ? `\n${entry.Exception}` : "";
-
   return {
-    timestamp: entry.Timestamp ?? new Date().toISOString(),
-    level: mapLogLevel(entry.Level),
-    message: `${categoryPrefix}${entry.Message}${exceptionSuffix}`,
+    timestamp: entry.Timestamp ?? entry.timestamp ?? new Date().toISOString(),
+    level: mapLogLevel(entry.Level ?? entry.level),
+    category: entry.Category ?? entry.category,
+    message,
+    exception: entry.Exception ?? entry.exception ?? null,
   };
 }
 

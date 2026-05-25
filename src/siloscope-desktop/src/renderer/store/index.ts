@@ -24,6 +24,7 @@ interface AppState {
   setSelectedFunction: (functionId: string | null) => void;
   setInvocationResult: (result: InvocationResult | null) => void;
   addLog: (entry: LogEntry) => void;
+  hydrateLogs: (entries: LogEntry[]) => void;
   clearLogs: () => void;
   setNugetFeeds: (feeds: NugetFeed[]) => void;
   setNugetPackages: (packages: NugetPackage[]) => void;
@@ -54,7 +55,13 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedMethod: (selectedMethod) => set({ selectedMethod, selectedFunctionId: null }),
   setSelectedFunction: (selectedFunctionId) => set({ selectedFunctionId }),
   setInvocationResult: (invocationResult) => set({ invocationResult }),
-  addLog: (entry) => set((state) => ({ logs: [...state.logs, entry] })),
+  addLog: (entry) => set((state) => ({ logs: [...state.logs, entry].slice(-1_000) })),
+  hydrateLogs: (entries) => set((state) => {
+    const incoming = new Set(state.logs.map(logIdentity));
+    return {
+      logs: [...entries.filter((entry) => !incoming.has(logIdentity(entry))), ...state.logs].slice(-1_000),
+    };
+  }),
   clearLogs: () => set({ logs: [] }),
   setNugetFeeds: (nugetFeeds) => set({ nugetFeeds }),
   setNugetPackages: (nugetPackages) => set({ nugetPackages }),
@@ -62,3 +69,7 @@ export const useAppStore = create<AppState>((set) => ({
   setFontFamily: (fontFamily) => set({ fontFamily }),
   setFontSize: (fontSize) => set({ fontSize }),
 }));
+
+function logIdentity(entry: LogEntry): string {
+  return `${entry.timestamp}\u0000${entry.level}\u0000${entry.category ?? ""}\u0000${entry.message}\u0000${entry.exception ?? ""}`;
+}

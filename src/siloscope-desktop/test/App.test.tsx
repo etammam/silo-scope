@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Electroview } from "electrobun/view";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/renderer/App";
@@ -23,6 +23,8 @@ const electrobunMock = vi.hoisted(() => {
     addNugetPackageSource: vi.fn(),
     invokeGrain: vi.fn(),
     getWorkspaces: vi.fn(),
+    getBackendLogs: vi.fn(),
+    openBackendLogDirectory: vi.fn(),
     getAppUpdateState: vi.fn(),
     checkForAppUpdate: vi.fn(),
     downloadAppUpdate: vi.fn(),
@@ -86,6 +88,8 @@ describe("App shell", () => {
     electrobunMock.request.addNugetPackageSource.mockClear();
     electrobunMock.request.invokeGrain.mockClear();
     electrobunMock.request.getWorkspaces.mockClear();
+    electrobunMock.request.getBackendLogs.mockClear();
+    electrobunMock.request.openBackendLogDirectory.mockClear();
     electrobunMock.request.getAppUpdateState.mockClear();
     electrobunMock.request.checkForAppUpdate.mockClear();
     electrobunMock.request.downloadAppUpdate.mockClear();
@@ -162,6 +166,11 @@ describe("App shell", () => {
       },
     });
     electrobunMock.request.getWorkspaces.mockResolvedValue({ workspaces: [] });
+    electrobunMock.request.getBackendLogs.mockResolvedValue({ entries: [] });
+    electrobunMock.request.openBackendLogDirectory.mockResolvedValue({
+      success: true,
+      path: "/tmp/siloscope/logs",
+    });
     electrobunMock.request.getAppUpdateState.mockResolvedValue({
       localInfo: {
         version: "0.0.1",
@@ -901,6 +910,43 @@ describe("App shell", () => {
         message: "Workspace loaded",
       },
     ]);
+    expect(screen.getByRole("button", { name: "Toggle backend logs panel" })).toHaveTextContent("Workspace loaded");
+  });
+
+  it("opens retained backend logs in a resizable bottom panel from the status bar", async () => {
+    electrobunMock.request.getBackendLogs.mockResolvedValue({
+      entries: [
+        {
+          timestamp: "2026-05-17T20:00:00.000Z",
+          level: "info",
+          category: "Siloscope.Core",
+          message: "JSON-RPC server listening",
+          exception: null,
+        },
+      ],
+    });
+
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Toggle backend logs panel" }));
+
+    const logPanel = await screen.findByRole("region", { name: "Backend logs panel" });
+    expect(logPanel).toBeInTheDocument();
+    const resizeHandle = screen.getByRole("separator", { name: "Resize backend logs panel" });
+    expect(resizeHandle).toBeInTheDocument();
+    expect(within(logPanel).getByText("JSON-RPC server listening")).toBeInTheDocument();
+    expect(electrobunMock.request.getBackendLogs).toHaveBeenCalledWith();
+
+    vi.spyOn(container.firstElementChild!, "getBoundingClientRect").mockReturnValue({
+      bottom: 800,
+      height: 800,
+    } as DOMRect);
+    fireEvent.mouseDown(resizeHandle);
+    fireEvent.mouseMove(document, { clientY: 500 });
+    fireEvent.mouseUp(document);
+    expect(container.firstElementChild).toHaveStyle({ "--log-panel-size": "276px" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Close logs panel" }));
+    expect(screen.queryByRole("region", { name: "Backend logs panel" })).not.toBeInTheDocument();
   });
 
 });

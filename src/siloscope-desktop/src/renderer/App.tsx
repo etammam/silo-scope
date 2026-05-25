@@ -35,6 +35,10 @@ import {
 } from "./catalog";
 import { ActivityBar, type ActivityView } from "./components/ActivityBar";
 import {
+  BackendLogsPanel,
+  BackendLogStatusButton,
+} from "./components/BackendLogsPanel";
+import {
   NavigationSidebar,
   NuGetRegistryManager,
 } from "./components/NavigationSidebar";
@@ -148,6 +152,8 @@ function App() {
     selectedFunctionId,
     selectedMethod,
     nugetFeeds,
+    logs,
+    clearLogs,
     setWorkspace,
     setSelectedGrain,
     setSelectedFunction,
@@ -172,6 +178,8 @@ function App() {
   const [horizontalResponseSize, setHorizontalResponseSize] = useState(420);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
   const [navigationSize, setNavigationSize] = useState(280);
+  const [isLogPanelVisible, setIsLogPanelVisible] = useState(false);
+  const [logPanelSize, setLogPanelSize] = useState(260);
   const [functionTabs, setFunctionTabs] = useState<string[]>([]);
   const [requestStates, setRequestStates] = useState<Record<string, RequestState>>({});
   const [hydratedWorkspaceId, setHydratedWorkspaceId] = useState<string | null>(null);
@@ -218,6 +226,7 @@ function App() {
     void refreshNugetFeeds();
     void refreshPersistedWorkspaces();
     void refreshAppUpdateState();
+    void refreshBackendLogs();
   }, []);
 
   useEffect(() => {
@@ -589,6 +598,7 @@ function App() {
   );
 
   const shellStyle = {
+    "--log-panel-size": `${logPanelSize}px`,
     "--response-size": `${responseSize}px`,
     "--navigation-size": `${navigationSize}px`,
   } as CSSProperties;
@@ -657,6 +667,38 @@ function App() {
       document.addEventListener("mouseup", handleMouseUp);
     },
     [paneLayout],
+  );
+
+  const handleLogPanelResizeStart = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      const shell = event.currentTarget.parentElement;
+      if (!shell) {
+        return;
+      }
+
+      event.preventDefault();
+      const bounds = shell.getBoundingClientRect();
+      const statusBarSize = 24;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        setLogPanelSize(
+          clamp(
+            bounds.bottom - statusBarSize - moveEvent.clientY,
+            120,
+            bounds.height * 0.68,
+          ),
+        );
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [],
   );
 
   const handleInvoke = useCallback((request: GrainInvocationRequest) => {
@@ -794,6 +836,10 @@ function App() {
     await electroview.rpc!.request.applyAppUpdate();
   }, []);
 
+  const handleOpenBackendLogDirectory = useCallback(async () => {
+    return await electroview.rpc!.request.openBackendLogDirectory();
+  }, []);
+
   useEffect(() => {
     const handleCloseRequest = () => {
       void handleClose();
@@ -817,6 +863,7 @@ function App() {
       className="app-shell"
       data-activity-visible={isActivityBarVisible}
       data-navigation-visible={isNavigationVisible}
+      data-log-panel-visible={isLogPanelVisible}
       data-pane-layout={paneLayout}
       data-platform={platform}
       data-response-visible={isResponseVisible}
@@ -1203,6 +1250,36 @@ function App() {
         )}
       </main>
 
+      {isLogPanelVisible && (
+        <div
+          aria-label="Resize backend logs panel"
+          aria-orientation="horizontal"
+          className="backend-logs-panel-resizer"
+          onMouseDown={handleLogPanelResizeStart}
+          role="separator"
+          tabIndex={0}
+        />
+      )}
+      {isLogPanelVisible && (
+        <BackendLogsPanel
+          entries={logs}
+          onClear={clearLogs}
+          onClose={() => setIsLogPanelVisible(false)}
+          onOpenLogDirectory={handleOpenBackendLogDirectory}
+        />
+      )}
+      <footer className="global-status-bar">
+        <div className="global-status-bar__workspace">
+          <span data-connected={isConnected}>{isConnected ? "Online" : "Offline"}</span>
+          <small>{workspace?.name ?? "No active cluster"}</small>
+        </div>
+        <BackendLogStatusButton
+          entries={logs}
+          isOpen={isLogPanelVisible}
+          onToggle={() => setIsLogPanelVisible((visible) => !visible)}
+        />
+      </footer>
+
       <QuickAccessPanel
         isOpen={isQuickAccessOpen}
         onClose={() => setIsQuickAccessOpen(false)}
@@ -1491,6 +1568,23 @@ async function refreshPersistedWorkspaces() {
         error instanceof Error
           ? error.message
           : "Failed to load persisted workspaces.",
+    });
+  }
+}
+
+async function refreshBackendLogs() {
+  try {
+    const response = await electroview.rpc!.request.getBackendLogs();
+    useAppStore.getState().hydrateLogs(response.entries);
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      category: "SiloScope.Desktop",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to load backend logs.",
     });
   }
 }

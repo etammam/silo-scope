@@ -1,5 +1,6 @@
 using FluentResults;
 using Siloscope.Core.JsonRpc.Models;
+using Siloscope.Core.Logging;
 using StreamJsonRpc;
 
 namespace Siloscope.Core.JsonRpc;
@@ -9,6 +10,25 @@ namespace Siloscope.Core.JsonRpc;
 /// </summary>
 public interface ISiloScopeCommands
 {
+    // Logs
+    /// <summary>
+    /// Gets the captured backend log entries retained in memory.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> containing the captured log entries.</returns>
+    [JsonRpcMethod("GetLogsAsync")]
+    Task<Result<IReadOnlyList<CapturedLogEntry>>> GetLogsAsync(
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>
+    /// Gets the directory that contains rolling backend log files.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> containing the backend log directory path.</returns>
+    [JsonRpcMethod("GetLogDirectoryAsync")]
+    Task<Result<string>> GetLogDirectoryAsync(CancellationToken cancellationToken = default);
+
     // Workspace
     /// <summary>
     /// Loads a workspace from the specified path.

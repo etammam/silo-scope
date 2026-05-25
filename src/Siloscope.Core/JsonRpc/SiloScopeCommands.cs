@@ -4,6 +4,7 @@ using Siloscope.Core.Catalog;
 using Siloscope.Core.Clustering;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.JsonRpc.Models;
+using Siloscope.Core.Logging;
 using Siloscope.Core.NuGet;
 using Siloscope.Core.NuGet.Models;
 using IWorkspaceService = Siloscope.Core.Workspaces.IWorkspaceService;
@@ -22,6 +23,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
     private readonly IWorkspaceService _workspaceService;
     private readonly INugetConnectionManager _nugetManager;
     private readonly ILogger<SiloScopeCommands> _logger;
+    private readonly ILogSink _logSink;
 
     private InterfaceCatalog? _catalog;
     private Workspaces.Workspace? _currentWorkspace;
@@ -32,7 +34,8 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         InterfaceCatalogLoader catalogLoader,
         IWorkspaceService workspaceService,
         INugetConnectionManager nugetManager,
-        ILogger<SiloScopeCommands> logger
+        ILogger<SiloScopeCommands> logger,
+        ILogSink logSink
     )
     {
         _connectorPool = connectorPool;
@@ -41,6 +44,27 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         _workspaceService = workspaceService;
         _nugetManager = nugetManager;
         _logger = logger;
+        _logSink = logSink;
+    }
+
+    public Task<Result<IReadOnlyList<CapturedLogEntry>>> GetLogsAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Result.Ok(_logSink.Entries));
+    }
+
+    public Task<Result<string>> GetLogDirectoryAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var logDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "SiloScope",
+            "logs"
+        );
+
+        return Task.FromResult(Result.Ok(logDirectory));
     }
 
     public async Task<Result<WorkspaceInfo>> LoadWorkspaceAsync(

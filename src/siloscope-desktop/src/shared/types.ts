@@ -134,7 +134,9 @@ export interface InvocationTiming {
 export interface LogEntry {
   timestamp: string;
   level: "debug" | "info" | "warn" | "error";
+  category?: string;
   message: string;
+  exception?: string | null;
 }
 
 export interface AppUpdateLocalInfo {

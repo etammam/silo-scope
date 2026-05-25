@@ -62,6 +62,8 @@ export type SiloScopeRPC = {
         response: InvocationResult;
       };
       getWorkspaces: { params: void; response: { workspaces: Workspace[] } };
+      getBackendLogs: { params: void; response: { entries: LogEntry[] } };
+      openBackendLogDirectory: { params: void; response: { success: boolean; path: string } };
       getAppUpdateState: { params: void; response: AppUpdateState };
       checkForAppUpdate: { params: void; response: AppUpdateState };
       downloadAppUpdate: { params: void; response: AppUpdateState };

@@ -7,6 +7,7 @@ using Siloscope.Core.Clustering;
 using Siloscope.Core.Configuration;
 using Siloscope.Core.JsonRpc;
 using Siloscope.Core.JsonRpc.Models;
+using Siloscope.Core.Logging;
 using Siloscope.Core.NuGet;
 using Siloscope.Core.NuGet.Models;
 using Siloscope.Core.Workspaces;
@@ -27,6 +28,7 @@ public sealed class SiloScopeCommandsTests
     private readonly Mock<IWorkspaceService> _workspaceServiceMock;
     private readonly Mock<INugetConnectionManager> _nugetManagerMock;
     private readonly Mock<ILogger<SiloScopeCommands>> _loggerMock;
+    private readonly Mock<ILogSink> _logSinkMock;
     private readonly SiloScopeCommands _commands;
 
     public SiloScopeCommandsTests()
@@ -37,6 +39,7 @@ public sealed class SiloScopeCommandsTests
         _workspaceServiceMock = new Mock<IWorkspaceService>(MockBehavior.Strict);
         _nugetManagerMock = new Mock<INugetConnectionManager>(MockBehavior.Strict);
         _loggerMock = new Mock<ILogger<SiloScopeCommands>>();
+        _logSinkMock = new Mock<ILogSink>();
 
         _commands = new SiloScopeCommands(
             _connectorPoolMock.Object,
@@ -44,8 +47,36 @@ public sealed class SiloScopeCommandsTests
             _catalogLoader,
             _workspaceServiceMock.Object,
             _nugetManagerMock.Object,
-            _loggerMock.Object
+            _loggerMock.Object,
+            _logSinkMock.Object
         );
+    }
+
+    [Fact]
+    public async Task GetLogsAsync_ReturnsCapturedBackendEntries()
+    {
+        var entry = new CapturedLogEntry(
+            DateTimeOffset.UtcNow,
+            "information",
+            "SiloScope.Test",
+            "Ready",
+            null
+        );
+        _logSinkMock.SetupGet(sink => sink.Entries).Returns([entry]);
+
+        var result = await _commands.GetLogsAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().ContainSingle().Which.Should().Be(entry);
+    }
+
+    [Fact]
+    public async Task GetLogDirectoryAsync_ReturnsApplicationLogsDirectory()
+    {
+        var result = await _commands.GetLogDirectoryAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().EndWith(Path.Combine("SiloScope", "logs"));
     }
 
     [Fact]
