@@ -85,7 +85,8 @@ public sealed class OrleansClientConnectorPool : IOrleansClientConnectorPool, ID
             var perGatewayCluster = new ToolClusterOptions(
                 clusterOptions.ClusterId,
                 clusterOptions.ServiceId,
-                [gateway]
+                [gateway],
+                clusterOptions.Clustering
             );
 
             gatewayToAssemblyPaths.TryGetValue(gateway, out var assemblyPaths);
