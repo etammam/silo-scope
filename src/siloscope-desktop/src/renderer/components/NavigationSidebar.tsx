@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronRight, ChevronDown, Loader2, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  ChevronDown,
+  Loader2,
+  Search,
+  X,
+  XCircle,
+} from "lucide-react";
 import type {
   GrainInterfaceDescriptor,
   NugetFeed,
@@ -19,6 +27,11 @@ const defaultNugetFeed: NugetFeed = {
 };
 
 type FeedTestState = "idle" | "testing" | "success" | "error";
+
+const largeCatalogFunctionThreshold = 40;
+const largeCatalogInterfaceThreshold = 18;
+const interfacePreviewLimit = 50;
+const methodPreviewLimit = 30;
 
 type NavigationSidebarProps = {
   activeView: ActivityView;
@@ -121,24 +134,26 @@ function WorkspaceNavigator({
   const [collapsedSources, setCollapsedSources] = useState<Set<string>>(
     () => new Set(),
   );
-  const [collapsedInterfaces, setCollapsedInterfaces] = useState<Set<string>>(
+  const [interfaceExpansion, setInterfaceExpansion] = useState<Map<string, boolean>>(
+    () => new Map(),
+  );
+  const [fullyVisibleInterfaces, setFullyVisibleInterfaces] = useState<Set<string>>(
     () => new Set(),
   );
-  const [disabledSourceIds, setDisabledSourceIds] = useState<Set<string>>(
-    () => new Set(),
+  const [visibleInterfaceLimits, setVisibleInterfaceLimits] = useState<Map<string, number>>(
+    () => new Map(),
   );
 
   const filteredSources = useMemo(
-    () =>
-      filterCatalogSources(
-        catalog.sources.map((source) => ({
-          ...source,
-          enabled: source.enabled && !disabledSourceIds.has(source.sourceId),
-        })),
-        catalogQuery,
-      ),
-    [catalog.sources, catalogQuery, disabledSourceIds],
+    () => filterCatalogSources(catalog.sources, catalogQuery),
+    [catalog.sources, catalogQuery],
   );
+  const catalogMetrics = useMemo(() => getCatalogMetrics(catalog.sources), [catalog.sources]);
+  const visibleMetrics = useMemo(() => getCatalogMetrics(filteredSources), [filteredSources]);
+  const hasCatalogQuery = catalogQuery.trim().length > 0;
+  const isLargeCatalog =
+    catalogMetrics.functions > largeCatalogFunctionThreshold ||
+    catalogMetrics.interfaces > largeCatalogInterfaceThreshold;
 
   const toggleSource = (sourceId: string) => {
     setCollapsedSources((current) => {
@@ -152,27 +167,24 @@ function WorkspaceNavigator({
     });
   };
 
-  const toggleSourceEnabled = (sourceId: string) => {
-    setDisabledSourceIds((current) => {
-      const next = new Set(current);
-      if (next.has(sourceId)) {
-        next.delete(sourceId);
-      } else {
-        next.add(sourceId);
-      }
+  const toggleInterface = (sourceId: string, interfaceId: string, isExpanded: boolean) => {
+    const key = `${sourceId}:${interfaceId}`;
+    setInterfaceExpansion((current) => {
+      const next = new Map(current);
+      next.set(key, !isExpanded);
       return next;
     });
   };
 
-  const toggleInterface = (sourceId: string, interfaceId: string) => {
+  const showAllInterfaceMethods = (sourceId: string, interfaceId: string) => {
     const key = `${sourceId}:${interfaceId}`;
-    setCollapsedInterfaces((current) => {
-      const next = new Set(current);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+    setFullyVisibleInterfaces((current) => new Set(current).add(key));
+  };
+
+  const showMoreInterfaces = (sourceId: string) => {
+    setVisibleInterfaceLimits((current) => {
+      const next = new Map(current);
+      next.set(sourceId, (next.get(sourceId) ?? interfacePreviewLimit) + interfacePreviewLimit);
       return next;
     });
   };
@@ -183,33 +195,62 @@ function WorkspaceNavigator({
         className="navigation-sidebar__section navigation-sidebar__section--sources"
         aria-labelledby="source-catalog-title"
       >
-        <div
-          className="navigation-sidebar__section-title"
-          id="source-catalog-title"
-        >
-          Sources
+        <div className="catalog-overview">
+          <div className="navigation-sidebar__section-title" id="source-catalog-title">
+            API Index
+          </div>
+          <div className="catalog-overview__headline">
+            <strong>{catalogMetrics.functions.toLocaleString()} functions</strong>
+            <span>{catalogMetrics.interfaces.toLocaleString()} interfaces indexed</span>
+          </div>
+          <dl className="catalog-overview__metrics" aria-label="Catalog totals">
+            <div>
+              <dt>Sources</dt>
+              <dd>{catalogMetrics.sources.toLocaleString()}</dd>
+            </div>
+            <div>
+              <dt>Interfaces</dt>
+              <dd>{catalogMetrics.interfaces.toLocaleString()}</dd>
+            </div>
+            <div>
+              <dt>Methods</dt>
+              <dd>{catalogMetrics.functions.toLocaleString()}</dd>
+            </div>
+          </dl>
         </div>
-        <label className="navigation-sidebar__select-label">
-          <span>Search catalog</span>
+        <label className="catalog-search">
+          <span className="sr-only">Search catalog</span>
+          <Search aria-hidden="true" width={15} height={15} />
           <input
             aria-label="Search catalog"
-            placeholder="Source, interface, method"
+            placeholder="Filter interfaces or functions..."
             value={catalogQuery}
             onChange={(event) => setCatalogQuery(event.target.value)}
           />
+          {hasCatalogQuery && (
+            <button
+              aria-label="Clear catalog search"
+              className="catalog-search__clear"
+              onClick={() => setCatalogQuery("")}
+              type="button"
+            >
+              <X aria-hidden="true" width={13} height={13} />
+            </button>
+          )}
         </label>
+        <div className="catalog-results" role="status">
+          {hasCatalogQuery
+            ? `${visibleMetrics.functions.toLocaleString()} matching functions in ${visibleMetrics.interfaces.toLocaleString()} interfaces`
+            : isLargeCatalog
+              ? "Interfaces collapsed for fast browsing"
+              : "All discovered functions visible"}
+        </div>
         <div className="navigation-sidebar__sources-container">
           {filteredSources.length > 0 ? (
             <ul className="navigation-sidebar__tree navigation-sidebar__catalog">
             {filteredSources.map((source) => (
               <li key={source.sourceId} className="navigation-sidebar__source-item">
                 <div className="navigation-sidebar__source-row">
-                  <input
-                    aria-label={`${source.label} enabled`}
-                    checked={source.enabled}
-                    onChange={() => toggleSourceEnabled(source.sourceId)}
-                    type="checkbox"
-                  />
                   <button
                     aria-label={`${source.label} ${source.interfaces.length}`}
                     aria-expanded={!collapsedSources.has(source.sourceId)}
@@ -243,19 +284,33 @@ function WorkspaceNavigator({
                         <span>{formatSourceDetail(source)}</span>
                       </span>
                     </span>
-                    <small>{source.discoveryStatus}</small>
+                    <span
+                      className="navigation-sidebar__source-status"
+                      data-status={source.discoveryStatus}
+                    >
+                      {source.discoveryStatus}
+                    </span>
+                    <small>
+                      {source.interfaces.length.toLocaleString()} interfaces
+                    </small>
                   </button>
                 </div>
                 {source.interfaces.length > 0 && !collapsedSources.has(source.sourceId) && (
                   <div className="navigation-sidebar__source-children">
                     <SourceInterfaceTree
-                      collapsedInterfaces={collapsedInterfaces}
+                      fullyVisibleInterfaces={fullyVisibleInterfaces}
+                      hasCatalogQuery={hasCatalogQuery}
+                      interfaceExpansion={interfaceExpansion}
+                      isLargeCatalog={isLargeCatalog}
                       onSelectFunction={onSelectFunction}
                       onSelectGrain={onSelectGrain}
+                      onShowAllMethods={showAllInterfaceMethods}
+                      onShowMoreInterfaces={showMoreInterfaces}
                       onToggleInterface={toggleInterface}
                       selectedFunctionId={selectedFunctionId}
                       selectedGrain={selectedGrain}
                       source={source}
+                      visibleInterfaceLimit={visibleInterfaceLimits.get(source.sourceId) ?? interfacePreviewLimit}
                     />
                   </div>
                 )}
@@ -264,7 +319,9 @@ function WorkspaceNavigator({
           </ul>
         ) : (
             <div className="navigation-sidebar__empty">
-              {workspace
+              {hasCatalogQuery
+                ? `No functions match "${catalogQuery.trim()}"`
+                : workspace
                 ? isConnected
                   ? "No functions discovered"
                   : "Connect to discover source functions"
@@ -279,21 +336,33 @@ function WorkspaceNavigator({
 }
 
 function SourceInterfaceTree({
-  collapsedInterfaces,
+  fullyVisibleInterfaces,
+  hasCatalogQuery,
+  interfaceExpansion,
+  isLargeCatalog,
   onSelectFunction,
   onSelectGrain,
+  onShowAllMethods,
+  onShowMoreInterfaces,
   onToggleInterface,
   selectedFunctionId,
   selectedGrain,
   source,
+  visibleInterfaceLimit,
 }: {
-  collapsedInterfaces: Set<string>;
+  fullyVisibleInterfaces: Set<string>;
+  hasCatalogQuery: boolean;
+  interfaceExpansion: Map<string, boolean>;
+  isLargeCatalog: boolean;
   onSelectFunction?: (functionId: string | null) => void;
   onSelectGrain: (grainId: string | null) => void;
-  onToggleInterface: (sourceId: string, interfaceId: string) => void;
+  onShowAllMethods: (sourceId: string, interfaceId: string) => void;
+  onShowMoreInterfaces: (sourceId: string) => void;
+  onToggleInterface: (sourceId: string, interfaceId: string, isExpanded: boolean) => void;
   selectedFunctionId?: string | null;
   selectedGrain: string | null;
   source: SourceCatalogSource;
+  visibleInterfaceLimit: number;
 }) {
   if (source.interfaces.length === 0) {
     return (
@@ -303,24 +372,50 @@ function SourceInterfaceTree({
     );
   }
 
+  const initiallyVisibleInterfaces = source.interfaces.slice(0, visibleInterfaceLimit);
+  const selectedInterface = source.interfaces.find(
+    (catalogInterface) =>
+      catalogInterface.interfaceId === selectedGrain ||
+      catalogInterface.methods.some((method) => method.functionId === selectedFunctionId),
+  );
+  const visibleInterfaces =
+    selectedInterface &&
+    !initiallyVisibleInterfaces.some(
+      (catalogInterface) => catalogInterface.interfaceId === selectedInterface.interfaceId,
+    )
+      ? [...initiallyVisibleInterfaces, selectedInterface]
+      : initiallyVisibleInterfaces;
+  const hiddenInterfaceCount = source.interfaces.length - visibleInterfaces.length;
+
   return (
     <ul className="navigation-sidebar__tree navigation-sidebar__tree--nested">
-      {source.interfaces.map((catalogInterface) => {
+      {visibleInterfaces.map((catalogInterface) => {
         const key = `${source.sourceId}:${catalogInterface.interfaceId}`;
-        const isCollapsed = collapsedInterfaces.has(key);
+        const containsSelection =
+          selectedGrain === catalogInterface.interfaceId ||
+          catalogInterface.methods.some((method) => method.functionId === selectedFunctionId);
+        const expandsByDefault =
+          hasCatalogQuery || !isLargeCatalog || containsSelection;
+        const isExpanded = hasCatalogQuery
+          ? true
+          : (interfaceExpansion.get(key) ?? expandsByDefault);
+        const visibleMethods = fullyVisibleInterfaces.has(key)
+          ? catalogInterface.methods
+          : catalogInterface.methods.slice(0, methodPreviewLimit);
+        const hiddenMethodCount = catalogInterface.methods.length - visibleMethods.length;
 
         return (
-          <li key={catalogInterface.interfaceId}>
+          <li className="navigation-sidebar__interface-item" key={catalogInterface.interfaceId}>
             <button
               aria-label={`${catalogInterface.interfaceName} ${catalogInterface.methods.length}`}
-              aria-expanded={!isCollapsed}
+              aria-expanded={isExpanded}
               className="navigation-sidebar__interface"
               onClick={() =>
-                onToggleInterface(source.sourceId, catalogInterface.interfaceId)
+                onToggleInterface(source.sourceId, catalogInterface.interfaceId, isExpanded)
               }
               type="button"
             >
-              {isCollapsed ? (
+              {!isExpanded ? (
                 <ChevronRight
                   aria-hidden="true"
                   className="navigation-sidebar__disclosure"
@@ -341,9 +436,9 @@ function SourceInterfaceTree({
               </span>
               <small>{catalogInterface.methods.length}</small>
             </button>
-            {!isCollapsed && (
+            {isExpanded && (
               <ul className="navigation-sidebar__tree navigation-sidebar__tree--nested navigation-sidebar__tree--methods">
-                {catalogInterface.methods.map((method) => (
+                {visibleMethods.map((method) => (
                   <li key={method.functionId}>
                     <button
                       aria-pressed={
@@ -367,11 +462,34 @@ function SourceInterfaceTree({
                     </button>
                   </li>
                 ))}
+                {hiddenMethodCount > 0 && (
+                  <li className="navigation-sidebar__show-more-item">
+                    <button
+                      className="navigation-sidebar__show-more"
+                      onClick={() => onShowAllMethods(source.sourceId, catalogInterface.interfaceId)}
+                      type="button"
+                    >
+                      Show {hiddenMethodCount.toLocaleString()} more functions
+                    </button>
+                  </li>
+                )}
               </ul>
             )}
           </li>
         );
       })}
+      {hiddenInterfaceCount > 0 && (
+        <li className="navigation-sidebar__load-more-item">
+          <button
+            className="navigation-sidebar__load-more"
+            onClick={() => onShowMoreInterfaces(source.sourceId)}
+            type="button"
+          >
+            Show next {Math.min(hiddenInterfaceCount, interfacePreviewLimit).toLocaleString()} of{" "}
+            {hiddenInterfaceCount.toLocaleString()} interfaces
+          </button>
+        </li>
+      )}
     </ul>
   );
 }
@@ -709,4 +827,22 @@ function formatSourceDetail(source: SourceCatalogSource): string {
   return source.version
     ? `${source.reference} @ ${source.version}`
     : source.reference;
+}
+
+function getCatalogMetrics(sources: SourceCatalogSource[]): {
+  sources: number;
+  interfaces: number;
+  functions: number;
+} {
+  return sources.reduce(
+    (metrics, source) => {
+      metrics.interfaces += source.interfaces.length;
+      metrics.functions += source.interfaces.reduce(
+        (total, catalogInterface) => total + catalogInterface.methods.length,
+        0,
+      );
+      return metrics;
+    },
+    { sources: sources.length, interfaces: 0, functions: 0 },
+  );
 }

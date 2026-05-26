@@ -183,7 +183,7 @@ function App() {
   const [paneLayout, setPaneLayout] = useState<PaneLayout>("horizontal");
   const [horizontalResponseSize, setHorizontalResponseSize] = useState(420);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
-  const [navigationSize, setNavigationSize] = useState(280);
+  const [navigationSize, setNavigationSize] = useState(352);
   const [isLogPanelVisible, setIsLogPanelVisible] = useState(false);
   const [logPanelSize, setLogPanelSize] = useState(260);
   const [functionTabs, setFunctionTabs] = useState<string[]>([]);

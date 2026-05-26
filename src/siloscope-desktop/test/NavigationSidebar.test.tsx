@@ -110,7 +110,7 @@ describe("NavigationSidebar", () => {
     expect(screen.queryByRole("button", { name: "StartMatch()" })).not.toBeInTheDocument();
   });
 
-  it("toggles source enabled state without losing the catalog", () => {
+  it("does not show source enable checkboxes in the catalog", () => {
     render(
       <NavigationSidebar
         activeView="workspace"
@@ -124,12 +124,7 @@ describe("NavigationSidebar", () => {
       />,
     );
 
-    const sourceToggle = screen.getByRole("checkbox", { name: "127.0.0.1:30000 enabled" });
-
-    expect(sourceToggle).toBeChecked();
-    fireEvent.click(sourceToggle);
-
-    expect(sourceToggle).not.toBeChecked();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "GetProfile()" })).toBeInTheDocument();
   });
 
@@ -169,6 +164,93 @@ describe("NavigationSidebar", () => {
 
     expect(inventoryGroup).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("button", { name: "GetItem()" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a large catalog collapsed until an interface is opened", () => {
+    const largeCatalog = Array.from({ length: 60 }, (_, interfaceIndex) => ({
+      interfaceId: `grain-${interfaceIndex}`,
+      interfaceName: `Domain.IGrain${interfaceIndex}`,
+      methods: Array.from({ length: 3 }, (_, methodIndex) => ({
+        name: `Action${interfaceIndex}_${methodIndex}`,
+        parameters: [],
+      })),
+    }));
+
+    render(
+      <NavigationSidebar
+        activeView="workspace"
+        grains={largeCatalog}
+        isConnected
+        onSelectGrain={vi.fn()}
+        selectedGrain={null}
+        workspace={workspace}
+      />,
+    );
+
+    expect(screen.getByText("180 functions")).toBeInTheDocument();
+    expect(screen.getByText("Interfaces collapsed for fast browsing")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Action0_0()" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Domain.IGrain59 3" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Domain.IGrain0 3" }));
+
+    expect(screen.getByRole("button", { name: "Action0_0()" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show next 10 of 10 interfaces" }));
+
+    expect(screen.getByRole("button", { name: "Domain.IGrain59 3" })).toBeInTheDocument();
+  });
+
+  it("reveals long function lists progressively", () => {
+    const longInterface = [{
+      interfaceId: "bulk-grain",
+      interfaceName: "Domain.IBulkGrain",
+      methods: Array.from({ length: 45 }, (_, index) => ({
+        name: `Invoke${index}`,
+        parameters: [],
+      })),
+    }];
+
+    render(
+      <NavigationSidebar
+        activeView="workspace"
+        grains={longInterface}
+        isConnected
+        onSelectGrain={vi.fn()}
+        selectedGrain={null}
+        workspace={workspace}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Domain.IBulkGrain 45" }));
+
+    expect(screen.getByRole("button", { name: "Invoke29()" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Invoke30()" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show 15 more functions" }));
+
+    expect(screen.getByRole("button", { name: "Invoke44()" })).toBeInTheDocument();
+  });
+
+  it("keeps a selected interface expanded in a large catalog", () => {
+    const largeCatalog = Array.from({ length: 60 }, (_, index) => ({
+      interfaceId: `grain-${index}`,
+      interfaceName: `Domain.IGrain${index}`,
+      methods: [{ name: `Read${index}`, parameters: [] }],
+    }));
+
+    render(
+      <NavigationSidebar
+        activeView="workspace"
+        grains={largeCatalog}
+        isConnected
+        onSelectGrain={vi.fn()}
+        selectedGrain="grain-59"
+        workspace={workspace}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Read59()" })).toBeInTheDocument();
   });
 
   it("renders NuGet workspace navigation when NuGet view is active", () => {
