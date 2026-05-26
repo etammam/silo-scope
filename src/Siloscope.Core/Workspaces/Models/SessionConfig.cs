@@ -8,12 +8,6 @@ namespace Siloscope.Core.Workspaces;
 public sealed record SessionConfig
 {
     /// <summary>
-    /// Gets the name of the active environment.
-    /// </summary>
-    [JsonPropertyName("activeEnvironment")]
-    public string ActiveEnvironment { get; init; } = string.Empty;
-
-    /// <summary>
     /// Gets the optional identifier of the last active workspace.
     /// </summary>
     [JsonPropertyName("lastWorkspaceId")]

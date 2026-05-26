@@ -26,6 +26,7 @@ public sealed class SiloScopeCommandsTests
     private readonly Mock<IGrainInvocationService> _grainInvocationServiceMock;
     private readonly InterfaceCatalogLoader _catalogLoader;
     private readonly Mock<IWorkspaceService> _workspaceServiceMock;
+    private readonly Mock<IEnvironmentService> _environmentServiceMock;
     private readonly Mock<INugetConnectionManager> _nugetManagerMock;
     private readonly Mock<ILogger<SiloScopeCommands>> _loggerMock;
     private readonly Mock<ILogSink> _logSinkMock;
@@ -37,6 +38,7 @@ public sealed class SiloScopeCommandsTests
         _grainInvocationServiceMock = new Mock<IGrainInvocationService>(MockBehavior.Strict);
         _catalogLoader = new InterfaceCatalogLoader();
         _workspaceServiceMock = new Mock<IWorkspaceService>(MockBehavior.Strict);
+        _environmentServiceMock = new Mock<IEnvironmentService>(MockBehavior.Strict);
         _nugetManagerMock = new Mock<INugetConnectionManager>(MockBehavior.Strict);
         _loggerMock = new Mock<ILogger<SiloScopeCommands>>();
         _logSinkMock = new Mock<ILogSink>();
@@ -46,6 +48,7 @@ public sealed class SiloScopeCommandsTests
             _grainInvocationServiceMock.Object,
             _catalogLoader,
             _workspaceServiceMock.Object,
+            _environmentServiceMock.Object,
             _nugetManagerMock.Object,
             _loggerMock.Object,
             _logSinkMock.Object
@@ -259,7 +262,6 @@ public sealed class SiloScopeCommandsTests
             "Local dev workspace",
             new ClusterOptions("dev", "SiloScope", ["127.0.0.1:30000"]),
             [new Siloscope.Core.JsonRpc.Models.SiloSource("missing.dll", "DLL", null, null, false)],
-            new Dictionary<string, string> { ["ASPNETCORE_ENVIRONMENT"] = "Development" },
             []
         );
 
@@ -520,6 +522,9 @@ public sealed class SiloScopeCommandsTests
             ["/test/path.dll"]
         );
         SetCatalog(catalog);
+        _environmentServiceMock
+            .Setup(service => service.LoadAsync())
+            .ReturnsAsync((EnvironmentConfig?)null);
 
         _grainInvocationServiceMock
             .Setup(s =>
@@ -572,6 +577,9 @@ public sealed class SiloScopeCommandsTests
                 service.SaveAsync("/tmp/test-workspace.workspace.json", It.IsAny<Workspace>())
             )
             .Returns(Task.CompletedTask);
+        _environmentServiceMock
+            .Setup(service => service.LoadAsync())
+            .ReturnsAsync((EnvironmentConfig?)null);
         _grainInvocationServiceMock
             .Setup(service =>
                 service.InvokeWithTimingAsync(
@@ -592,7 +600,6 @@ public sealed class SiloScopeCommandsTests
                 "Test",
                 "Test workspace",
                 new ClusterOptions("cluster", "service", ["localhost:30000"]),
-                [],
                 [],
                 [
                     new Siloscope.Core.JsonRpc.Models.SavedRequestContext(
@@ -635,6 +642,9 @@ public sealed class SiloScopeCommandsTests
             ["/test/path.dll"]
         );
         SetCatalog(catalog);
+        _environmentServiceMock
+            .Setup(service => service.LoadAsync())
+            .ReturnsAsync((EnvironmentConfig?)null);
 
         GrainInterfaceDescriptor? invokedGrain = null;
         _grainInvocationServiceMock
@@ -755,8 +765,7 @@ public sealed class SiloScopeCommandsTests
                 DefaultGateway = "localhost:30000",
             },
             Silos = [],
-            Environments = [],
-            Session = new SessionConfig { ActiveEnvironment = "default" },
+            Session = new SessionConfig(),
         };
     }
 

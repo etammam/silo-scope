@@ -2,6 +2,7 @@ import { Electroview } from "electrobun/view";
 import {
   Briefcase,
   ChevronDown,
+  Layers,
   LayoutTemplate,
   PanelLeftClose,
   PanelRightClose,
@@ -22,6 +23,7 @@ import {
 import type { SiloScopeRPC } from "../shared/rpc";
 import type {
   AppUpdateState,
+  EnvironmentProfile,
   GrainKeyType,
   SavedRequestContext,
   SourceCatalogFunction,
@@ -52,6 +54,7 @@ import {
   type ResponsePaneTab,
 } from "./components/ResponseTelemetryPane";
 import { QuickAccessPanel } from "./components/QuickAccessPanel";
+import { EnvironmentPage } from "./components/EnvironmentPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { WorkspacesPage } from "./components/WorkspacesPage";
 import { useAppStore } from "./store";
@@ -164,6 +167,9 @@ function App() {
     fontSize,
     setFontFamily,
     setFontSize,
+    environments,
+    activeEnvironment,
+    setActiveEnvironment,
   } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
   const [theme, setTheme] = useState<WorkbenchTheme>(() => readStoredTheme());
@@ -227,6 +233,7 @@ function App() {
     void refreshPersistedWorkspaces();
     void refreshAppUpdateState();
     void refreshBackendLogs();
+    void refreshEnvironments();
   }, []);
 
   useEffect(() => {
@@ -706,7 +713,7 @@ function App() {
   }, []);
 
   const handleSelectWorkspace = useCallback(
-    (workspaceId: string) => {
+    async (workspaceId: string) => {
       const nextWorkspace = workspaces.find(
         (candidate) => candidate.id === workspaceId,
       );
@@ -922,6 +929,28 @@ function App() {
               <Play aria-hidden="true" width={12} height={12} />
             )}
           </button>
+          {environments.length > 0 && (
+            <div className="titlebar-environment-selector">
+              <Layers aria-hidden="true" width={11} height={11} />
+              <select
+                aria-label="Active environment"
+                className="titlebar-environment-select"
+                value={activeEnvironment ?? ""}
+                onChange={(e) => {
+                  const envName = e.target.value || null;
+                  setActiveEnvironment(envName);
+                  void saveEnvironments(environments, envName);
+                }}
+                title="Active environment"
+              >
+                {environments.map((env) => (
+                  <option key={env.name} value={env.name}>
+                    {env.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {isWorkspaceMenuOpen && (
             <div className="workspace-menu" role="menu">
               {workspaces.length === 0 ? (
@@ -1115,6 +1144,16 @@ function App() {
             searchNugetPackages={searchNugetPackages}
             getNugetPackageVersions={getNugetPackageVersions}
           />
+        ) : activeView === "environments" ? (
+          <EnvironmentPage
+            environments={environments}
+            activeEnvironment={activeEnvironment}
+            onEnvironmentsChange={async (nextEnvironments, nextActive) => {
+              useAppStore.getState().setEnvironments(nextEnvironments);
+              useAppStore.getState().setActiveEnvironment(nextActive);
+              await saveEnvironments(nextEnvironments, nextActive);
+            }}
+          />
         ) : (
           <>
           <div className="workbench-tabs" role="tablist" aria-label="Open functions">
@@ -1221,6 +1260,22 @@ function App() {
             }}
             sourceCatalog={effectiveSourceCatalog}
             theme={theme}
+            environments={environments}
+            activeEnvironment={activeEnvironment}
+            onActiveEnvironmentChange={async (envName) => {
+              setActiveEnvironment(envName);
+              try {
+                await electroview.rpc!.request.saveEnvironments({
+                  config: { profiles: useAppStore.getState().environments, activeEnvironment: envName },
+                });
+              } catch (error) {
+                useAppStore.getState().addLog({
+                  timestamp: new Date().toISOString(),
+                  level: "error",
+                  message: error instanceof Error ? error.message : "Failed to save environments.",
+                });
+              }
+            }}
           />
           {isResponseVisible && (
             <div
@@ -1529,6 +1584,31 @@ async function setActiveWorkspace(workspace: Workspace): Promise<boolean> {
   }
 }
 
+async function saveEnvironments(profiles: EnvironmentProfile[], activeEnvironment: string | null) {
+  try {
+    await electroview.rpc!.request.saveEnvironments({
+      config: { profiles, activeEnvironment },
+    });
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message: error instanceof Error ? error.message : "Failed to save environments.",
+    });
+  }
+}
+
+async function refreshEnvironments() {
+  try {
+    const envConfig = await electroview.rpc!.request.getEnvironments();
+    useAppStore.getState().setEnvironments(envConfig.profiles);
+    useAppStore.getState().setActiveEnvironment(envConfig.activeEnvironment);
+  } catch {
+    useAppStore.getState().setEnvironments([]);
+    useAppStore.getState().setActiveEnvironment(null);
+  }
+}
+
 function upsertWorkspace(
   workspaces: Workspace[],
   workspace: Workspace,
@@ -1557,8 +1637,9 @@ async function refreshPersistedWorkspaces() {
       }),
     );
     if (!store.workspace && workspaces.length > 0) {
-      store.setWorkspace(workspaces[0]);
-      await setActiveWorkspace(workspaces[0]);
+      const firstWorkspace = workspaces[0];
+      store.setWorkspace(firstWorkspace);
+      await setActiveWorkspace(firstWorkspace);
     }
   } catch (error) {
     useAppStore.getState().addLog({
@@ -1654,20 +1735,20 @@ async function saveCurrentWorkspace(path?: string) {
   }
 
   const activeRequestContext = activeRequestContextProvider?.() ?? null;
-  const workspaceToSave = activeRequestContext
+  const workspaceWithContext = activeRequestContext
     ? workspaceWithSavedRequestContext(workspace, activeRequestContext)
     : workspace;
 
   try {
-    await electroview.rpc!.request.saveWorkspace({ workspace: workspaceToSave, path });
-    useAppStore.setState({ workspace: workspaceToSave });
-    addWorkspaceToSession(workspaceToSave);
+    await electroview.rpc!.request.saveWorkspace({ workspace: workspaceWithContext, path });
+    useAppStore.setState({ workspace: workspaceWithContext });
+    addWorkspaceToSession(workspaceWithContext);
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "info",
       message: activeRequestContext
-        ? `Request context saved: ${workspaceToSave.name}`
-        : `Workspace saved: ${workspaceToSave.name}`,
+        ? `Request context saved: ${workspaceWithContext.name}`
+        : `Workspace saved: ${workspaceWithContext.name}`,
     });
   } catch (error) {
     useAppStore.getState().addLog({
@@ -1686,15 +1767,15 @@ async function saveAllUnsavedRequestContexts(path?: string) {
     return;
   }
 
-  const workspaceToSave = workspaceWithSavedRequestContexts(
+  const workspaceWithContexts = workspaceWithSavedRequestContexts(
     workspace,
     unsavedContexts,
   );
 
   try {
-    await electroview.rpc!.request.saveWorkspace({ workspace: workspaceToSave, path });
-    useAppStore.setState({ workspace: workspaceToSave });
-    addWorkspaceToSession(workspaceToSave);
+    await electroview.rpc!.request.saveWorkspace({ workspace: workspaceWithContexts, path });
+    useAppStore.setState({ workspace: workspaceWithContexts });
+    addWorkspaceToSession(workspaceWithContexts);
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "info",

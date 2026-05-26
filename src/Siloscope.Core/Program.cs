@@ -46,6 +46,7 @@ Log.Information("SiloScope Core starting...");
 // Core services
 services.AddSingleton<INugetConnectionManager, NugetConnectionManager>();
 services.AddSingleton<IWorkspaceService, WorkspaceService>();
+services.AddSingleton<IEnvironmentService, EnvironmentService>();
 services.AddSingleton<InterfaceCatalogLoader>();
 services.AddSingleton<IOrleansClientConnectorPool, OrleansClientConnectorPool>();
 services.AddSingleton<IGrainInvocationService, GrainInvocationService>();

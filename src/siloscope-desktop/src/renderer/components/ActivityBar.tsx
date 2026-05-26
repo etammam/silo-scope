@@ -1,6 +1,6 @@
-import { Briefcase, Folder, Package, Settings } from "lucide-react";
+import { Briefcase, Folder, Globe, Package, Settings } from "lucide-react";
 
-export type ActivityView = "workspace" | "nuget" | "settings" | "workspaces";
+export type ActivityView = "workspace" | "nuget" | "settings" | "workspaces" | "environments";
 
 type ActivityBarItem = {
   id: ActivityView;
@@ -15,6 +15,7 @@ type ActivityBarItem = {
 const activityItems: ActivityBarItem[] = [
   { id: "workspace", label: "Workspace", Icon: Folder },
   { id: "workspaces", label: "Clusters", Icon: Briefcase },
+  { id: "environments", label: "Environments", Icon: Globe },
   { id: "nuget", label: "NuGet", Icon: Package },
   { id: "settings", label: "Settings", Icon: Settings },
 ];

@@ -219,6 +219,53 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         latestUnsavedRequests = [];
         return { success: true };
       },
+      getEnvironments: async () => {
+        const result = await requestSidecar<
+          FluentResult<{
+            Profiles: Array<{
+              Name: string;
+              Variables: Record<string, string>;
+            }>;
+            ActiveEnvironment: string | null;
+          }>
+        >("GetEnvironmentsAsync", undefined, "GetEnvironments");
+
+        if (!result.IsSuccess || !result.Value) {
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to load environments.",
+          );
+        }
+
+        return {
+          profiles: result.Value.Profiles?.map((profile) => ({
+            name: profile.Name,
+            variables: profile.Variables ?? {},
+          })) ?? [],
+          activeEnvironment: result.Value.ActiveEnvironment ?? null,
+        };
+      },
+      saveEnvironments: async ({ config }) => {
+        const payload = {
+          profiles: config.profiles.map((profile) => ({
+            name: profile.name,
+            variables: profile.variables ?? {},
+          })),
+          activeEnvironment: config.activeEnvironment,
+        };
+        const result = await requestSidecar<FluentResult<unknown>>(
+          "SaveEnvironmentsAsync",
+          [payload],
+          "SaveEnvironments",
+        );
+
+        if (!result.IsSuccess) {
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to save environments.",
+          );
+        }
+
+        return { success: true };
+      },
       connectCluster: async ({ workspace }) => {
         const result = await requestSidecar<FluentResult<string>>(
           "ConnectClusterAsync",
@@ -856,7 +903,6 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
     gatewayEndpoints:
       workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
     orleansVersion: "10.0",
-    environmentVariables: {},
     savedContexts: (workspace.SavedContexts ?? []).map(mapSavedRequestContext),
     sources: (workspace.Silos ?? []).map(
       (source): WorkspaceSource => ({
@@ -877,9 +923,7 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
   return result;
 }
 
-function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
-  EnvironmentVariables: Record<string, string>;
-} {
+function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo {
   return {
     Id: workspace.id,
     Name: workspace.name,
@@ -893,7 +937,6 @@ function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
       FeedName: source.feedName ?? null,
       Enabled: source.enabled,
     })),
-    EnvironmentVariables: workspace.environmentVariables ?? {},
     SavedContexts: (workspace.savedContexts ?? []).map(
       mapBackendSavedRequestContext,
     ),

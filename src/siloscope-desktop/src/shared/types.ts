@@ -59,6 +59,11 @@ export interface WorkspaceSource {
   enabled: boolean;
 }
 
+export interface EnvironmentProfile {
+  name: string;
+  variables: Record<string, string>;
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -71,9 +76,13 @@ export interface Workspace {
   clusterType?: ClusterType;
   clustering?: ClusterConnectionOptions | null;
   gatewayEndpoints?: string[];
-  environmentVariables?: Record<string, string>;
   sources?: WorkspaceSource[];
   savedContexts?: SavedRequestContext[];
+}
+
+export interface EnvironmentConfig {
+  profiles: EnvironmentProfile[];
+  activeEnvironment: string | null;
 }
 
 export interface SavedRequestContext {

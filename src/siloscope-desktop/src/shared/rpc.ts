@@ -1,6 +1,7 @@
 import type { RPCSchema } from "electrobun/bun";
 import type {
   Workspace,
+  EnvironmentConfig,
   GrainInterfaceDescriptor,
   InvocationResult,
   LogEntry,
@@ -29,6 +30,8 @@ export type SiloScopeRPC = {
       loadWorkspace: { params: { path?: string } | void; response: { workspace: Workspace } };
       setActiveWorkspace: { params: { workspace: Workspace }; response: { workspace: Workspace } };
       saveWorkspace: { params: { workspace: Workspace; path?: string }; response: { success: boolean } };
+      getEnvironments: { params: void; response: EnvironmentConfig };
+      saveEnvironments: { params: { config: EnvironmentConfig }; response: { success: boolean } };
       connectCluster: { params: { workspace: Workspace }; response: { message: string } };
       disconnectCluster: { params: void; response: { success: boolean } };
       discoverGrains: { params: { workspaceId: string }; response: { grains: GrainInterfaceDescriptor[]; sourceCatalog?: SourceOwnedCatalog } };

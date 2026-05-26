@@ -330,7 +330,7 @@ function WorkspaceForm({
     setSourceGateway("");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const [siloAddress, portRaw] = gatewayEndpoint.split(":");
     const gatewayPort = Number(portRaw);
     const workspace: Workspace = {
@@ -355,7 +355,6 @@ function WorkspaceForm({
         clusterConnection === "Local" && clusterType === "Homogenous" && gatewayEndpoint.trim()
           ? [gatewayEndpoint.trim()]
           : [],
-      environmentVariables: {},
       sources: sources.map((source) => ({
         ...source,
         gateway: clusterConnection === "Local" ? source.gateway : null,

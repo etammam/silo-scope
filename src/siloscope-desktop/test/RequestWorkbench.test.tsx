@@ -304,13 +304,15 @@ describe("RequestWorkbench", () => {
         selectedGrain="grain-1"
         selectedMethod="SetName"
         theme="dark"
+        environments={[{ name: "default", variables: { clusterId: "dev" } }]}
+        activeEnvironment="default"
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "clusterId" }));
 
     expect(screen.getByLabelText("Payload editor")).toHaveValue(
-      '{\n  "clusterId": "${env:clusterId}"\n}',
+      '{\n  "clusterId": "{{clusterId}}"\n}',
     );
   });
 
