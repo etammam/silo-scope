@@ -200,6 +200,10 @@ export function MonacoEditor({
         wordWrap: "on",
         formatOnPaste: true,
         formatOnType: true,
+        hover: { enabled: false },
+        quickSuggestions: false,
+        parameterHints: { enabled: false },
+        suggest: { showIcons: false, showStatusBar: false },
       }}
     />
   );

@@ -191,6 +191,7 @@ function App() {
   const [hydratedWorkspaceId, setHydratedWorkspaceId] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
+  const [isEnvironmentMenuOpen, setIsEnvironmentMenuOpen] = useState(false);
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
   const [isSavingBeforeClose, setIsSavingBeforeClose] = useState(false);
@@ -291,6 +292,22 @@ function App() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isWorkspaceMenuOpen]);
+
+  useEffect(() => {
+    if (!isEnvironmentMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const envSelector = document.querySelector(".titlebar-environment-selector");
+      if (envSelector && !envSelector.contains(event.target as Node)) {
+        setIsEnvironmentMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isEnvironmentMenuOpen]);
 
   useEffect(() => {
     if (invocationResult) {
@@ -929,28 +946,6 @@ function App() {
               <Play aria-hidden="true" width={12} height={12} />
             )}
           </button>
-          {environments.length > 0 && (
-            <div className="titlebar-environment-selector">
-              <Layers aria-hidden="true" width={11} height={11} />
-              <select
-                aria-label="Active environment"
-                className="titlebar-environment-select"
-                value={activeEnvironment ?? ""}
-                onChange={(e) => {
-                  const envName = e.target.value || null;
-                  setActiveEnvironment(envName);
-                  void saveEnvironments(environments, envName);
-                }}
-                title="Active environment"
-              >
-                {environments.map((env) => (
-                  <option key={env.name} value={env.name}>
-                    {env.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
           {isWorkspaceMenuOpen && (
             <div className="workspace-menu" role="menu">
               {workspaces.length === 0 ? (
@@ -998,6 +993,49 @@ function App() {
           Siloscope Workbench
         </button>
         <div className="app-titlebar__actions">
+          {environments.length > 0 && (
+            <div className="titlebar-environment-selector electrobun-webkit-app-region-no-drag">
+              <button
+                aria-expanded={isEnvironmentMenuOpen}
+                aria-haspopup="menu"
+                className="environment-menu__trigger"
+                onClick={() => setIsEnvironmentMenuOpen((open) => !open)}
+                type="button"
+              >
+                <Layers aria-hidden="true" width={11} height={11} />
+                <span>{activeEnvironment ?? "Select environment"}</span>
+                <ChevronDown aria-hidden="true" width={12} height={12} />
+              </button>
+              {isEnvironmentMenuOpen && (
+                <div className="environment-menu" role="menu">
+                  <div className="environment-menu__current">
+                    <strong>Environments</strong>
+                  </div>
+                  {environments.map((env) => (
+                    <button
+                      key={env.name}
+                      aria-pressed={activeEnvironment === env.name}
+                      className={`environment-menu__item ${activeEnvironment === env.name ? "environment-menu__item--active" : ""}`}
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        setIsEnvironmentMenuOpen(false);
+                        const envName = env.name || null;
+                        setActiveEnvironment(envName);
+                        void saveEnvironments(environments, envName);
+                      }}
+                    >
+                      <Layers aria-hidden="true" width={13} height={13} />
+                      <span className="environment-menu__item-name">{env.name}</span>
+                      {activeEnvironment === env.name && (
+                        <span className="environment-menu__item-status">Active</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button
             aria-label={
               isNavigationVisible
@@ -1262,20 +1300,6 @@ function App() {
             theme={theme}
             environments={environments}
             activeEnvironment={activeEnvironment}
-            onActiveEnvironmentChange={async (envName) => {
-              setActiveEnvironment(envName);
-              try {
-                await electroview.rpc!.request.saveEnvironments({
-                  config: { profiles: useAppStore.getState().environments, activeEnvironment: envName },
-                });
-              } catch (error) {
-                useAppStore.getState().addLog({
-                  timestamp: new Date().toISOString(),
-                  level: "error",
-                  message: error instanceof Error ? error.message : "Failed to save environments.",
-                });
-              }
-            }}
           />
           {isResponseVisible && (
             <div

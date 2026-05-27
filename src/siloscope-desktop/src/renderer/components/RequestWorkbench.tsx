@@ -27,7 +27,6 @@ type RequestWorkbenchProps = {
   onRequestStateChange: (nextState: RequestState) => void;
   environments?: EnvironmentProfile[];
   activeEnvironment?: string | null;
-  onActiveEnvironmentChange?: (envName: string | null) => void;
   onInvoke: (request: {
     grainType: string;
     grainKey: string;
@@ -58,7 +57,6 @@ export function RequestWorkbench({
   onRequestStateChange,
   environments = [],
   activeEnvironment,
-  onActiveEnvironmentChange,
   onInvoke,
 }: RequestWorkbenchProps) {
   const [activeTab, setActiveTab] = useState<RequestTab>("payload");
@@ -109,6 +107,11 @@ export function RequestWorkbench({
     [missingGrainKeyTokens, missingPayloadTokens],
   );
 
+  const hasValidGrainKeyTokens = useMemo(() => {
+    const classified = classifyTokens(requestState.grainKey, activeEnvVars);
+    return classified.valid.length > 0;
+  }, [requestState.grainKey, activeEnvVars]);
+
   const canInvoke = Boolean(
     (activeFunction || activeGrain) &&
       activeMethod &&
@@ -145,30 +148,6 @@ export function RequestWorkbench({
     return { monacoMarkers: markers, monacoDecorations: decorations };
   }, [requestState.payload, activeEnvVars]);
 
-  const envOptions = useMemo(() => {
-    const options = environments.map((env) => env.name);
-    return ["(none)", ...options];
-  }, [environments]);
-
-  const insertEnvToken = (token: string) => {
-    updateRequestState((currentState) => {
-      const currentPayload = currentState.payload;
-      const insertAt = Math.max(currentPayload.lastIndexOf("}"), 0);
-      const prefix = currentPayload.slice(0, insertAt).trimEnd();
-      const suffix = currentPayload.slice(insertAt);
-      const separator = prefix.endsWith("{") ? "\n  " : ",\n  ";
-
-      return {
-        ...currentState,
-        payload: `${prefix}${separator}"${token}": "{{${token}}}"\n${suffix}`,
-      };
-    });
-  };
-
-  const updateRequestState = (updater: (currentState: RequestState) => RequestState) => {
-    onRequestStateChange(updater(requestState));
-  };
-
   const handleInvoke = () => {
     if ((!activeGrain && !activeFunction) || !activeMethod || !canInvoke) {
       return;
@@ -200,7 +179,10 @@ export function RequestWorkbench({
           <span>Grain ID</span>
           <input
             aria-invalid={missingGrainKeyTokens.length > 0}
+            autoComplete="off"
+            data-1p-ignore="true"
             data-env-error={missingGrainKeyTokens.length > 0}
+            data-env-valid={hasValidGrainKeyTokens && missingGrainKeyTokens.length === 0}
             placeholder="Primary key"
             title={missingGrainKeyTokens.length > 0 ? `Missing: ${missingGrainKeyTokens.join(", ")}` : undefined}
             value={requestState.grainKey}
@@ -282,34 +264,6 @@ export function RequestWorkbench({
           <div className="request-workbench__editor">
             <div className="request-workbench__editor-header">
               <span>Payload</span>
-              <div className="request-workbench__env-toolbar" aria-label="Environment tools">
-                <select
-                  aria-label="Active environment"
-                  className="request-workbench__env-select"
-                  value={activeEnvironment ?? "(none)"}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    onActiveEnvironmentChange?.(value === "(none)" ? null : value);
-                  }}
-                >
-                  {envOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-                <div className="request-workbench__tokens" aria-label="Environment token autocomplete">
-                  {Object.keys(activeEnvVars).length === 0 ? (
-                    <span className="request-workbench__tokens-empty">No variables</span>
-                  ) : (
-                    Object.keys(activeEnvVars).map((key) => (
-                      <button key={key} onClick={() => insertEnvToken(key)} type="button" title={`Insert ${key}`}>
-                        {key}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
             </div>
             <MonacoEditor
               value={requestState.payload}

@@ -294,7 +294,7 @@ describe("RequestWorkbench", () => {
     expect(screen.getByText(/Expected property name|Unexpected end|JSON/)).toBeInTheDocument();
   });
 
-  it("inserts environment token placeholders into the payload", () => {
+  it("keeps environment tools out of the payload header", () => {
     render(
       <StatefulRequestWorkbench
         grains={grains}
@@ -309,11 +309,8 @@ describe("RequestWorkbench", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "clusterId" }));
-
-    expect(screen.getByLabelText("Payload editor")).toHaveValue(
-      '{\n  "clusterId": "{{clusterId}}"\n}',
-    );
+    expect(screen.queryByLabelText("Environment tools")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "clusterId" })).not.toBeInTheDocument();
   });
 
   it("keeps function selection read-only in the request line", () => {
