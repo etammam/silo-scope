@@ -49,6 +49,7 @@ import {
   RequestWorkbench,
   type RequestState,
 } from "./components/RequestWorkbench";
+import { RequestEmptyState } from "./components/RequestEmptyState";
 import {
   ResponseTelemetryPane,
   type ResponsePaneTab,
@@ -1276,52 +1277,60 @@ function App() {
           </button>
         </div>
         <section className="workbench-tab-panel" aria-label="Function workbench">
-          <RequestWorkbench
-            grains={grains}
-            onInvoke={handleInvoke}
-            onSelectFunction={handleSelectFunction}
-            onSelectGrain={setSelectedGrain}
-            onSelectMethod={setSelectedMethod}
-            selectedFunctionId={selectedFunctionId}
-            selectedGrain={selectedGrain}
-            selectedMethod={selectedMethod}
-            requestState={activeRequestState}
-            onRequestStateChange={(nextState) => {
-              if (!selectedFunctionId) {
-                return;
-              }
-
-              setRequestStates((current) => ({
-                ...current,
-                [selectedFunctionId]: nextState,
-              }));
-            }}
-            sourceCatalog={effectiveSourceCatalog}
-            theme={theme}
-            environments={environments}
-            activeEnvironment={activeEnvironment}
-          />
-          {isResponseVisible && (
-            <div
-              aria-label="Resize request and response panels"
-              aria-orientation={
-                paneLayout === "horizontal" ? "vertical" : "horizontal"
-              }
-              className="workbench-resizer"
-              onMouseDown={handleResizeStart}
-              role="separator"
-              tabIndex={0}
-            />
-          )}
-          {isResponseVisible && (
-            <ResponseTelemetryPane
-              activeTab={responseTab}
-              onTabChange={setResponseTab}
-              result={invocationResult}
-              theme={theme}
-              invocationHistory={invocationHistory}
-              fontFamily={fontFamily}
-              fontSize={fontSize}
+          {selectedFunctionId ? (
+            <>
+              <RequestWorkbench
+                grains={grains}
+                onInvoke={handleInvoke}
+                onSelectFunction={handleSelectFunction}
+                onSelectGrain={setSelectedGrain}
+                onSelectMethod={setSelectedMethod}
+                selectedFunctionId={selectedFunctionId}
+                selectedGrain={selectedGrain}
+                selectedMethod={selectedMethod}
+                requestState={activeRequestState}
+                onRequestStateChange={(nextState) => {
+                  setRequestStates((current) => ({
+                    ...current,
+                    [selectedFunctionId]: nextState,
+                  }));
+                }}
+                sourceCatalog={effectiveSourceCatalog}
+                theme={theme}
+                environments={environments}
+                activeEnvironment={activeEnvironment}
+              />
+              {isResponseVisible && (
+                <div
+                  aria-label="Resize request and response panels"
+                  aria-orientation={
+                    paneLayout === "horizontal" ? "vertical" : "horizontal"
+                  }
+                  className="workbench-resizer"
+                  onMouseDown={handleResizeStart}
+                  role="separator"
+                  tabIndex={0}
+                />
+              )}
+              {isResponseVisible && (
+                <ResponseTelemetryPane
+                  activeTab={responseTab}
+                  onTabChange={setResponseTab}
+                  result={invocationResult}
+                  theme={theme}
+                  invocationHistory={invocationHistory}
+                  fontFamily={fontFamily}
+                  fontSize={fontSize}
+                />
+              )}
+            </>
+          ) : (
+            <RequestEmptyState
+              onOpenQuickAccess={() => setIsQuickAccessOpen(true)}
+              onOpenSources={() => {
+                setActiveView("workspace");
+                setIsNavigationVisible(true);
+              }}
             />
           )}
         </section>
