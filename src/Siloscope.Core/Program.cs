@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -70,20 +71,23 @@ var messageHandler = new HeaderDelimitedMessageHandler(
 );
 
 var jsonRpc = new JsonRpc(messageHandler, commands);
-logSink.EntryCaptured += (_, entry) =>
+var logChannel = Channel.CreateUnbounded<CapturedLogEntry>();
+logSink.EntryCaptured += (_, entry) => logChannel.Writer.TryWrite(entry);
+
+_ = Task.Run(async () =>
 {
-    _ = Task.Run(async () =>
+    await foreach (var entry in logChannel.Reader.ReadAllAsync().ConfigureAwait(false))
     {
         try
         {
-            await jsonRpc.NotifyAsync("log", entry).ConfigureAwait(false);
+            await jsonRpc.NotifyWithParameterObjectAsync("log", entry).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             Log.Debug(ex, "Failed to send log notification.");
         }
-    });
-};
+    }
+});
 jsonRpc.StartListening();
 
 Log.Information("JSON-RPC server listening...");

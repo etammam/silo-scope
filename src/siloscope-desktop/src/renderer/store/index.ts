@@ -64,11 +64,11 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedMethod: (selectedMethod) => set({ selectedMethod, selectedFunctionId: null }),
   setSelectedFunction: (selectedFunctionId) => set({ selectedFunctionId }),
   setInvocationResult: (invocationResult) => set({ invocationResult }),
-  addLog: (entry) => set((state) => ({ logs: [...state.logs, entry].slice(-1_000) })),
+  addLog: (entry) => set((state) => ({ logs: [...state.logs, entry].slice(-50_000) })),
   hydrateLogs: (entries) => set((state) => {
     const incoming = new Set(state.logs.map(logIdentity));
     return {
-      logs: [...entries.filter((entry) => !incoming.has(logIdentity(entry))), ...state.logs].slice(-1_000),
+      logs: [...entries.filter((entry) => !incoming.has(logIdentity(entry))), ...state.logs].slice(-50_000),
     };
   }),
   clearLogs: () => set({ logs: [] }),

@@ -5,7 +5,7 @@ namespace Siloscope.Core.Logging;
 /// </summary>
 public sealed class LogSink : ILogSink
 {
-    private const int MaxEntries = 1_000;
+    private const int MaxEntries = 50_000;
     private readonly List<CapturedLogEntry> _entries = [];
     private readonly Lock _gate = new();
 

@@ -1203,9 +1203,14 @@ function mapLogEntry(params: unknown): LogEntry | null {
     return null;
   }
 
-  const entry = params as BackendLogEntry;
+  const raw = Array.isArray(params) ? params[0] : params;
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const entry = raw as BackendLogEntry;
   const message = entry.Message ?? entry.message;
-  if (!message) {
+  if (message == null) {
     return null;
   }
 
