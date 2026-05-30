@@ -8,6 +8,7 @@ import type {
   AppUpdateState,
   AppUpdateStatusEntry,
   CreateNugetFeedRequest,
+  ClusterTopologySnapshot,
   NugetFeed,
   NugetPackage,
   SavedRequestContext,
@@ -37,6 +38,7 @@ export type SiloScopeRPC = {
       discoverGrains: { params: { workspaceId: string }; response: { grains: GrainInterfaceDescriptor[]; sourceCatalog?: SourceOwnedCatalog } };
       getGrains: { params: { workspaceId: string }; response: { grains: GrainInterfaceDescriptor[]; sourceCatalog?: SourceOwnedCatalog } };
       getSourceCatalog: { params: { workspaceId: string }; response: { sourceCatalog: SourceOwnedCatalog } };
+      getClusterTopology: { params: { workspaceId?: string } | void; response: { topology: ClusterTopologySnapshot } };
       listNugetFeeds: { params: void; response: { feeds: NugetFeed[] } };
       createNugetFeed: { params: CreateNugetFeedRequest; response: { feed: NugetFeed } };
       testNugetFeed: { params: CreateNugetFeedRequest; response: { success: boolean } };

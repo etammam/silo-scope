@@ -12,6 +12,7 @@ import type {
   AppUpdateLocalInfo,
   AppUpdateState,
   AppUpdateStatusEntry,
+  ClusterTopologySnapshot,
   ClusterConnectionProvider,
   ClusterType,
   LogEntry,
@@ -170,6 +171,118 @@ type BackendInvocationResult = {
   };
 };
 
+type BackendClusterTopologySnapshot = {
+  CapturedAt?: string;
+  capturedAt?: string;
+  IsLive?: boolean;
+  isLive?: boolean;
+  Source?: string;
+  source?: string;
+  Clients?: BackendClientTopologyTelemetry[];
+  clients?: BackendClientTopologyTelemetry[];
+  Silos?: BackendSiloTopologyTelemetry[];
+  silos?: BackendSiloTopologyTelemetry[];
+  RequestEvents?: BackendRequestTopologyTelemetry[];
+  requestEvents?: BackendRequestTopologyTelemetry[];
+  Connections?: BackendTopologyConnectionTelemetry[];
+  connections?: BackendTopologyConnectionTelemetry[];
+};
+
+type BackendClientTopologyTelemetry = {
+  ClientId?: string;
+  clientId?: string;
+  Name?: string;
+  name?: string;
+  Gateway?: string | null;
+  gateway?: string | null;
+  Address?: string;
+  address?: string;
+  ConnectedSiloIds?: string[];
+  connectedSiloIds?: string[];
+  Status?: string;
+  status?: string;
+};
+
+type BackendSiloTopologyTelemetry = {
+  SiloId?: string;
+  siloId?: string;
+  Name?: string;
+  name?: string;
+  Gateway?: string | null;
+  gateway?: string | null;
+  Host?: BackendSiloHostMetadata;
+  host?: BackendSiloHostMetadata;
+  Resources?: BackendSiloResourceTelemetry;
+  resources?: BackendSiloResourceTelemetry;
+  Grains?: BackendGrainPlacementTelemetry[];
+  grains?: BackendGrainPlacementTelemetry[];
+  Status?: string;
+  status?: string;
+};
+
+type BackendSiloHostMetadata = {
+  Address?: string;
+  address?: string;
+  UptimeSeconds?: number;
+  uptimeSeconds?: number;
+  ClientConnections?: number;
+  clientConnections?: number;
+};
+
+type BackendSiloResourceTelemetry = {
+  CpuPercent?: number;
+  cpuPercent?: number;
+  MemoryPercent?: number;
+  memoryPercent?: number;
+  MemoryBytes?: number;
+  memoryBytes?: number;
+};
+
+type BackendGrainPlacementTelemetry = {
+  GrainType?: string;
+  grainType?: string;
+  Count?: number;
+  count?: number;
+};
+
+type BackendRequestTopologyTelemetry = {
+  EventId?: string;
+  eventId?: string;
+  SourceId?: string;
+  sourceId?: string;
+  TargetSiloId?: string;
+  targetSiloId?: string;
+  GrainType?: string;
+  grainType?: string;
+  MethodName?: string;
+  methodName?: string;
+  IsSuccess?: boolean;
+  isSuccess?: boolean;
+  LatencyMs?: number;
+  latencyMs?: number;
+  Message?: string | null;
+  message?: string | null;
+  ObservedAt?: string;
+  observedAt?: string;
+};
+
+type BackendTopologyConnectionTelemetry = {
+  ConnectionId?: string;
+  connectionId?: string;
+  SourceSiloId?: string;
+  sourceSiloId?: string;
+  TargetSiloId?: string;
+  targetSiloId?: string;
+  LatencyMs?: number;
+  latencyMs?: number;
+  Status?: string;
+  status?: string;
+  IsSpiking?: boolean;
+  isSpiking?: boolean;
+  ObservedAt?: string;
+  observedAt?: string;
+};
+
 const rpc = BrowserView.defineRPC<SiloScopeRPC>({
   handlers: {
     requests: {
@@ -318,6 +431,19 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
       getSourceCatalog: async ({ workspaceId: _workspaceId }) => {
         console.log("getSourceCatalog", _workspaceId);
         return { sourceCatalog: await discoverSourceCatalog() };
+      },
+      getClusterTopology: async () => {
+        const result = await requestSidecar<
+          FluentResult<BackendClusterTopologySnapshot>
+        >("GetClusterTopologyAsync", undefined, "GetClusterTopology");
+
+        if (!result.IsSuccess || !result.Value) {
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to get cluster topology.",
+          );
+        }
+
+        return { topology: mapClusterTopology(result.Value) };
       },
       listNugetFeeds: async () => {
         const result = await requestSidecar<FluentResult<BackendNugetFeed[]>>(
@@ -1169,6 +1295,88 @@ function mapInvocationTiming(result: BackendInvocationResult | undefined) {
     serializationMs: result.Timing.SerializationMs ?? 0,
     executionMs: result.Timing.ExecutionMs ?? 0,
     totalMs: result.Timing.TotalMs ?? 0,
+  };
+}
+
+function mapClusterTopology(
+  snapshot: BackendClusterTopologySnapshot,
+): ClusterTopologySnapshot {
+  const silos = snapshot.Silos ?? snapshot.silos ?? [];
+  const clients = snapshot.Clients ?? snapshot.clients ?? [];
+  const requestEvents = snapshot.RequestEvents ?? snapshot.requestEvents ?? [];
+  const connections = snapshot.Connections ?? snapshot.connections ?? [];
+
+  return {
+    capturedAt:
+      snapshot.CapturedAt ?? snapshot.capturedAt ?? new Date().toISOString(),
+    isLive: snapshot.IsLive ?? snapshot.isLive ?? false,
+    source: snapshot.Source ?? snapshot.source ?? "workspace-catalog",
+    clients: clients.map((client) => ({
+      clientId: client.ClientId ?? client.clientId ?? "",
+      name: client.Name ?? client.name ?? "Client",
+      gateway: client.Gateway ?? client.gateway ?? null,
+      address: client.Address ?? client.address ?? "localhost",
+      connectedSiloIds:
+        client.ConnectedSiloIds ?? client.connectedSiloIds ?? [],
+      status: client.Status ?? client.status ?? "healthy",
+    })),
+    silos: silos.map((silo) => {
+      const host = silo.Host ?? silo.host ?? {};
+      const resources = silo.Resources ?? silo.resources ?? {};
+      const grains = silo.Grains ?? silo.grains ?? [];
+
+      return {
+        siloId: silo.SiloId ?? silo.siloId ?? "",
+        name: silo.Name ?? silo.name ?? "Silo",
+        gateway: silo.Gateway ?? silo.gateway ?? null,
+        host: {
+          address: host.Address ?? host.address ?? "not-advertised",
+          uptimeSeconds: host.UptimeSeconds ?? host.uptimeSeconds ?? 0,
+          clientConnections:
+            host.ClientConnections ?? host.clientConnections ?? 0,
+        },
+        resources: {
+          cpuPercent: resources.CpuPercent ?? resources.cpuPercent ?? 0,
+          memoryPercent:
+            resources.MemoryPercent ?? resources.memoryPercent ?? 0,
+          memoryBytes: resources.MemoryBytes ?? resources.memoryBytes ?? 0,
+        },
+        grains: grains.map((grain) => ({
+          grainType: grain.GrainType ?? grain.grainType ?? "Grain",
+          count: grain.Count ?? grain.count ?? 0,
+        })),
+        status: silo.Status ?? silo.status ?? "healthy",
+      };
+    }),
+    requestEvents: requestEvents.map((event) => ({
+      eventId: event.EventId ?? event.eventId ?? "",
+      sourceId: event.SourceId ?? event.sourceId ?? "",
+      targetSiloId: event.TargetSiloId ?? event.targetSiloId ?? "",
+      grainType: event.GrainType ?? event.grainType ?? "Grain",
+      methodName: event.MethodName ?? event.methodName ?? "Invoke",
+      isSuccess: event.IsSuccess ?? event.isSuccess ?? false,
+      latencyMs: event.LatencyMs ?? event.latencyMs ?? 0,
+      message: event.Message ?? event.message ?? null,
+      observedAt:
+        event.ObservedAt ??
+        event.observedAt ??
+        new Date().toISOString(),
+    })),
+    connections: connections.map((connection) => ({
+      connectionId:
+        connection.ConnectionId ?? connection.connectionId ?? "",
+      sourceSiloId:
+        connection.SourceSiloId ?? connection.sourceSiloId ?? "",
+      targetSiloId:
+        connection.TargetSiloId ?? connection.targetSiloId ?? "",
+      latencyMs: connection.LatencyMs ?? connection.latencyMs ?? 0,
+      status: connection.Status ?? connection.status ?? "healthy",
+      isSpiking: connection.IsSpiking ?? connection.isSpiking ?? false,
+      observedAt:
+        connection.ObservedAt ??
+        connection.observedAt ??
+        new Date().toISOString(),
+    })),
   };
 }
 

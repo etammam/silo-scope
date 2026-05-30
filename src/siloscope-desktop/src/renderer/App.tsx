@@ -23,6 +23,7 @@ import {
 import type { SiloScopeRPC } from "../shared/rpc";
 import type {
   AppUpdateState,
+  ClusterTopologySnapshot,
   EnvironmentProfile,
   GrainKeyType,
   SavedRequestContext,
@@ -49,6 +50,7 @@ import {
   RequestWorkbench,
   type RequestState,
 } from "./components/RequestWorkbench";
+import { ClusterTopologyPage } from "./components/ClusterTopologyPage";
 import { RequestEmptyState } from "./components/RequestEmptyState";
 import {
   ResponseTelemetryPane,
@@ -219,6 +221,8 @@ function App() {
   const [appUpdateState, setAppUpdateState] = useState<AppUpdateState | null>(
     null,
   );
+  const [clusterTopology, setClusterTopology] =
+    useState<ClusterTopologySnapshot | null>(null);
   const [updateAction, setUpdateAction] = useState<
     "checking" | "downloading" | "applying" | null
   >(null);
@@ -950,6 +954,42 @@ function App() {
       );
   }, [handleClose]);
 
+  useEffect(() => {
+    if (!isConnected) {
+      setClusterTopology(null);
+      return;
+    }
+
+    if (activeView !== "topology" || !workspace) {
+      return;
+    }
+
+    let isCancelled = false;
+    const refreshTopology = async () => {
+      try {
+        const response = await electroview.rpc!.request.getClusterTopology({
+          workspaceId: workspace.id,
+        });
+        if (!isCancelled) {
+          setClusterTopology(response.topology);
+        }
+      } catch (error) {
+        console.warn(
+          "Failed to refresh cluster topology",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    };
+
+    void refreshTopology();
+    const intervalId = window.setInterval(refreshTopology, 2_000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeView, isConnected, workspace]);
+
   const closeConfirmationItems = dirtyRequestSummaries;
   const titlebarClassName = usesNativeWindowFrame
     ? "app-titlebar app-titlebar--toolbar"
@@ -1268,6 +1308,14 @@ function App() {
               await saveEnvironments(nextEnvironments, nextActive);
             }}
           />
+        ) : activeView === "topology" ? (
+          <ClusterTopologyPage
+            workspace={workspace}
+            sourceCatalog={effectiveSourceCatalog}
+            topology={clusterTopology}
+            isConnected={isConnected}
+            invocationHistory={invocationHistory}
+          />
         ) : (
           <>
             <div
@@ -1361,7 +1409,7 @@ function App() {
               </button>
             </div>
             <section
-              className="workbench-tab-panel"
+              className={`workbench-tab-panel ${selectedFunctionId ? "" : "workbench-tab-panel--empty"}`}
               aria-label="Function workbench"
             >
               {selectedFunctionId ? (
@@ -1412,13 +1460,38 @@ function App() {
                   )}
                 </>
               ) : (
-                <RequestEmptyState
-                  onOpenQuickAccess={() => setIsQuickAccessOpen(true)}
-                  onOpenSources={() => {
-                    setActiveView("workspace");
-                    setIsNavigationVisible(true);
-                  }}
-                />
+                <>
+                  <RequestEmptyState
+                    onOpenQuickAccess={() => setIsQuickAccessOpen(true)}
+                    onOpenSources={() => {
+                      setActiveView("workspace");
+                      setIsNavigationVisible(true);
+                    }}
+                  />
+                  {isResponseVisible && (
+                    <div
+                      aria-label="Resize request and response panels"
+                      aria-orientation={
+                        paneLayout === "horizontal" ? "vertical" : "horizontal"
+                      }
+                      className="workbench-resizer"
+                      onMouseDown={handleResizeStart}
+                      role="separator"
+                      tabIndex={0}
+                    />
+                  )}
+                  {isResponseVisible && (
+                    <ResponseTelemetryPane
+                      activeTab={responseTab}
+                      onTabChange={setResponseTab}
+                      result={invocationResult}
+                      theme={theme}
+                      invocationHistory={invocationHistory}
+                      fontFamily={fontFamily}
+                      fontSize={fontSize}
+                    />
+                  )}
+                </>
               )}
             </section>
           </>

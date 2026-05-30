@@ -140,6 +140,74 @@ export interface InvocationTiming {
   totalMs: number;
 }
 
+export interface ClusterTopologySnapshot {
+  capturedAt: string;
+  isLive: boolean;
+  source: "observed-sidecar" | "workspace-catalog" | string;
+  clients: ClientTopologyTelemetry[];
+  silos: SiloTopologyTelemetry[];
+  requestEvents: RequestTopologyTelemetry[];
+  connections: TopologyConnectionTelemetry[];
+}
+
+export interface ClientTopologyTelemetry {
+  clientId: string;
+  name: string;
+  gateway?: string | null;
+  address: string;
+  connectedSiloIds: string[];
+  status: "healthy" | "warning" | "critical" | string;
+}
+
+export interface SiloTopologyTelemetry {
+  siloId: string;
+  name: string;
+  gateway?: string | null;
+  host: SiloHostMetadata;
+  resources: SiloResourceTelemetry;
+  grains: GrainPlacementTelemetry[];
+  status: "healthy" | "warning" | "critical" | string;
+}
+
+export interface SiloHostMetadata {
+  address: string;
+  uptimeSeconds: number;
+  clientConnections: number;
+}
+
+export interface SiloResourceTelemetry {
+  cpuPercent: number;
+  memoryPercent: number;
+  memoryBytes: number;
+}
+
+export interface GrainPlacementTelemetry {
+  grainType: string;
+  count: number;
+}
+
+export interface RequestTopologyTelemetry {
+  eventId: string;
+  sourceId: string;
+  targetSiloId: string;
+  grainType: string;
+  methodName: string;
+  isSuccess: boolean;
+  latencyMs: number;
+  message?: string | null;
+  observedAt: string;
+}
+
+export interface TopologyConnectionTelemetry {
+  connectionId: string;
+  sourceSiloId: string;
+  targetSiloId: string;
+  latencyMs: number;
+  status: "healthy" | "warning" | "critical" | string;
+  isSpiking: boolean;
+  observedAt: string;
+}
+
 export interface LogEntry {
   timestamp: string;
   level: "debug" | "info" | "warn" | "error";

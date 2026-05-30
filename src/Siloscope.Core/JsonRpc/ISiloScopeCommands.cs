@@ -122,6 +122,16 @@ public interface ISiloScopeCommands
     [JsonRpcMethod("DisconnectClusterAsync")]
     Task<Result> DisconnectClusterAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Gets the latest topology and telemetry snapshot for the active cluster.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> containing the cluster topology snapshot.</returns>
+    [JsonRpcMethod("GetClusterTopologyAsync")]
+    Task<Result<ClusterTopologySnapshot>> GetClusterTopologyAsync(
+        CancellationToken cancellationToken = default
+    );
+
     // Grains
     /// <summary>
     /// Discovers all grain interfaces available in the current workspace.

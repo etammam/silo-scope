@@ -83,6 +83,69 @@ public sealed class SiloScopeCommandsTests
     }
 
     [Fact]
+    public async Task GetClusterTopologyAsync_NoWorkspace_ReturnsFailure()
+    {
+        var result = await _commands.GetClusterTopologyAsync();
+
+        result.IsFailed.Should().BeTrue();
+        result.Errors.Should().Contain(error => error.Message.Contains("No active workspace"));
+    }
+
+    [Fact]
+    public async Task GetClusterTopologyAsync_WithWorkspaceAndCatalog_ReturnsSiloTelemetry()
+    {
+        var methodInfo = typeof(ITestStringGrain).GetMethod("Echo")!;
+        SetWorkspace(
+            new Workspace
+            {
+                Id = "workspace-1",
+                WorkspaceInfo = new Siloscope.Core.Workspaces.WorkspaceInfo { Name = "Actors" },
+                Cluster = new ClusterConfig { DefaultGateway = "127.0.0.1:30000" },
+                Silos =
+                [
+                    new Siloscope.Core.Workspaces.SiloSource
+                    {
+                        Reference = "/tmp/Contracts.dll",
+                        Source = "DLL",
+                        Gateway = "127.0.0.1:30000",
+                        Enabled = true,
+                    },
+                ],
+            }
+        );
+        SetCatalog(
+            new InterfaceCatalog(
+                [
+                    new GrainInterfaceDescriptor(
+                        "TestGrain",
+                        typeof(ITestStringGrain),
+                        [new GrainMethodDescriptor("string Echo()", methodInfo)],
+                        "127.0.0.1:30000",
+                        "DLL:/tmp/Contracts.dll::127.0.0.1:30000"
+                    ),
+                ],
+                []
+            )
+        );
+        _connectorPoolMock.SetupGet(pool => pool.IsConnected).Returns(true);
+        _connectorPoolMock
+            .SetupGet(pool => pool.Connectors)
+            .Returns(new Dictionary<string, OrleansClientConnector>());
+
+        var result = await _commands.GetClusterTopologyAsync();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Silos.Should().ContainSingle();
+        result.Value.Silos[0].Gateway.Should().Be("127.0.0.1:30000");
+        result
+            .Value.Silos[0]
+            .Grains.Should()
+            .ContainSingle(grain => grain.GrainType == "TestString");
+        result.Value.Silos[0].Resources.MemoryBytes.Should().BeGreaterThan(0);
+        result.Value.Source.Should().Be("workspace-catalog");
+    }
+
+    [Fact]
     public async Task ConnectClusterAsync_ValidOptions_ReturnsSuccess()
     {
         var options = new ClusterOptions("test-cluster", "test-service", ["127.0.0.1:30000"]);
@@ -522,6 +585,18 @@ public sealed class SiloScopeCommandsTests
             ["/test/path.dll"]
         );
         SetCatalog(catalog);
+        SetWorkspace(
+            new Workspace
+            {
+                Id = "workspace-1",
+                WorkspaceInfo = new Siloscope.Core.Workspaces.WorkspaceInfo { Name = "Actors" },
+                Cluster = new ClusterConfig { DefaultGateway = "localhost:30000" },
+            }
+        );
+        _connectorPoolMock.SetupGet(pool => pool.IsConnected).Returns(true);
+        _connectorPoolMock
+            .SetupGet(pool => pool.Connectors)
+            .Returns(new Dictionary<string, OrleansClientConnector>());
         _environmentServiceMock
             .Setup(service => service.LoadAsync())
             .ReturnsAsync((EnvironmentConfig?)null);
@@ -549,6 +624,18 @@ public sealed class SiloScopeCommandsTests
         result.Value.Timing.SerializationMs.Should().Be(1);
         result.Value.Timing.ExecutionMs.Should().Be(10);
         result.Value.Timing.TotalMs.Should().Be(15);
+
+        var topology = await _commands.GetClusterTopologyAsync();
+
+        topology.IsSuccess.Should().BeTrue();
+        topology
+            .Value.RequestEvents.Should()
+            .ContainSingle(evt =>
+                evt.GrainType == "TestGrain"
+                && evt.MethodName == "Echo"
+                && evt.IsSuccess
+                && evt.LatencyMs == 15
+            );
     }
 
     [Fact]

@@ -14,6 +14,7 @@ const electrobunMock = vi.hoisted(() => {
     discoverGrains: vi.fn(),
     getGrains: vi.fn(),
     getSourceCatalog: vi.fn(),
+    getClusterTopology: vi.fn(),
     listNugetFeeds: vi.fn(),
     createNugetFeed: vi.fn(),
     testNugetFeed: vi.fn(),
@@ -79,6 +80,7 @@ describe("App shell", () => {
     electrobunMock.request.discoverGrains.mockClear();
     electrobunMock.request.getGrains.mockClear();
     electrobunMock.request.getSourceCatalog.mockClear();
+    electrobunMock.request.getClusterTopology.mockClear();
     electrobunMock.request.listNugetFeeds.mockClear();
     electrobunMock.request.createNugetFeed.mockClear();
     electrobunMock.request.testNugetFeed.mockClear();
@@ -167,6 +169,16 @@ describe("App shell", () => {
     });
     electrobunMock.request.getWorkspaces.mockResolvedValue({ workspaces: [] });
     electrobunMock.request.getBackendLogs.mockResolvedValue({ entries: [] });
+    electrobunMock.request.getClusterTopology.mockResolvedValue({
+      topology: {
+        capturedAt: new Date().toISOString(),
+        isLive: false,
+        source: "workspace-catalog",
+        clients: [],
+        silos: [],
+        connections: [],
+      },
+    });
     electrobunMock.request.openBackendLogDirectory.mockResolvedValue({
       success: true,
       path: "/tmp/siloscope/logs",
