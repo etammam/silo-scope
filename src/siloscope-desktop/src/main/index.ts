@@ -237,10 +237,11 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         }
 
         return {
-          profiles: result.Value.Profiles?.map((profile) => ({
-            name: profile.Name,
-            variables: profile.Variables ?? {},
-          })) ?? [],
+          profiles:
+            result.Value.Profiles?.map((profile) => ({
+              name: profile.Name,
+              variables: profile.Variables ?? {},
+            })) ?? [],
           activeEnvironment: result.Value.ActiveEnvironment ?? null,
         };
       },
@@ -560,12 +561,13 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         return { workspaces: (result.Value ?? []).map(mapWorkspace) };
       },
       getBackendLogs: async () => {
-        const result = await requestSidecar<FluentResult<BackendLogEntry[]>>(
-          "GetLogsAsync",
-        );
+        const result =
+          await requestSidecar<FluentResult<BackendLogEntry[]>>("GetLogsAsync");
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to load backend logs.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to load backend logs.",
+          );
         }
 
         return {
@@ -580,7 +582,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess || !result.Value) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to locate backend logs.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to locate backend logs.",
+          );
         }
 
         return { success: Utils.openPath(result.Value), path: result.Value };
@@ -990,11 +994,15 @@ function mapBackendCluster(workspace: Workspace) {
     ServiceId: workspace.serviceId ?? "SiloScope",
     Type: workspace.clusterType ?? "Homogenous",
     GatewayEndpoints: gatewayEndpoints,
-    Clustering: provider && clustering ? buildBackendClustering(clustering) : null,
+    Clustering:
+      provider && clustering ? buildBackendClustering(clustering) : null,
   };
 }
 
-const clusterConnectionProviderByEnumValue: Record<number, ClusterConnectionProvider> = {
+const clusterConnectionProviderByEnumValue: Record<
+  number,
+  ClusterConnectionProvider
+> = {
   2: "Redis",
   3: "AdoNet",
   4: "AzureStorage",
@@ -1040,10 +1048,11 @@ function buildWorkspaceClustering(
   clustering: NonNullable<BackendWorkspaceInfo["Cluster"]>["Clustering"],
 ): NonNullable<Workspace["clustering"]> {
   const keys = clusterConnectionOptionKeys[provider];
-  const backendOptions = clustering?.[keys.backend as keyof NonNullable<typeof clustering>]
-    ?? clustering?.[keys.workspace as keyof NonNullable<typeof clustering>];
+  const backendOptions =
+    clustering?.[keys.backend as keyof NonNullable<typeof clustering>] ??
+    clustering?.[keys.workspace as keyof NonNullable<typeof clustering>];
   const connectionString = isBackendConnectionStringOptions(backendOptions)
-    ? backendOptions.ConnectionString ?? backendOptions.connectionString ?? ""
+    ? (backendOptions.ConnectionString ?? backendOptions.connectionString ?? "")
     : "";
 
   return {
@@ -1051,7 +1060,7 @@ function buildWorkspaceClustering(
     [keys.workspace]: {
       connectionString,
       invariant: isBackendConnectionStringOptions(backendOptions)
-        ? backendOptions.Invariant ?? backendOptions.invariant ?? null
+        ? (backendOptions.Invariant ?? backendOptions.invariant ?? null)
         : null,
     },
   };
@@ -1062,25 +1071,29 @@ function buildBackendClustering(
 ): Record<string, unknown> {
   const provider = clustering.provider;
   const keys = clusterConnectionOptionKeys[provider];
-  const workspaceOptions = clustering[keys.workspace as keyof typeof clustering];
+  const workspaceOptions =
+    clustering[keys.workspace as keyof typeof clustering];
   const connectionString =
-    typeof workspaceOptions === "object"
-      && workspaceOptions !== null
-      && "connectionString" in workspaceOptions
-      && typeof workspaceOptions.connectionString === "string"
+    typeof workspaceOptions === "object" &&
+    workspaceOptions !== null &&
+    "connectionString" in workspaceOptions &&
+    typeof workspaceOptions.connectionString === "string"
       ? workspaceOptions.connectionString
       : "";
   const invariant =
-    typeof workspaceOptions === "object"
-      && workspaceOptions !== null
-      && "invariant" in workspaceOptions
-      && typeof workspaceOptions.invariant === "string"
+    typeof workspaceOptions === "object" &&
+    workspaceOptions !== null &&
+    "invariant" in workspaceOptions &&
+    typeof workspaceOptions.invariant === "string"
       ? workspaceOptions.invariant
       : null;
 
   return {
     Provider: provider,
-    [keys.backend]: { ConnectionString: connectionString, Invariant: invariant },
+    [keys.backend]: {
+      ConnectionString: connectionString,
+      Invariant: invariant,
+    },
   };
 }
 
@@ -1289,8 +1302,8 @@ function createMainWindow() {
     frame: {
       x: 100,
       y: 100,
-      width: 1200,
-      height: 800,
+      width: 1400,
+      height: 900,
     },
   });
 
