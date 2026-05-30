@@ -302,6 +302,24 @@ function App() {
     };
   }, []);
 
+  const previousIsConnected = useRef(isConnected);
+
+  useEffect(() => {
+    if (previousIsConnected.current && !isConnected) {
+      setFunctionTabs([]);
+      setRequestStates({});
+      setSelectedFunction(null);
+      setSelectedGrain(null);
+      setSelectedMethod(null);
+    }
+    previousIsConnected.current = isConnected;
+  }, [
+    isConnected,
+    setSelectedFunction,
+    setSelectedGrain,
+    setSelectedMethod,
+  ]);
+
   useEffect(() => {
     if (!isWorkspaceMenuOpen) {
       return;
