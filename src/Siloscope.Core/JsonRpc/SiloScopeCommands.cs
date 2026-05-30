@@ -7,6 +7,7 @@ using Siloscope.Core.JsonRpc.Models;
 using Siloscope.Core.Logging;
 using Siloscope.Core.NuGet;
 using Siloscope.Core.NuGet.Models;
+using IEnvironmentService = Siloscope.Core.Workspaces.IEnvironmentService;
 using IWorkspaceService = Siloscope.Core.Workspaces.IWorkspaceService;
 using Workspaces = Siloscope.Core.Workspaces;
 
@@ -21,6 +22,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
     private readonly IGrainInvocationService _grainInvocationService;
     private readonly InterfaceCatalogLoader _catalogLoader;
     private readonly IWorkspaceService _workspaceService;
+    private readonly IEnvironmentService _environmentService;
     private readonly INugetConnectionManager _nugetManager;
     private readonly ILogger<SiloScopeCommands> _logger;
     private readonly ILogSink _logSink;
@@ -33,6 +35,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         IGrainInvocationService grainInvocationService,
         InterfaceCatalogLoader catalogLoader,
         IWorkspaceService workspaceService,
+        IEnvironmentService environmentService,
         INugetConnectionManager nugetManager,
         ILogger<SiloScopeCommands> logger,
         ILogSink logSink
@@ -42,6 +45,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         _grainInvocationService = grainInvocationService;
         _catalogLoader = catalogLoader;
         _workspaceService = workspaceService;
+        _environmentService = environmentService;
         _nugetManager = nugetManager;
         _logger = logger;
         _logSink = logSink;
@@ -101,18 +105,12 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                 ))
                 .ToList();
 
-            var activeEnv = workspace.Environments.FirstOrDefault(e =>
-                e.Name == workspace.Session.ActiveEnvironment
-            );
-            var envVars = activeEnv?.Variables ?? new Dictionary<string, string>();
-
             var workspaceInfo = new WorkspaceInfo(
                 workspace.Id,
                 workspace.WorkspaceInfo.Name,
                 workspace.WorkspaceInfo.Description,
                 clusterOptions,
                 siloSources,
-                envVars,
                 workspace.Session.SavedContexts.Select(ToJsonRpcSavedContext).ToList()
             );
 
@@ -204,6 +202,53 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
 
         _logger.LogInformation("Active workspace set: {WorkspaceName}", workspace.Name);
         return Task.FromResult(Result.Ok(ToWorkspaceInfo(_currentWorkspace)));
+    }
+
+    public async Task<Result<EnvironmentConfigInfo>> GetEnvironmentsAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var config = await _environmentService.LoadAsync();
+        if (config is null)
+        {
+            return Result.Ok(new EnvironmentConfigInfo([], null));
+        }
+
+        var profiles = config
+            .Profiles.Select(p => new EnvironmentProfile(p.Name, p.Variables))
+            .ToList();
+        return Result.Ok(new EnvironmentConfigInfo(profiles, config.ActiveEnvironment));
+    }
+
+    public async Task<Result> SaveEnvironmentsAsync(
+        EnvironmentConfigInfo config,
+        CancellationToken cancellationToken = default
+    )
+    {
+        try
+        {
+            var model = new Workspaces.EnvironmentConfig
+            {
+                Profiles = (config.Profiles ?? [])
+                    .Select(p => new Workspaces.EnvironmentProfile
+                    {
+                        Name = p.Name ?? "unnamed",
+                        Variables =
+                            p.Variables ?? new Dictionary<string, string>(StringComparer.Ordinal),
+                    })
+                    .ToList(),
+                ActiveEnvironment = config.ActiveEnvironment,
+            };
+
+            await _environmentService.SaveAsync(model);
+            return Result.Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save environments");
+            return Result.Fail(ex.Message);
+        }
     }
 
     public async Task<Result<string>> ConnectClusterAsync(
@@ -404,11 +449,48 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
             );
         }
 
+        var activeEnvVars = await GetActiveEnvironmentVariablesAsync();
+        var envConfig = await _environmentService.LoadAsync();
+        var activeEnvName = envConfig?.ActiveEnvironment ?? "(none)";
+
+        _logger.LogInformation(
+            "[Env] Active environment='{ActiveEnv}', Variables=[{VariableKeys}]",
+            activeEnvName,
+            string.Join(", ", activeEnvVars.Keys)
+        );
+        _logger.LogInformation("[Env] Raw grainKey='{RawGrainKey}'", grainKey);
+        _logger.LogInformation("[Env] Raw payload='{RawPayload}'", payload ?? "(empty)");
+
+        var substitutedGrainKey = EnvironmentTokenSubstitutor.Substitute(grainKey, activeEnvVars);
+        var substitutedPayload = EnvironmentTokenSubstitutor.Substitute(
+            payload ?? string.Empty,
+            activeEnvVars
+        );
+
+        _logger.LogInformation(
+            "[Env] Substituted grainKey='{SubstitutedGrainKey}'",
+            substitutedGrainKey
+        );
+
+        var missingTokens = EnvironmentTokenSubstitutor
+            .FindMissing(grainKey, activeEnvVars)
+            .Concat(EnvironmentTokenSubstitutor.FindMissing(payload ?? string.Empty, activeEnvVars))
+            .Distinct()
+            .ToList();
+
+        if (missingTokens.Count > 0)
+        {
+            return Result.Fail<InvocationResult>(
+                $"Missing environment variable(s): {string.Join(", ", missingTokens)}. "
+                    + "Ensure the active environment profile defines these keys."
+            );
+        }
+
         var result = await _grainInvocationService.InvokeWithTimingAsync(
             grain,
             method,
-            grainKey,
-            payload,
+            substitutedGrainKey,
+            substitutedPayload,
             cancellationToken
         );
 
@@ -869,17 +951,12 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
             ))
             .ToList();
 
-        var activeEnv = workspace.Environments.FirstOrDefault(e =>
-            e.Name == workspace.Session.ActiveEnvironment
-        );
-
         return new WorkspaceInfo(
             workspace.Id,
             workspace.WorkspaceInfo.Name,
             workspace.WorkspaceInfo.Description,
             clusterOptions,
             siloSources,
-            activeEnv?.Variables ?? new Dictionary<string, string>(),
             workspace.Session.SavedContexts.Select(ToJsonRpcSavedContext).ToList()
         );
     }
@@ -888,45 +965,41 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
     {
         return new Workspaces.Workspace
         {
-            Id = workspace.Id,
+            Id = workspace.Id ?? string.Empty,
             WorkspaceInfo = new Workspaces.WorkspaceInfo
             {
-                Name = workspace.Name,
+                Name = workspace.Name ?? "Untitled",
                 Description = workspace.Description ?? string.Empty,
                 Creation = DateTime.UtcNow.ToString("O"),
             },
-            Cluster = new Workspaces.ClusterConfig
-            {
-                Type = workspace.Cluster.Type,
-                ClusterId = workspace.Cluster.ClusterId,
-                ServiceId = workspace.Cluster.ServiceId,
-                DefaultGateway =
-                    workspace.Cluster.GatewayEndpoints.FirstOrDefault() ?? string.Empty,
-                Clustering = workspace.Cluster.Clustering,
-            },
-            Silos = workspace
-                .Silos.Select(s => new Workspaces.SiloSource
+            Cluster = workspace.Cluster is not null
+                ? new Workspaces.ClusterConfig
                 {
-                    Reference = s.Reference,
-                    Source = s.Source,
-                    Version = s.Version,
-                    Gateway = s.Gateway,
-                    Enabled = s.Enabled,
-                })
-                .ToList(),
+                    Type = workspace.Cluster.Type,
+                    ClusterId = workspace.Cluster.ClusterId,
+                    ServiceId = workspace.Cluster.ServiceId,
+                    DefaultGateway =
+                        workspace.Cluster.GatewayEndpoints.FirstOrDefault() ?? string.Empty,
+                    Clustering = workspace.Cluster.Clustering,
+                }
+                : new Workspaces.ClusterConfig(),
+            Silos =
+                workspace
+                    .Silos?.Select(s => new Workspaces.SiloSource
+                    {
+                        Reference = s.Reference,
+                        Source = s.Source,
+                        Version = s.Version,
+                        Gateway = s.Gateway,
+                        Enabled = s.Enabled,
+                    })
+                    .ToList()
+                ?? [],
             Security = new Workspaces.SecurityConfig(),
-            Environments =
-            [
-                new Workspaces.EnvironmentConfig
-                {
-                    Name = "default",
-                    Variables = workspace.EnvironmentVariables,
-                },
-            ],
             Session = new Workspaces.SessionConfig
             {
-                ActiveEnvironment = "default",
-                SavedContexts = workspace.SavedContexts.Select(ToWorkspaceSavedContext).ToList(),
+                SavedContexts =
+                    workspace.SavedContexts?.Select(ToWorkspaceSavedContext).ToList() ?? [],
             },
         };
     }
@@ -977,6 +1050,16 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
             SourceId = context.SourceId,
             FunctionId = context.FunctionId,
         };
+    }
+
+    private async Task<Dictionary<string, string>> GetActiveEnvironmentVariablesAsync()
+    {
+        var envConfig = await _environmentService.LoadAsync();
+        var activeProfile = envConfig?.Profiles.FirstOrDefault(p =>
+            p.Name == envConfig.ActiveEnvironment
+        );
+
+        return activeProfile?.Variables ?? new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
     private static string BuildSourceId(Workspaces.SiloSource silo)

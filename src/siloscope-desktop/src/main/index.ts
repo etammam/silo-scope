@@ -219,6 +219,54 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         latestUnsavedRequests = [];
         return { success: true };
       },
+      getEnvironments: async () => {
+        const result = await requestSidecar<
+          FluentResult<{
+            Profiles: Array<{
+              Name: string;
+              Variables: Record<string, string>;
+            }>;
+            ActiveEnvironment: string | null;
+          }>
+        >("GetEnvironmentsAsync", undefined, "GetEnvironments");
+
+        if (!result.IsSuccess || !result.Value) {
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to load environments.",
+          );
+        }
+
+        return {
+          profiles:
+            result.Value.Profiles?.map((profile) => ({
+              name: profile.Name,
+              variables: profile.Variables ?? {},
+            })) ?? [],
+          activeEnvironment: result.Value.ActiveEnvironment ?? null,
+        };
+      },
+      saveEnvironments: async ({ config }) => {
+        const payload = {
+          profiles: config.profiles.map((profile) => ({
+            name: profile.name,
+            variables: profile.variables ?? {},
+          })),
+          activeEnvironment: config.activeEnvironment,
+        };
+        const result = await requestSidecar<FluentResult<unknown>>(
+          "SaveEnvironmentsAsync",
+          [payload],
+          "SaveEnvironments",
+        );
+
+        if (!result.IsSuccess) {
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to save environments.",
+          );
+        }
+
+        return { success: true };
+      },
       connectCluster: async ({ workspace }) => {
         const result = await requestSidecar<FluentResult<string>>(
           "ConnectClusterAsync",
@@ -513,12 +561,13 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         return { workspaces: (result.Value ?? []).map(mapWorkspace) };
       },
       getBackendLogs: async () => {
-        const result = await requestSidecar<FluentResult<BackendLogEntry[]>>(
-          "GetLogsAsync",
-        );
+        const result =
+          await requestSidecar<FluentResult<BackendLogEntry[]>>("GetLogsAsync");
 
         if (!result.IsSuccess) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to load backend logs.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to load backend logs.",
+          );
         }
 
         return {
@@ -533,7 +582,9 @@ const rpc = BrowserView.defineRPC<SiloScopeRPC>({
         );
 
         if (!result.IsSuccess || !result.Value) {
-          throw new Error(result.Errors?.[0]?.Message ?? "Failed to locate backend logs.");
+          throw new Error(
+            result.Errors?.[0]?.Message ?? "Failed to locate backend logs.",
+          );
         }
 
         return { success: Utils.openPath(result.Value), path: result.Value };
@@ -856,7 +907,6 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
     gatewayEndpoints:
       workspace.Cluster?.GatewayEndpoints ?? (gateway ? [gateway] : []),
     orleansVersion: "10.0",
-    environmentVariables: {},
     savedContexts: (workspace.SavedContexts ?? []).map(mapSavedRequestContext),
     sources: (workspace.Silos ?? []).map(
       (source): WorkspaceSource => ({
@@ -877,9 +927,7 @@ function mapWorkspace(workspace: BackendWorkspaceInfo): Workspace {
   return result;
 }
 
-function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
-  EnvironmentVariables: Record<string, string>;
-} {
+function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo {
   return {
     Id: workspace.id,
     Name: workspace.name,
@@ -893,7 +941,6 @@ function mapBackendWorkspace(workspace: Workspace): BackendWorkspaceInfo & {
       FeedName: source.feedName ?? null,
       Enabled: source.enabled,
     })),
-    EnvironmentVariables: workspace.environmentVariables ?? {},
     SavedContexts: (workspace.savedContexts ?? []).map(
       mapBackendSavedRequestContext,
     ),
@@ -947,11 +994,15 @@ function mapBackendCluster(workspace: Workspace) {
     ServiceId: workspace.serviceId ?? "SiloScope",
     Type: workspace.clusterType ?? "Homogenous",
     GatewayEndpoints: gatewayEndpoints,
-    Clustering: provider && clustering ? buildBackendClustering(clustering) : null,
+    Clustering:
+      provider && clustering ? buildBackendClustering(clustering) : null,
   };
 }
 
-const clusterConnectionProviderByEnumValue: Record<number, ClusterConnectionProvider> = {
+const clusterConnectionProviderByEnumValue: Record<
+  number,
+  ClusterConnectionProvider
+> = {
   2: "Redis",
   3: "AdoNet",
   4: "AzureStorage",
@@ -997,10 +1048,11 @@ function buildWorkspaceClustering(
   clustering: NonNullable<BackendWorkspaceInfo["Cluster"]>["Clustering"],
 ): NonNullable<Workspace["clustering"]> {
   const keys = clusterConnectionOptionKeys[provider];
-  const backendOptions = clustering?.[keys.backend as keyof NonNullable<typeof clustering>]
-    ?? clustering?.[keys.workspace as keyof NonNullable<typeof clustering>];
+  const backendOptions =
+    clustering?.[keys.backend as keyof NonNullable<typeof clustering>] ??
+    clustering?.[keys.workspace as keyof NonNullable<typeof clustering>];
   const connectionString = isBackendConnectionStringOptions(backendOptions)
-    ? backendOptions.ConnectionString ?? backendOptions.connectionString ?? ""
+    ? (backendOptions.ConnectionString ?? backendOptions.connectionString ?? "")
     : "";
 
   return {
@@ -1008,7 +1060,7 @@ function buildWorkspaceClustering(
     [keys.workspace]: {
       connectionString,
       invariant: isBackendConnectionStringOptions(backendOptions)
-        ? backendOptions.Invariant ?? backendOptions.invariant ?? null
+        ? (backendOptions.Invariant ?? backendOptions.invariant ?? null)
         : null,
     },
   };
@@ -1019,25 +1071,29 @@ function buildBackendClustering(
 ): Record<string, unknown> {
   const provider = clustering.provider;
   const keys = clusterConnectionOptionKeys[provider];
-  const workspaceOptions = clustering[keys.workspace as keyof typeof clustering];
+  const workspaceOptions =
+    clustering[keys.workspace as keyof typeof clustering];
   const connectionString =
-    typeof workspaceOptions === "object"
-      && workspaceOptions !== null
-      && "connectionString" in workspaceOptions
-      && typeof workspaceOptions.connectionString === "string"
+    typeof workspaceOptions === "object" &&
+    workspaceOptions !== null &&
+    "connectionString" in workspaceOptions &&
+    typeof workspaceOptions.connectionString === "string"
       ? workspaceOptions.connectionString
       : "";
   const invariant =
-    typeof workspaceOptions === "object"
-      && workspaceOptions !== null
-      && "invariant" in workspaceOptions
-      && typeof workspaceOptions.invariant === "string"
+    typeof workspaceOptions === "object" &&
+    workspaceOptions !== null &&
+    "invariant" in workspaceOptions &&
+    typeof workspaceOptions.invariant === "string"
       ? workspaceOptions.invariant
       : null;
 
   return {
     Provider: provider,
-    [keys.backend]: { ConnectionString: connectionString, Invariant: invariant },
+    [keys.backend]: {
+      ConnectionString: connectionString,
+      Invariant: invariant,
+    },
   };
 }
 
@@ -1147,9 +1203,14 @@ function mapLogEntry(params: unknown): LogEntry | null {
     return null;
   }
 
-  const entry = params as BackendLogEntry;
+  const raw = Array.isArray(params) ? params[0] : params;
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const entry = raw as BackendLogEntry;
   const message = entry.Message ?? entry.message;
-  if (!message) {
+  if (message == null) {
     return null;
   }
 
@@ -1246,8 +1307,8 @@ function createMainWindow() {
     frame: {
       x: 100,
       y: 100,
-      width: 1200,
-      height: 800,
+      width: 1400,
+      height: 900,
     },
   });
 

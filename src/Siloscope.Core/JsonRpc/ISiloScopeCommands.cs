@@ -78,6 +78,29 @@ public interface ISiloScopeCommands
         CancellationToken cancellationToken = default
     );
 
+    // Environments
+    /// <summary>
+    /// Loads the global environment configuration.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> containing the environment configuration.</returns>
+    [JsonRpcMethod("GetEnvironmentsAsync")]
+    Task<Result<EnvironmentConfigInfo>> GetEnvironmentsAsync(
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>
+    /// Saves the global environment configuration.
+    /// </summary>
+    /// <param name="config">The environment configuration to persist.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> indicating success or failure.</returns>
+    [JsonRpcMethod("SaveEnvironmentsAsync")]
+    Task<Result> SaveEnvironmentsAsync(
+        EnvironmentConfigInfo config,
+        CancellationToken cancellationToken = default
+    );
+
     // Cluster
     /// <summary>
     /// Connects to an Orleans cluster using the specified options.

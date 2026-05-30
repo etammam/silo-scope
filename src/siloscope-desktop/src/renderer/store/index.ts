@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Workspace, GrainInterfaceDescriptor, InvocationResult, LogEntry, NugetFeed, NugetPackage, SourceOwnedCatalog } from "../../shared/types";
+import type { Workspace, EnvironmentProfile, GrainInterfaceDescriptor, InvocationResult, LogEntry, NugetFeed, NugetPackage, SourceOwnedCatalog } from "../../shared/types";
 
 interface AppState {
   workspace: Workspace | null;
@@ -15,6 +15,9 @@ interface AppState {
   isConnected: boolean;
   fontFamily: string;
   fontSize: number;
+  environments: EnvironmentProfile[];
+  activeEnvironment: string | null;
+  environmentErrors: string[];
 
   setWorkspace: (workspace: Workspace | null) => void;
   setGrains: (grains: GrainInterfaceDescriptor[]) => void;
@@ -31,6 +34,9 @@ interface AppState {
   setIsConnected: (connected: boolean) => void;
   setFontFamily: (fontFamily: string) => void;
   setFontSize: (fontSize: number) => void;
+  setEnvironments: (environments: EnvironmentProfile[]) => void;
+  setActiveEnvironment: (activeEnvironment: string | null) => void;
+  setEnvironmentErrors: (environmentErrors: string[]) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -47,19 +53,22 @@ export const useAppStore = create<AppState>((set) => ({
   isConnected: false,
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
   fontSize: 13,
+  environments: [],
+  activeEnvironment: null,
+  environmentErrors: [],
 
-  setWorkspace: (workspace) => set({ workspace, selectedFunctionId: null, selectedGrain: null, selectedMethod: null }),
+  setWorkspace: (workspace) => set({ workspace, selectedFunctionId: null, selectedGrain: null, selectedMethod: null, environmentErrors: [] }),
   setGrains: (grains) => set({ grains }),
   setSourceCatalog: (sourceCatalog) => set({ sourceCatalog }),
   setSelectedGrain: (selectedGrain) => set({ selectedGrain, selectedMethod: null, selectedFunctionId: null }),
   setSelectedMethod: (selectedMethod) => set({ selectedMethod, selectedFunctionId: null }),
   setSelectedFunction: (selectedFunctionId) => set({ selectedFunctionId }),
   setInvocationResult: (invocationResult) => set({ invocationResult }),
-  addLog: (entry) => set((state) => ({ logs: [...state.logs, entry].slice(-1_000) })),
+  addLog: (entry) => set((state) => ({ logs: [...state.logs, entry].slice(-50_000) })),
   hydrateLogs: (entries) => set((state) => {
     const incoming = new Set(state.logs.map(logIdentity));
     return {
-      logs: [...entries.filter((entry) => !incoming.has(logIdentity(entry))), ...state.logs].slice(-1_000),
+      logs: [...entries.filter((entry) => !incoming.has(logIdentity(entry))), ...state.logs].slice(-50_000),
     };
   }),
   clearLogs: () => set({ logs: [] }),
@@ -68,6 +77,9 @@ export const useAppStore = create<AppState>((set) => ({
   setIsConnected: (isConnected) => set({ isConnected }),
   setFontFamily: (fontFamily) => set({ fontFamily }),
   setFontSize: (fontSize) => set({ fontSize }),
+  setEnvironments: (environments) => set({ environments }),
+  setActiveEnvironment: (activeEnvironment) => set({ activeEnvironment }),
+  setEnvironmentErrors: (environmentErrors) => set({ environmentErrors }),
 }));
 
 function logIdentity(entry: LogEntry): string {

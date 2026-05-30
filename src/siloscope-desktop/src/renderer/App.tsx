@@ -2,6 +2,7 @@ import { Electroview } from "electrobun/view";
 import {
   Briefcase,
   ChevronDown,
+  Layers,
   LayoutTemplate,
   PanelLeftClose,
   PanelRightClose,
@@ -22,6 +23,7 @@ import {
 import type { SiloScopeRPC } from "../shared/rpc";
 import type {
   AppUpdateState,
+  EnvironmentProfile,
   GrainKeyType,
   SavedRequestContext,
   SourceCatalogFunction,
@@ -47,11 +49,13 @@ import {
   RequestWorkbench,
   type RequestState,
 } from "./components/RequestWorkbench";
+import { RequestEmptyState } from "./components/RequestEmptyState";
 import {
   ResponseTelemetryPane,
   type ResponsePaneTab,
 } from "./components/ResponseTelemetryPane";
 import { QuickAccessPanel } from "./components/QuickAccessPanel";
+import { EnvironmentPage } from "./components/EnvironmentPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { WorkspacesPage } from "./components/WorkspacesPage";
 import { useAppStore } from "./store";
@@ -60,7 +64,12 @@ type PaneLayout = "horizontal" | "vertical";
 type WorkbenchTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
 
 const themeStorageKey = "siloscope.theme";
-const workbenchThemes = ["dark", "light", "vscode-dark", "vscode-light"] as const;
+const workbenchThemes = [
+  "dark",
+  "light",
+  "vscode-dark",
+  "vscode-light",
+] as const;
 const applicationMenuEventName = "siloscope:application-menu-action";
 const closeApplicationRequestEventName = "siloscope:request-application-close";
 const appUpdateStatusEventName = "siloscope:app-update-status";
@@ -69,7 +78,8 @@ const emptyRequestState: RequestState = {
   keyType: "String",
   payload: "{\n}",
 };
-let activeRequestContextProvider: (() => SavedRequestContext | null) | null = null;
+let activeRequestContextProvider: (() => SavedRequestContext | null) | null =
+  null;
 let unsavedRequestContextSummariesProvider:
   | (() => UnsavedRequestContextSummary[])
   | null = null;
@@ -130,7 +140,9 @@ const rendererRpc = Electroview.defineRPC<SiloScopeRPC>({
         }
       },
       filePicked: ({ paths }) => {
-        window.dispatchEvent(new CustomEvent("filePicked", { detail: { paths } }));
+        window.dispatchEvent(
+          new CustomEvent("filePicked", { detail: { paths } }),
+        );
       },
       appUpdateStatusChanged: ({ state }) => {
         window.dispatchEvent(
@@ -164,6 +176,9 @@ function App() {
     fontSize,
     setFontFamily,
     setFontSize,
+    environments,
+    activeEnvironment,
+    setActiveEnvironment,
   } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
   const [theme, setTheme] = useState<WorkbenchTheme>(() => readStoredTheme());
@@ -172,24 +187,41 @@ function App() {
   const [isResponseVisible, setIsResponseVisible] = useState(true);
   const [responseTab, setResponseTab] = useState<ResponsePaneTab>("response");
   const [invocationHistory, setInvocationHistory] = useState<
-    { timestamp: number; isSuccess: boolean; timing: { totalMs: number; executionMs: number; serializationMs: number } | null }[]
+    {
+      timestamp: number;
+      isSuccess: boolean;
+      timing: {
+        totalMs: number;
+        executionMs: number;
+        serializationMs: number;
+      } | null;
+    }[]
   >([]);
   const [paneLayout, setPaneLayout] = useState<PaneLayout>("horizontal");
   const [horizontalResponseSize, setHorizontalResponseSize] = useState(420);
   const [verticalResponseSize, setVerticalResponseSize] = useState(260);
-  const [navigationSize, setNavigationSize] = useState(280);
+  const [navigationSize, setNavigationSize] = useState(352);
   const [isLogPanelVisible, setIsLogPanelVisible] = useState(false);
   const [logPanelSize, setLogPanelSize] = useState(260);
   const [functionTabs, setFunctionTabs] = useState<string[]>([]);
-  const [requestStates, setRequestStates] = useState<Record<string, RequestState>>({});
-  const [hydratedWorkspaceId, setHydratedWorkspaceId] = useState<string | null>(null);
+  const [requestStates, setRequestStates] = useState<
+    Record<string, RequestState>
+  >({});
+  const [hydratedWorkspaceId, setHydratedWorkspaceId] = useState<string | null>(
+    null,
+  );
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
+  const [isEnvironmentMenuOpen, setIsEnvironmentMenuOpen] = useState(false);
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
   const [isSavingBeforeClose, setIsSavingBeforeClose] = useState(false);
-  const [appUpdateState, setAppUpdateState] = useState<AppUpdateState | null>(null);
-  const [updateAction, setUpdateAction] = useState<"checking" | "downloading" | "applying" | null>(null);
+  const [appUpdateState, setAppUpdateState] = useState<AppUpdateState | null>(
+    null,
+  );
+  const [updateAction, setUpdateAction] = useState<
+    "checking" | "downloading" | "applying" | null
+  >(null);
   const allowCloseRef = useRef(false);
   const platform = useMemo(() => {
     const ua = navigator.userAgent.toLowerCase();
@@ -227,6 +259,7 @@ function App() {
     void refreshPersistedWorkspaces();
     void refreshAppUpdateState();
     void refreshBackendLogs();
+    void refreshEnvironments();
   }, []);
 
   useEffect(() => {
@@ -269,6 +302,24 @@ function App() {
     };
   }, []);
 
+  const previousIsConnected = useRef(isConnected);
+
+  useEffect(() => {
+    if (previousIsConnected.current && !isConnected) {
+      setFunctionTabs([]);
+      setRequestStates({});
+      setSelectedFunction(null);
+      setSelectedGrain(null);
+      setSelectedMethod(null);
+    }
+    previousIsConnected.current = isConnected;
+  }, [
+    isConnected,
+    setSelectedFunction,
+    setSelectedGrain,
+    setSelectedMethod,
+  ]);
+
   useEffect(() => {
     if (!isWorkspaceMenuOpen) {
       return;
@@ -284,6 +335,24 @@ function App() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isWorkspaceMenuOpen]);
+
+  useEffect(() => {
+    if (!isEnvironmentMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const envSelector = document.querySelector(
+        ".titlebar-environment-selector",
+      );
+      if (envSelector && !envSelector.contains(event.target as Node)) {
+        setIsEnvironmentMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isEnvironmentMenuOpen]);
 
   useEffect(() => {
     if (invocationResult) {
@@ -364,7 +433,7 @@ function App() {
       : buildSourceCatalogFromGrains(grains, workspace);
   }, [grains, sourceCatalog, workspace]);
   const activeRequestState = selectedFunctionId
-    ? requestStates[selectedFunctionId] ?? emptyRequestState
+    ? (requestStates[selectedFunctionId] ?? emptyRequestState)
     : emptyRequestState;
   const activeFunction = useMemo(
     () => findCatalogFunction(effectiveSourceCatalog, selectedFunctionId),
@@ -373,7 +442,10 @@ function App() {
   const dirtyFunctionIds = useMemo(() => {
     return new Set(
       functionTabs.filter((functionId) => {
-        const tabFunction = findCatalogFunction(effectiveSourceCatalog, functionId);
+        const tabFunction = findCatalogFunction(
+          effectiveSourceCatalog,
+          functionId,
+        );
         const tabState = requestStates[functionId];
         if (!tabFunction || !tabState) {
           return false;
@@ -383,7 +455,10 @@ function App() {
           (context) =>
             context.tabId === functionId || context.functionId === functionId,
         );
-        return !savedContext || !savedRequestContextMatches(savedContext, tabFunction, tabState);
+        return (
+          !savedContext ||
+          !savedRequestContextMatches(savedContext, tabFunction, tabState)
+        );
       }),
     );
   }, [effectiveSourceCatalog, functionTabs, requestStates, workspace]);
@@ -393,7 +468,10 @@ function App() {
         return [];
       }
 
-      const tabFunction = findCatalogFunction(effectiveSourceCatalog, functionId);
+      const tabFunction = findCatalogFunction(
+        effectiveSourceCatalog,
+        functionId,
+      );
       const tabState = requestStates[functionId];
       if (!tabFunction || !tabState) {
         return [];
@@ -540,10 +618,16 @@ function App() {
     const hydratedEntries = savedContexts
       .map((context) => ({
         context,
-        functionId: resolveSavedContextFunctionId(context, effectiveSourceCatalog),
+        functionId: resolveSavedContextFunctionId(
+          context,
+          effectiveSourceCatalog,
+        ),
       }))
-      .filter((entry): entry is { context: SavedRequestContext; functionId: string } =>
-        Boolean(entry.functionId),
+      .filter(
+        (
+          entry,
+        ): entry is { context: SavedRequestContext; functionId: string } =>
+          Boolean(entry.functionId),
       );
 
     if (hydratedEntries.length === 0) {
@@ -556,16 +640,25 @@ function App() {
         requestStateFromSavedContext(context),
       ]),
     );
-    const defaultContext = savedContexts.find((context) => context.isDefaultActive) ?? savedContexts[0];
+    const defaultContext =
+      savedContexts.find((context) => context.isDefaultActive) ??
+      savedContexts[0];
     const defaultFunctionId =
       resolveSavedContextFunctionId(defaultContext, effectiveSourceCatalog) ??
       hydratedEntries[0].functionId;
 
     setRequestStates(nextStates);
-    setFunctionTabs(uniqueStrings(hydratedEntries.map((entry) => entry.functionId)));
+    setFunctionTabs(
+      uniqueStrings(hydratedEntries.map((entry) => entry.functionId)),
+    );
     handleSelectFunction(defaultFunctionId);
     setHydratedWorkspaceId(workspace.id);
-  }, [effectiveSourceCatalog, handleSelectFunction, hydratedWorkspaceId, workspace]);
+  }, [
+    effectiveSourceCatalog,
+    handleSelectFunction,
+    hydratedWorkspaceId,
+    workspace,
+  ]);
 
   const handleCloseFunctionTab = useCallback(
     (functionId: string) => {
@@ -577,7 +670,8 @@ function App() {
         return;
       }
 
-      const nextFunctionId = nextTabs[tabIndex] ?? nextTabs[tabIndex - 1] ?? null;
+      const nextFunctionId =
+        nextTabs[tabIndex] ?? nextTabs[tabIndex - 1] ?? null;
       if (nextFunctionId) {
         handleSelectFunction(nextFunctionId);
         return;
@@ -609,9 +703,7 @@ function App() {
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         const activityOffset = isActivityBarVisible ? 48 : 0;
-        setNavigationSize(
-          clamp(moveEvent.clientX - activityOffset, 220, 460),
-        );
+        setNavigationSize(clamp(moveEvent.clientX - activityOffset, 220, 460));
       };
 
       const handleMouseUp = () => {
@@ -706,7 +798,7 @@ function App() {
   }, []);
 
   const handleSelectWorkspace = useCallback(
-    (workspaceId: string) => {
+    async (workspaceId: string) => {
       const nextWorkspace = workspaces.find(
         (candidate) => candidate.id === workspaceId,
       );
@@ -777,7 +869,9 @@ function App() {
   }, []);
 
   const closeApplication = useCallback(async () => {
-    console.log("[close-guard:renderer] close confirmed, requesting native close");
+    console.log(
+      "[close-guard:renderer] close confirmed, requesting native close",
+    );
     allowCloseRef.current = true;
     await electroview.rpc?.request.closeWindow();
   }, []);
@@ -845,7 +939,10 @@ function App() {
       void handleClose();
     };
 
-    window.addEventListener(closeApplicationRequestEventName, handleCloseRequest);
+    window.addEventListener(
+      closeApplicationRequestEventName,
+      handleCloseRequest,
+    );
     return () =>
       window.removeEventListener(
         closeApplicationRequestEventName,
@@ -871,10 +968,7 @@ function App() {
       style={shellStyle}
     >
       {isActivityBarVisible && (
-        <ActivityBar
-          activeView={activeView}
-          onViewChange={setActiveView}
-        />
+        <ActivityBar activeView={activeView} onViewChange={setActiveView} />
       )}
 
       <header
@@ -948,7 +1042,9 @@ function App() {
                       }}
                     >
                       <Briefcase aria-hidden="true" width={13} height={13} />
-                      <span className="workspace-menu__cluster-name">{ws.name}</span>
+                      <span className="workspace-menu__cluster-name">
+                        {ws.name}
+                      </span>
                       {workspace?.id === ws.id && (
                         <span className="workspace-menu__cluster-status">
                           {isConnected ? "Connected" : "Active"}
@@ -969,6 +1065,53 @@ function App() {
           Siloscope Workbench
         </button>
         <div className="app-titlebar__actions">
+          {environments.length > 0 && (
+            <div className="titlebar-environment-selector electrobun-webkit-app-region-no-drag">
+              <button
+                aria-expanded={isEnvironmentMenuOpen}
+                aria-haspopup="menu"
+                className="environment-menu__trigger"
+                onClick={() => setIsEnvironmentMenuOpen((open) => !open)}
+                type="button"
+              >
+                <Layers aria-hidden="true" width={11} height={11} />
+                <span>{activeEnvironment ?? "Select environment"}</span>
+                <ChevronDown aria-hidden="true" width={12} height={12} />
+              </button>
+              {isEnvironmentMenuOpen && (
+                <div className="environment-menu" role="menu">
+                  <div className="environment-menu__current">
+                    <strong>Environments</strong>
+                  </div>
+                  {environments.map((env) => (
+                    <button
+                      key={env.name}
+                      aria-pressed={activeEnvironment === env.name}
+                      className={`environment-menu__item ${activeEnvironment === env.name ? "environment-menu__item--active" : ""}`}
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        setIsEnvironmentMenuOpen(false);
+                        const envName = env.name || null;
+                        setActiveEnvironment(envName);
+                        void saveEnvironments(environments, envName);
+                      }}
+                    >
+                      <Layers aria-hidden="true" width={13} height={13} />
+                      <span className="environment-menu__item-name">
+                        {env.name}
+                      </span>
+                      {activeEnvironment === env.name && (
+                        <span className="environment-menu__item-status">
+                          Active
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button
             aria-label={
               isNavigationVisible
@@ -1115,138 +1258,170 @@ function App() {
             searchNugetPackages={searchNugetPackages}
             getNugetPackageVersions={getNugetPackageVersions}
           />
+        ) : activeView === "environments" ? (
+          <EnvironmentPage
+            environments={environments}
+            activeEnvironment={activeEnvironment}
+            onEnvironmentsChange={async (nextEnvironments, nextActive) => {
+              useAppStore.getState().setEnvironments(nextEnvironments);
+              useAppStore.getState().setActiveEnvironment(nextActive);
+              await saveEnvironments(nextEnvironments, nextActive);
+            }}
+          />
         ) : (
           <>
-          <div className="workbench-tabs" role="tablist" aria-label="Open functions">
-          {functionTabs.length > 0 ? (
-            functionTabs.map((functionId) => {
-              const tabFunction = findCatalogFunction(
-                effectiveSourceCatalog,
-                functionId,
-              );
-              const tabSource = findCatalogSource(
-                effectiveSourceCatalog,
-                tabFunction?.sourceId ?? null,
-              );
-              return (
-                <div
-                  aria-label={`${formatFunctionTabLabel(tabFunction, functionId)} ${formatFunctionTabContext(tabFunction, tabSource)}`}
-                  aria-selected={selectedFunctionId === functionId}
-                  className="workbench-tabs__tab"
-                  data-dirty={dirtyFunctionIds.has(functionId)}
-                  key={functionId}
-                  onClick={() => handleSelectFunction(functionId)}
-                  role="tab"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleSelectFunction(functionId);
-                    }
-                  }}
-                  title={formatFunctionTabContext(tabFunction, tabSource)}
-                >
-                  <span className="workbench-tabs__primary">
-                    <span className="workbench-tabs__kind">RPC</span>
-                    <span className="workbench-tabs__name">
-                      {formatFunctionTabLabel(tabFunction, functionId)}
-                    </span>
-                  </span>
-                  <button
-                    aria-label={`Save ${formatFunctionTabLabel(tabFunction, functionId)} context`}
-                    className="workbench-tabs__save"
-                    disabled={selectedFunctionId !== functionId}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleSelectFunction(functionId);
-                      void saveCurrentWorkspace();
-                    }}
-                    title="Save request context"
-                    type="button"
-                  >
-                    <Save aria-hidden="true" width={12} height={12} />
-                  </button>
-                  <button
-                    aria-label={`Close ${formatFunctionTabLabel(tabFunction, functionId)}`}
-                    className="workbench-tabs__close"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleCloseFunctionTab(functionId);
-                    }}
-                    type="button"
-                  >
-                    <X aria-hidden="true" width={12} height={12} />
-                  </button>
-                  {dirtyFunctionIds.has(functionId) && (
-                    <span className="workbench-tabs__dirty-dot" aria-label="Unsaved changes" />
-                  )}
-                  <span className="workbench-tabs__meta">
-                    {formatFunctionTabContext(tabFunction, tabSource)}
-                  </span>
-                </div>
-              );
-            })
-          ) : (
-            <div className="workbench-tabs__empty">Select a function from Sources</div>
-          )}
-          <button
-            aria-label="Open a function from Sources"
-            className="workbench-tabs__add"
-            disabled
-            type="button"
-          >
-            +
-          </button>
-        </div>
-        <section className="workbench-tab-panel" aria-label="Function workbench">
-          <RequestWorkbench
-            grains={grains}
-            onInvoke={handleInvoke}
-            onSelectFunction={handleSelectFunction}
-            onSelectGrain={setSelectedGrain}
-            onSelectMethod={setSelectedMethod}
-            selectedFunctionId={selectedFunctionId}
-            selectedGrain={selectedGrain}
-            selectedMethod={selectedMethod}
-            requestState={activeRequestState}
-            onRequestStateChange={(nextState) => {
-              if (!selectedFunctionId) {
-                return;
-              }
-
-              setRequestStates((current) => ({
-                ...current,
-                [selectedFunctionId]: nextState,
-              }));
-            }}
-            sourceCatalog={effectiveSourceCatalog}
-            theme={theme}
-          />
-          {isResponseVisible && (
             <div
-              aria-label="Resize request and response panels"
-              aria-orientation={
-                paneLayout === "horizontal" ? "vertical" : "horizontal"
-              }
-              className="workbench-resizer"
-              onMouseDown={handleResizeStart}
-              role="separator"
-              tabIndex={0}
-            />
-          )}
-          {isResponseVisible && (
-            <ResponseTelemetryPane
-              activeTab={responseTab}
-              onTabChange={setResponseTab}
-              result={invocationResult}
-              theme={theme}
-              invocationHistory={invocationHistory}
-              fontFamily={fontFamily}
-              fontSize={fontSize}
-            />
-          )}
-        </section>
-        </>
+              className="workbench-tabs"
+              role="tablist"
+              aria-label="Open functions"
+            >
+              {functionTabs.length > 0 ? (
+                functionTabs.map((functionId) => {
+                  const tabFunction = findCatalogFunction(
+                    effectiveSourceCatalog,
+                    functionId,
+                  );
+                  const tabSource = findCatalogSource(
+                    effectiveSourceCatalog,
+                    tabFunction?.sourceId ?? null,
+                  );
+                  return (
+                    <div
+                      aria-label={`${formatFunctionTabLabel(tabFunction, functionId)} ${formatFunctionTabContext(tabFunction, tabSource)}`}
+                      aria-selected={selectedFunctionId === functionId}
+                      className="workbench-tabs__tab"
+                      data-dirty={dirtyFunctionIds.has(functionId)}
+                      key={functionId}
+                      onClick={() => handleSelectFunction(functionId)}
+                      role="tab"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleSelectFunction(functionId);
+                        }
+                      }}
+                      title={formatFunctionTabContext(tabFunction, tabSource)}
+                    >
+                      <span className="workbench-tabs__primary">
+                        <span className="workbench-tabs__kind">RPC</span>
+                        <span className="workbench-tabs__name">
+                          {formatFunctionTabLabel(tabFunction, functionId)}
+                        </span>
+                      </span>
+                      <button
+                        aria-label={`Save ${formatFunctionTabLabel(tabFunction, functionId)} context`}
+                        className="workbench-tabs__save"
+                        disabled={selectedFunctionId !== functionId}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleSelectFunction(functionId);
+                          void saveCurrentWorkspace();
+                        }}
+                        title="Save request context"
+                        type="button"
+                      >
+                        <Save aria-hidden="true" width={12} height={12} />
+                      </button>
+                      <button
+                        aria-label={`Close ${formatFunctionTabLabel(tabFunction, functionId)}`}
+                        className="workbench-tabs__close"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleCloseFunctionTab(functionId);
+                        }}
+                        type="button"
+                      >
+                        <X aria-hidden="true" width={12} height={12} />
+                      </button>
+                      {dirtyFunctionIds.has(functionId) && (
+                        <span
+                          className="workbench-tabs__dirty-dot"
+                          aria-label="Unsaved changes"
+                        />
+                      )}
+                      <span className="workbench-tabs__meta">
+                        {formatFunctionTabContext(tabFunction, tabSource)}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="workbench-tabs__empty">
+                  Select a function from Sources
+                </div>
+              )}
+              <button
+                aria-label="Open a function from Sources"
+                className="workbench-tabs__add"
+                disabled
+                type="button"
+              >
+                +
+              </button>
+            </div>
+            <section
+              className="workbench-tab-panel"
+              aria-label="Function workbench"
+            >
+              {selectedFunctionId ? (
+                <>
+                  <RequestWorkbench
+                    grains={grains}
+                    onInvoke={handleInvoke}
+                    onSelectFunction={handleSelectFunction}
+                    onSelectGrain={setSelectedGrain}
+                    onSelectMethod={setSelectedMethod}
+                    selectedFunctionId={selectedFunctionId}
+                    selectedGrain={selectedGrain}
+                    selectedMethod={selectedMethod}
+                    requestState={activeRequestState}
+                    onRequestStateChange={(nextState) => {
+                      setRequestStates((current) => ({
+                        ...current,
+                        [selectedFunctionId]: nextState,
+                      }));
+                    }}
+                    sourceCatalog={effectiveSourceCatalog}
+                    theme={theme}
+                    environments={environments}
+                    activeEnvironment={activeEnvironment}
+                  />
+                  {isResponseVisible && (
+                    <div
+                      aria-label="Resize request and response panels"
+                      aria-orientation={
+                        paneLayout === "horizontal" ? "vertical" : "horizontal"
+                      }
+                      className="workbench-resizer"
+                      onMouseDown={handleResizeStart}
+                      role="separator"
+                      tabIndex={0}
+                    />
+                  )}
+                  {isResponseVisible && (
+                    <ResponseTelemetryPane
+                      activeTab={responseTab}
+                      onTabChange={setResponseTab}
+                      result={invocationResult}
+                      theme={theme}
+                      invocationHistory={invocationHistory}
+                      fontFamily={fontFamily}
+                      fontSize={fontSize}
+                    />
+                  )}
+                </>
+              ) : (
+                <RequestEmptyState
+                  onOpenQuickAccess={() => setIsQuickAccessOpen(true)}
+                  onOpenSources={() => {
+                    setActiveView("workspace");
+                    setIsNavigationVisible(true);
+                  }}
+                />
+              )}
+            </section>
+          </>
         )}
       </main>
 
@@ -1270,7 +1445,9 @@ function App() {
       )}
       <footer className="global-status-bar">
         <div className="global-status-bar__workspace">
-          <span data-connected={isConnected}>{isConnected ? "Online" : "Offline"}</span>
+          <span data-connected={isConnected}>
+            {isConnected ? "Online" : "Offline"}
+          </span>
           <small>{workspace?.name ?? "No active cluster"}</small>
         </div>
         <BackendLogStatusButton
@@ -1286,6 +1463,10 @@ function App() {
         workspaces={workspaces}
         feeds={nugetFeeds}
         sourceCatalog={effectiveSourceCatalog}
+        workspace={workspace}
+        isConnected={isConnected}
+        environments={environments}
+        activeEnvironment={activeEnvironment}
         onSelectWorkspace={(workspaceId) => {
           setActiveView("workspace");
           handleSelectWorkspace(workspaceId);
@@ -1303,6 +1484,12 @@ function App() {
           setActiveView("workspace");
           handleSelectFunction(functionId);
         }}
+        onConnectCluster={connectCluster}
+        onDisconnectCluster={disconnectCluster}
+        onSwitchEnvironment={(envName) => {
+          setActiveEnvironment(envName);
+          void saveEnvironments(environments, envName);
+        }}
       />
       {isCloseConfirmationOpen && (
         <div className="close-confirmation" role="presentation">
@@ -1315,7 +1502,9 @@ function App() {
             <div className="close-confirmation__header">
               <h2 id="close-confirmation-title">Unsaved request contexts</h2>
               <p>
-                {closeConfirmationItems.length} request context{closeConfirmationItems.length === 1 ? " has" : "s have"} unsaved changes.
+                {closeConfirmationItems.length} request context
+                {closeConfirmationItems.length === 1 ? " has" : "s have"}{" "}
+                unsaved changes.
               </p>
             </div>
             <ul className="close-confirmation__list">
@@ -1384,7 +1573,9 @@ function formatFunctionTabContext(
   return `${sourceLabel}${catalogFunction.interfaceName}`;
 }
 
-function createRequestState(catalogFunction: SourceCatalogFunction): RequestState {
+function createRequestState(
+  catalogFunction: SourceCatalogFunction,
+): RequestState {
   return {
     grainKey: "",
     keyType: catalogFunction.keyType,
@@ -1392,7 +1583,9 @@ function createRequestState(catalogFunction: SourceCatalogFunction): RequestStat
   };
 }
 
-function requestStateFromSavedContext(context: SavedRequestContext): RequestState {
+function requestStateFromSavedContext(
+  context: SavedRequestContext,
+): RequestState {
   return {
     grainKey: context.grainId,
     keyType: context.keyType,
@@ -1529,6 +1722,35 @@ async function setActiveWorkspace(workspace: Workspace): Promise<boolean> {
   }
 }
 
+async function saveEnvironments(
+  profiles: EnvironmentProfile[],
+  activeEnvironment: string | null,
+) {
+  try {
+    await electroview.rpc!.request.saveEnvironments({
+      config: { profiles, activeEnvironment },
+    });
+  } catch (error) {
+    useAppStore.getState().addLog({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      message:
+        error instanceof Error ? error.message : "Failed to save environments.",
+    });
+  }
+}
+
+async function refreshEnvironments() {
+  try {
+    const envConfig = await electroview.rpc!.request.getEnvironments();
+    useAppStore.getState().setEnvironments(envConfig.profiles);
+    useAppStore.getState().setActiveEnvironment(envConfig.activeEnvironment);
+  } catch {
+    useAppStore.getState().setEnvironments([]);
+    useAppStore.getState().setActiveEnvironment(null);
+  }
+}
+
 function upsertWorkspace(
   workspaces: Workspace[],
   workspace: Workspace,
@@ -1557,8 +1779,9 @@ async function refreshPersistedWorkspaces() {
       }),
     );
     if (!store.workspace && workspaces.length > 0) {
-      store.setWorkspace(workspaces[0]);
-      await setActiveWorkspace(workspaces[0]);
+      const firstWorkspace = workspaces[0];
+      store.setWorkspace(firstWorkspace);
+      await setActiveWorkspace(firstWorkspace);
     }
   } catch (error) {
     useAppStore.getState().addLog({
@@ -1582,9 +1805,7 @@ async function refreshBackendLogs() {
       level: "error",
       category: "SiloScope.Desktop",
       message:
-        error instanceof Error
-          ? error.message
-          : "Failed to load backend logs.",
+        error instanceof Error ? error.message : "Failed to load backend logs.",
     });
   }
 }
@@ -1654,20 +1875,23 @@ async function saveCurrentWorkspace(path?: string) {
   }
 
   const activeRequestContext = activeRequestContextProvider?.() ?? null;
-  const workspaceToSave = activeRequestContext
+  const workspaceWithContext = activeRequestContext
     ? workspaceWithSavedRequestContext(workspace, activeRequestContext)
     : workspace;
 
   try {
-    await electroview.rpc!.request.saveWorkspace({ workspace: workspaceToSave, path });
-    useAppStore.setState({ workspace: workspaceToSave });
-    addWorkspaceToSession(workspaceToSave);
+    await electroview.rpc!.request.saveWorkspace({
+      workspace: workspaceWithContext,
+      path,
+    });
+    useAppStore.setState({ workspace: workspaceWithContext });
+    addWorkspaceToSession(workspaceWithContext);
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "info",
       message: activeRequestContext
-        ? `Request context saved: ${workspaceToSave.name}`
-        : `Workspace saved: ${workspaceToSave.name}`,
+        ? `Request context saved: ${workspaceWithContext.name}`
+        : `Workspace saved: ${workspaceWithContext.name}`,
     });
   } catch (error) {
     useAppStore.getState().addLog({
@@ -1686,15 +1910,18 @@ async function saveAllUnsavedRequestContexts(path?: string) {
     return;
   }
 
-  const workspaceToSave = workspaceWithSavedRequestContexts(
+  const workspaceWithContexts = workspaceWithSavedRequestContexts(
     workspace,
     unsavedContexts,
   );
 
   try {
-    await electroview.rpc!.request.saveWorkspace({ workspace: workspaceToSave, path });
-    useAppStore.setState({ workspace: workspaceToSave });
-    addWorkspaceToSession(workspaceToSave);
+    await electroview.rpc!.request.saveWorkspace({
+      workspace: workspaceWithContexts,
+      path,
+    });
+    useAppStore.setState({ workspace: workspaceWithContexts });
+    addWorkspaceToSession(workspaceWithContexts);
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "info",
@@ -1756,6 +1983,9 @@ async function disconnectCluster() {
   try {
     await electroview.rpc!.request.disconnectCluster();
     const store = useAppStore.getState();
+    store.setGrains([]);
+    store.setSourceCatalog({ sources: [] });
+    store.setInvocationResult(null);
     store.setIsConnected(false);
     store.addLog({
       timestamp: new Date().toISOString(),
@@ -1822,7 +2052,12 @@ async function discoverWorkspaceGrains() {
   await refreshWorkspaceCatalog(workspace.id);
 }
 
-function pickFile(options?: { allowedFileTypes?: string; canChooseFiles?: boolean; canChooseDirectory?: boolean; allowsMultipleSelection?: boolean }) {
+function pickFile(options?: {
+  allowedFileTypes?: string;
+  canChooseFiles?: boolean;
+  canChooseDirectory?: boolean;
+  allowsMultipleSelection?: boolean;
+}) {
   electroview.rpc!.send.openFileDialog({
     canChooseFiles: options?.canChooseFiles ?? true,
     canChooseDirectories: options?.canChooseDirectory ?? false,
@@ -1831,15 +2066,26 @@ function pickFile(options?: { allowedFileTypes?: string; canChooseFiles?: boolea
   });
 }
 
-async function searchNugetPackages(query: string, feedName?: string, take?: number) {
+async function searchNugetPackages(
+  query: string,
+  feedName?: string,
+  take?: number,
+) {
   try {
-    const response = await electroview.rpc!.request.searchNugetPackages({ query, feedName, take: take ?? 20 });
+    const response = await electroview.rpc!.request.searchNugetPackages({
+      query,
+      feedName,
+      take: take ?? 20,
+    });
     return response.packages;
   } catch (error) {
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "error",
-      message: error instanceof Error ? error.message : "Failed to search NuGet packages.",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to search NuGet packages.",
     });
     return [];
   }
@@ -1847,13 +2093,19 @@ async function searchNugetPackages(query: string, feedName?: string, take?: numb
 
 async function getNugetPackageVersions(packageId: string, feedName?: string) {
   try {
-    const response = await electroview.rpc!.request.getNugetPackageVersions({ packageId, feedName });
+    const response = await electroview.rpc!.request.getNugetPackageVersions({
+      packageId,
+      feedName,
+    });
     return response.versions;
   } catch (error) {
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "error",
-      message: error instanceof Error ? error.message : "Failed to get NuGet package versions.",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to get NuGet package versions.",
     });
     return [];
   }
@@ -1920,7 +2172,9 @@ async function updateNugetFeed(
   });
   const store = useAppStore.getState();
   store.setNugetFeeds([
-    ...store.nugetFeeds.filter((feed) => feed.name !== name && feed.name !== response.feed.name),
+    ...store.nugetFeeds.filter(
+      (feed) => feed.name !== name && feed.name !== response.feed.name,
+    ),
     response.feed,
   ]);
 }

@@ -163,15 +163,7 @@ public sealed class WorkspaceServiceTests
                 },
             ],
             Security = new SecurityConfig { WorkspaceSalt = "test-salt" },
-            Environments =
-            [
-                new EnvironmentConfig
-                {
-                    Name = "development",
-                    Variables = new Dictionary<string, string> { ["KEY"] = "VALUE" },
-                },
-            ],
-            Session = new SessionConfig { ActiveEnvironment = "development" },
+            Session = new SessionConfig(),
         };
     }
 }

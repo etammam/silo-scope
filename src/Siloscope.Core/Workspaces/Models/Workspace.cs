@@ -38,12 +38,6 @@ public sealed record Workspace
     public SecurityConfig Security { get; init; } = new();
 
     /// <summary>
-    /// Gets the list of environment configurations.
-    /// </summary>
-    [JsonPropertyName("environments")]
-    public List<EnvironmentConfig> Environments { get; init; } = [];
-
-    /// <summary>
     /// Gets the session configuration.
     /// </summary>
     [JsonPropertyName("session")]

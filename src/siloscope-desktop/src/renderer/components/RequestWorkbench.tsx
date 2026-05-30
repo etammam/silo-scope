@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Play } from "lucide-react";
+import { AlertTriangle, Play } from "lucide-react";
 import type {
+  EnvironmentProfile,
   GrainInterfaceDescriptor,
   GrainKeyType,
   GrainMethodDescriptor,
@@ -8,7 +9,9 @@ import type {
   SourceOwnedCatalog,
 } from "../../shared/types";
 import { findCatalogFunction, findCatalogSource } from "../catalog";
+import { classifyTokens, findMissingTokens } from "../envSubstitution";
 import { MonacoEditor } from "./MonacoEditor";
+import type * as Monaco from "monaco-editor";
 
 type RequestWorkbenchProps = {
   grains: GrainInterfaceDescriptor[];
@@ -22,6 +25,8 @@ type RequestWorkbenchProps = {
   onSelectMethod: (methodName: string | null) => void;
   requestState: RequestState;
   onRequestStateChange: (nextState: RequestState) => void;
+  environments?: EnvironmentProfile[];
+  activeEnvironment?: string | null;
   onInvoke: (request: {
     grainType: string;
     grainKey: string;
@@ -50,6 +55,8 @@ export function RequestWorkbench({
   theme,
   requestState,
   onRequestStateChange,
+  environments = [],
+  activeEnvironment,
   onInvoke,
 }: RequestWorkbenchProps) {
   const [activeTab, setActiveTab] = useState<RequestTab>("payload");
@@ -81,32 +88,65 @@ export function RequestWorkbench({
     : methods.find((method) => method.name === selectedMethod) ?? null;
   const payloadError = useMemo(() => validateJson(requestState.payload), [requestState.payload]);
   const expectsSourceOwnedSelection = Boolean(sourceCatalog?.sources.some((source) => source.interfaces.length > 0));
+
+  const activeEnvVars = useMemo(() => {
+    const env = environments.find((e) => e.name === activeEnvironment);
+    return env?.variables ?? {};
+  }, [environments, activeEnvironment]);
+
+  const missingGrainKeyTokens = useMemo(
+    () => findMissingTokens(requestState.grainKey, activeEnvVars),
+    [requestState.grainKey, activeEnvVars],
+  );
+  const missingPayloadTokens = useMemo(
+    () => findMissingTokens(requestState.payload, activeEnvVars),
+    [requestState.payload, activeEnvVars],
+  );
+  const missingEnvKeys = useMemo(
+    () => Array.from(new Set([...missingGrainKeyTokens, ...missingPayloadTokens])),
+    [missingGrainKeyTokens, missingPayloadTokens],
+  );
+
+  const hasValidGrainKeyTokens = useMemo(() => {
+    const classified = classifyTokens(requestState.grainKey, activeEnvVars);
+    return classified.valid.length > 0;
+  }, [requestState.grainKey, activeEnvVars]);
+
   const canInvoke = Boolean(
     (activeFunction || activeGrain) &&
       activeMethod &&
       (!expectsSourceOwnedSelection || activeFunction) &&
       requestState.grainKey.trim() &&
-      !payloadError,
+      !payloadError &&
+      missingEnvKeys.length === 0,
   );
 
-  const insertEnvToken = (token: string) => {
-    updateRequestState((currentState) => {
-      const currentPayload = currentState.payload;
-      const insertAt = Math.max(currentPayload.lastIndexOf("}"), 0);
-      const prefix = currentPayload.slice(0, insertAt).trimEnd();
-      const suffix = currentPayload.slice(insertAt);
-      const separator = prefix.endsWith("{") ? "\n  " : ",\n  ";
+  function textToMonacoRange(text: string, start: number, end: number) {
+    const before = text.slice(0, start);
+    const lines = before.split("\n");
+    const lineNumber = lines.length;
+    const lineStart = lines[lines.length - 1].length;
+    const startColumn = lineStart + 1;
+    const endColumn = lineStart + 1 + (end - start);
+    return { startLineNumber: lineNumber, startColumn, endLineNumber: lineNumber, endColumn };
+  }
 
-      return {
-        ...currentState,
-        payload: `${prefix}${separator}"${token}": "\${env:${token}}"\n${suffix}`,
-      };
-    });
-  };
+  const { monacoMarkers, monacoDecorations } = useMemo(() => {
+    const classified = classifyTokens(requestState.payload, activeEnvVars);
 
-  const updateRequestState = (updater: (currentState: RequestState) => RequestState) => {
-    onRequestStateChange(updater(requestState));
-  };
+    const markers: Monaco.editor.IMarkerData[] = classified.missing.map((match) => ({
+      severity: 8, // Error
+      message: `Missing environment variable: ${match.key}`,
+      ...textToMonacoRange(requestState.payload, match.start, match.end),
+    }));
+
+    const decorations = classified.valid.map((match) => ({
+      ...textToMonacoRange(requestState.payload, match.start, match.end),
+      key: match.key,
+    }));
+
+    return { monacoMarkers: markers, monacoDecorations: decorations };
+  }, [requestState.payload, activeEnvVars]);
 
   const handleInvoke = () => {
     if ((!activeGrain && !activeFunction) || !activeMethod || !canInvoke) {
@@ -138,7 +178,13 @@ export function RequestWorkbench({
         <label>
           <span>Grain ID</span>
           <input
+            aria-invalid={missingGrainKeyTokens.length > 0}
+            autoComplete="off"
+            data-1p-ignore="true"
+            data-env-error={missingGrainKeyTokens.length > 0}
+            data-env-valid={hasValidGrainKeyTokens && missingGrainKeyTokens.length === 0}
             placeholder="Primary key"
+            title={missingGrainKeyTokens.length > 0 ? `Missing: ${missingGrainKeyTokens.join(", ")}` : undefined}
             value={requestState.grainKey}
             onChange={(event) =>
               onRequestStateChange({
@@ -218,19 +264,13 @@ export function RequestWorkbench({
           <div className="request-workbench__editor">
             <div className="request-workbench__editor-header">
               <span>Payload</span>
-              <div className="request-workbench__tokens" aria-label="Environment token autocomplete">
-                <button onClick={() => insertEnvToken("clusterId")} type="button">
-                  clusterId
-                </button>
-                <button onClick={() => insertEnvToken("workspaceId")} type="button">
-                  workspaceId
-                </button>
-              </div>
             </div>
             <MonacoEditor
               value={requestState.payload}
               onChange={(payload) => onRequestStateChange({ ...requestState, payload })}
               theme={theme}
+              markers={monacoMarkers}
+              decorations={monacoDecorations}
             />
           </div>
 
@@ -239,6 +279,25 @@ export function RequestWorkbench({
               {payloadError ?? "JSON valid"}
             </span>
           </div>
+
+          {missingEnvKeys.length > 0 && (
+            <div className="request-workbench__env-error-banner" role="alert">
+              <AlertTriangle aria-hidden="true" width={14} height={14} />
+              <div>
+                <strong>Missing environment variable{missingEnvKeys.length > 1 ? "s" : ""}</strong>
+                <span>{missingEnvKeys.join(", ")}</span>
+                <small>
+                  {missingGrainKeyTokens.length > 0 && missingPayloadTokens.length > 0
+                    ? "(in Grain ID and Payload)"
+                    : missingGrainKeyTokens.length > 0
+                      ? "(in Grain ID)"
+                      : missingPayloadTokens.length > 0
+                        ? "(in Payload)"
+                        : ""}
+                </small>
+              </div>
+            </div>
+          )}
         </>
       )}
 

@@ -1,5 +1,5 @@
 import Editor, { type BeforeMount, type OnMount } from "@monaco-editor/react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type * as Monaco from "monaco-editor";
 
 type AppTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
@@ -16,6 +16,14 @@ interface MonacoEditorProps {
   theme?: AppTheme;
   fontFamily?: string;
   fontSize?: number;
+  markers?: Monaco.editor.IMarkerData[];
+  decorations?: Array<{
+    startLineNumber: number;
+    startColumn: number;
+    endLineNumber: number;
+    endColumn: number;
+    key: string;
+  }>;
 }
 
 export function MonacoEditor({
@@ -26,10 +34,54 @@ export function MonacoEditor({
   theme = "dark",
   fontFamily,
   fontSize,
+  markers,
+  decorations,
 }: MonacoEditorProps) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof Monaco | null>(null);
+  const decorationIdsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) return;
+
+    const model = editor.getModel();
+    if (!model) return;
+
+    monaco.editor.setModelMarkers(model, "env-validation", markers ?? []);
+  }, [markers]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) return;
+
+    const deltaDecorations: Monaco.editor.IModelDeltaDecoration[] =
+      decorations?.map((d) => ({
+        range: new monaco.Range(
+          d.startLineNumber,
+          d.startColumn,
+          d.endLineNumber,
+          d.endColumn,
+        ),
+        options: {
+          inlineClassName: "env-token-valid",
+          overviewRuler: {
+            color: "#4ec9b0",
+            position: monaco.editor.OverviewRulerLane.Center,
+          },
+        },
+      })) ?? [];
+
+    decorationIdsRef.current = editor.deltaDecorations(
+      decorationIdsRef.current,
+      deltaDecorations,
+    );
+  }, [decorations]);
 
   const handleBeforeMount: BeforeMount = (monaco) => {
+    monacoRef.current = monaco;
     monaco.editor.defineTheme("siloscope-dark", {
       base: "vs-dark",
       inherit: true,
@@ -148,6 +200,10 @@ export function MonacoEditor({
         wordWrap: "on",
         formatOnPaste: true,
         formatOnType: true,
+        hover: { enabled: false },
+        quickSuggestions: false,
+        parameterHints: { enabled: false },
+        suggest: { showIcons: false, showStatusBar: false },
       }}
     />
   );
