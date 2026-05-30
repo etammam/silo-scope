@@ -331,4 +331,148 @@ describe("RequestWorkbench", () => {
     expect(screen.queryByLabelText("Grain")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Method")).not.toBeInTheDocument();
   });
+
+  it("substitutes faker tokens in grain key at invoke time", () => {
+    const onInvoke = vi.fn();
+
+    render(
+      <StatefulRequestWorkbench
+        grains={grains}
+        onInvoke={onInvoke}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        theme="dark"
+        initialRequestState={{
+          grainKey: "user-{{faker.uuid}}",
+          keyType: "String",
+          payload: '{"name":"test"}',
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+
+    expect(onInvoke).toHaveBeenCalledOnce();
+    const call = onInvoke.mock.calls[0][0];
+    expect(call.grainKey).not.toContain("{{faker.uuid}}");
+    expect(call.grainKey).toMatch(/^user-[0-9a-f]{8}-/);
+    expect(call.payload).toBe('{"name":"test"}');
+  });
+
+  it("substitutes faker tokens in payload at invoke time", () => {
+    const onInvoke = vi.fn();
+
+    render(
+      <StatefulRequestWorkbench
+        grains={grains}
+        onInvoke={onInvoke}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        theme="dark"
+        initialRequestState={{
+          grainKey: "player-1",
+          keyType: "String",
+          payload: '{"name":"{{faker.firstName}}","id":"{{faker.number}}"}',
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+
+    expect(onInvoke).toHaveBeenCalledOnce();
+    const call = onInvoke.mock.calls[0][0];
+    expect(call.payload).not.toContain("{{faker.firstName}}");
+    expect(call.payload).not.toContain("{{faker.number}}");
+    expect(call.payload).toMatch(/"name":"[^"]+"/);
+    expect(call.payload).toMatch(/"id":"\d+"/);
+  });
+
+  it("generates different values on successive invocations (runtime randomization)", () => {
+    const onInvoke = vi.fn();
+
+    render(
+      <StatefulRequestWorkbench
+        grains={grains}
+        onInvoke={onInvoke}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        theme="dark"
+        initialRequestState={{
+          grainKey: "{{faker.number}}",
+          keyType: "String",
+          payload: '{"name":"test"}',
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+
+    expect(onInvoke).toHaveBeenCalledTimes(2);
+    const grainKey1 = onInvoke.mock.calls[0][0].grainKey;
+    const grainKey2 = onInvoke.mock.calls[1][0].grainKey;
+    expect(grainKey1).not.toBe(grainKey2);
+  });
+
+  it("honors locale modifiers in faker tokens", () => {
+    const onInvoke = vi.fn();
+
+    render(
+      <StatefulRequestWorkbench
+        grains={grains}
+        onInvoke={onInvoke}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        theme="dark"
+        initialRequestState={{
+          grainKey: "player-1",
+          keyType: "String",
+          payload: '{"city":"{{faker.city:fr}}"}',
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+
+    expect(onInvoke).toHaveBeenCalledOnce();
+    const call = onInvoke.mock.calls[0][0];
+    expect(call.payload).not.toContain("{{faker.city:fr}}");
+    expect(call.payload).toMatch(/"city":"[^"]+"/);
+  });
+
+  it("falls back to English for unsupported locale modifiers", () => {
+    const onInvoke = vi.fn();
+
+    render(
+      <StatefulRequestWorkbench
+        grains={grains}
+        onInvoke={onInvoke}
+        onSelectGrain={vi.fn()}
+        onSelectMethod={vi.fn()}
+        selectedGrain="grain-1"
+        selectedMethod="SetName"
+        theme="dark"
+        initialRequestState={{
+          grainKey: "player-1",
+          keyType: "String",
+          payload: '{"name":"{{faker.firstName:xx}}"}',
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Invoke Grain" }));
+
+    expect(onInvoke).toHaveBeenCalledOnce();
+    const call = onInvoke.mock.calls[0][0];
+    expect(call.payload).not.toContain("{{faker.firstName:xx}}");
+    expect(call.payload).toMatch(/"name":"[^"]+"/);
+  });
 });

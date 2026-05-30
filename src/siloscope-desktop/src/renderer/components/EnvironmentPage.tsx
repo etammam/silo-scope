@@ -1,18 +1,25 @@
-import { useEffect, useRef, useState } from "react";
 import { Check, Globe, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { EnvironmentProfile } from "../../shared/types";
+import { InlineAutocomplete } from "./InlineAutocomplete";
 
 type EnvironmentPageProps = {
   environments: EnvironmentProfile[];
   activeEnvironment: string | null;
-  onEnvironmentsChange: (environments: EnvironmentProfile[], activeEnvironment: string | null) => void;
+  onEnvironmentsChange: (
+    environments: EnvironmentProfile[],
+    activeEnvironment: string | null,
+  ) => void;
 };
 
 function cloneProfiles(profiles: EnvironmentProfile[]): EnvironmentProfile[] {
   return profiles.map((p) => ({ name: p.name, variables: { ...p.variables } }));
 }
 
-function profilesEqual(a: EnvironmentProfile[], b: EnvironmentProfile[]): boolean {
+function profilesEqual(
+  a: EnvironmentProfile[],
+  b: EnvironmentProfile[],
+): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i].name !== b[i].name) return false;
@@ -31,23 +38,37 @@ export function EnvironmentPage({
   activeEnvironment,
   onEnvironmentsChange,
 }: EnvironmentPageProps) {
-  const [draftProfiles, setDraftProfiles] = useState<EnvironmentProfile[]>(cloneProfiles(environments));
-  const [draftActive, setDraftActive] = useState<string | null>(activeEnvironment);
-  const [selectedProfile, setSelectedProfile] = useState(activeEnvironment ?? (environments[0]?.name ?? ""));
+  const [draftProfiles, setDraftProfiles] = useState<EnvironmentProfile[]>(
+    cloneProfiles(environments),
+  );
+  const [draftActive, setDraftActive] = useState<string | null>(
+    activeEnvironment,
+  );
+  const [selectedProfile, setSelectedProfile] = useState(
+    activeEnvironment ?? environments[0]?.name ?? "",
+  );
   const [envVarKey, setEnvVarKey] = useState("");
   const [envVarValue, setEnvVarValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editKeyDraft, setEditKeyDraft] = useState("");
   const [editValueDraft, setEditValueDraft] = useState("");
 
+  const envVarValueRef = useRef<HTMLInputElement>(null);
+  const editValueRef = useRef<HTMLInputElement>(null);
+
   const lastEnvironmentsRef = useRef<EnvironmentProfile[]>(environments);
   const lastActiveRef = useRef<string | null>(activeEnvironment);
 
-  // Only reset draft when the actual content of props changes (not just reference)
   useEffect(() => {
-    const envChanged = !profilesEqual(environments, lastEnvironmentsRef.current);
+    const envChanged = !profilesEqual(
+      environments,
+      lastEnvironmentsRef.current,
+    );
     const activeChanged = activeEnvironment !== lastActiveRef.current;
 
     if (envChanged) {
@@ -58,19 +79,23 @@ export function EnvironmentPage({
       lastActiveRef.current = activeEnvironment;
       setDraftActive(activeEnvironment);
     }
-    if ((envChanged || activeChanged) && environments.length > 0 && !environments.some((e) => e.name === selectedProfile)) {
+    if (
+      (envChanged || activeChanged) &&
+      environments.length > 0 &&
+      !environments.some((e) => e.name === selectedProfile)
+    ) {
       setSelectedProfile(environments[0].name);
     }
   }, [environments, activeEnvironment, selectedProfile]);
 
-  // Auto-dismiss toast after 3 seconds
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const currentProfile = draftProfiles.find((e) => e.name === selectedProfile) ?? draftProfiles[0];
+  const currentProfile =
+    draftProfiles.find((e) => e.name === selectedProfile) ?? draftProfiles[0];
 
   const pendingKey = envVarKey.trim();
   const pendingValue = envVarValue.trim();
@@ -112,9 +137,10 @@ export function EnvironmentPage({
   const removeProfile = () => {
     if (draftProfiles.length === 0) return;
     const remaining = draftProfiles.filter((e) => e.name !== selectedProfile);
-    const nextActive = draftActive === selectedProfile
-      ? (remaining[0]?.name ?? null)
-      : draftActive;
+    const nextActive =
+      draftActive === selectedProfile
+        ? (remaining[0]?.name ?? null)
+        : draftActive;
     setDraftProfiles(remaining);
     setDraftActive(nextActive);
     setSelectedProfile(remaining[0]?.name ?? "");
@@ -122,7 +148,13 @@ export function EnvironmentPage({
 
   const renameProfile = (newName: string) => {
     const trimmed = newName.trim();
-    if (!trimmed || draftProfiles.some((e) => e.name === trimmed && e.name !== selectedProfile)) return;
+    if (
+      !trimmed ||
+      draftProfiles.some(
+        (e) => e.name === trimmed && e.name !== selectedProfile,
+      )
+    )
+      return;
     const next = draftProfiles.map((e) =>
       e.name === selectedProfile ? { ...e, name: trimmed } : e,
     );
@@ -192,7 +224,9 @@ export function EnvironmentPage({
   };
 
   const handleSave = async () => {
-    const profilesToSave = hasPendingInput ? flushPendingVariable() : draftProfiles;
+    const profilesToSave = hasPendingInput
+      ? flushPendingVariable()
+      : draftProfiles;
     setIsSaving(true);
     try {
       await onEnvironmentsChange(profilesToSave, draftActive);
@@ -201,7 +235,10 @@ export function EnvironmentPage({
       setToast({ message: "Environments saved successfully", type: "success" });
     } catch (error) {
       setToast({
-        message: error instanceof Error ? error.message : "Failed to save environments",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to save environments",
         type: "error",
       });
     } finally {
@@ -238,7 +275,10 @@ export function EnvironmentPage({
               <Globe aria-hidden="true" width={48} height={48} />
             </div>
             <h3>No environment profiles</h3>
-            <p>Environment profiles let you manage variable sets for your grain invocations across all clusters.</p>
+            <p>
+              Environment profiles let you manage variable sets for your grain
+              invocations across all clusters.
+            </p>
             <button
               className="environment-page__empty-action"
               onClick={addProfile}
@@ -270,9 +310,13 @@ export function EnvironmentPage({
                       onClick={() => setSelectedProfile(env.name)}
                       type="button"
                     >
-                      <span className="environment-page__list-name">{env.name}</span>
+                      <span className="environment-page__list-name">
+                        {env.name}
+                      </span>
                       {draftActive === env.name && (
-                        <span className="environment-page__list-badge">Active</span>
+                        <span className="environment-page__list-badge">
+                          Active
+                        </span>
                       )}
                     </button>
                   </li>
@@ -301,7 +345,9 @@ export function EnvironmentPage({
                           onClick={() => setActive(currentProfile.name)}
                           type="button"
                         >
-                          {draftActive === currentProfile.name ? "Active" : "Set Active"}
+                          {draftActive === currentProfile.name
+                            ? "Active"
+                            : "Set Active"}
                         </button>
                         <button
                           aria-label="Delete environment profile"
@@ -332,18 +378,23 @@ export function EnvironmentPage({
                           }
                         }}
                       />
-                      <input
-                        aria-label="Variable value"
-                        placeholder="Value"
-                        value={envVarValue}
-                        onChange={(e) => setEnvVarValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addVariable();
-                          }
-                        }}
-                      />
+                      <InlineAutocomplete
+                        envVars={Object.keys(currentProfile.variables)}
+                      >
+                        <input
+                          ref={envVarValueRef}
+                          aria-label="Variable value"
+                          placeholder="Value"
+                          value={envVarValue}
+                          onChange={(e) => setEnvVarValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addVariable();
+                            }
+                          }}
+                        />
+                      </InlineAutocomplete>
                       <button
                         aria-label="Add variable"
                         className="environment-form__mini-command"
@@ -357,92 +408,132 @@ export function EnvironmentPage({
                     </div>
 
                     {Object.entries(currentProfile.variables).length > 0 ? (
-                      <ul className="environment-form__var-list" aria-label="Environment variables">
-                        {Object.entries(currentProfile.variables).map(([key, value]) => (
-                          <li key={key}>
-                            {editingKey === key ? (
-                              <>
-                                <input
-                                  aria-label="Edit variable key"
-                                  className="environment-form__var-edit-input"
-                                  value={editKeyDraft}
-                                  onChange={(e) => setEditKeyDraft(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      saveEditVariable();
+                      <ul
+                        className="environment-form__var-list"
+                        aria-label="Environment variables"
+                      >
+                        {Object.entries(currentProfile.variables).map(
+                          ([key, value]) => (
+                            <li key={key}>
+                              {editingKey === key ? (
+                                <>
+                                  <input
+                                    aria-label="Edit variable key"
+                                    className="environment-form__var-edit-input"
+                                    value={editKeyDraft}
+                                    onChange={(e) =>
+                                      setEditKeyDraft(e.target.value)
                                     }
-                                    if (e.key === "Escape") {
-                                      e.preventDefault();
-                                      cancelEditVariable();
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        saveEditVariable();
+                                      }
+                                      if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        cancelEditVariable();
+                                      }
+                                    }}
+                                    autoFocus
+                                  />
+                                  <InlineAutocomplete
+                                    envVars={Object.keys(
+                                      currentProfile.variables,
+                                    )}
+                                  >
+                                    <input
+                                      ref={editValueRef}
+                                      aria-label="Edit variable value"
+                                      className="environment-form__var-edit-input environment-form__var-edit-input--value"
+                                      value={editValueDraft}
+                                      onChange={(e) =>
+                                        setEditValueDraft(e.target.value)
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          saveEditVariable();
+                                        }
+                                        if (e.key === "Escape") {
+                                          e.preventDefault();
+                                          cancelEditVariable();
+                                        }
+                                      }}
+                                    />
+                                  </InlineAutocomplete>
+                                  <button
+                                    aria-label="Save variable edit"
+                                    className="environment-form__mini-command"
+                                    onClick={saveEditVariable}
+                                    title="Save"
+                                    type="button"
+                                  >
+                                    <Check
+                                      aria-hidden="true"
+                                      width={12}
+                                      height={12}
+                                    />
+                                  </button>
+                                  <button
+                                    aria-label="Cancel variable edit"
+                                    className="environment-form__mini-command"
+                                    onClick={cancelEditVariable}
+                                    title="Cancel"
+                                    type="button"
+                                  >
+                                    <X
+                                      aria-hidden="true"
+                                      width={12}
+                                      height={12}
+                                    />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="environment-form__var-key">
+                                    {key}
+                                  </span>
+                                  <span className="environment-form__var-value">
+                                    {value}
+                                  </span>
+                                  <button
+                                    aria-label={`Edit ${key}`}
+                                    className="environment-form__mini-command"
+                                    onClick={() =>
+                                      startEditVariable(key, value)
                                     }
-                                  }}
-                                  autoFocus
-                                />
-                                <input
-                                  aria-label="Edit variable value"
-                                  className="environment-form__var-edit-input environment-form__var-edit-input--value"
-                                  value={editValueDraft}
-                                  onChange={(e) => setEditValueDraft(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      saveEditVariable();
-                                    }
-                                    if (e.key === "Escape") {
-                                      e.preventDefault();
-                                      cancelEditVariable();
-                                    }
-                                  }}
-                                />
-                                <button
-                                  aria-label="Save variable edit"
-                                  className="environment-form__mini-command"
-                                  onClick={saveEditVariable}
-                                  title="Save"
-                                  type="button"
-                                >
-                                  <Check aria-hidden="true" width={12} height={12} />
-                                </button>
-                                <button
-                                  aria-label="Cancel variable edit"
-                                  className="environment-form__mini-command"
-                                  onClick={cancelEditVariable}
-                                  title="Cancel"
-                                  type="button"
-                                >
-                                  <X aria-hidden="true" width={12} height={12} />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <span className="environment-form__var-key">{key}</span>
-                                <span className="environment-form__var-value">{value}</span>
-                                <button
-                                  aria-label={`Edit ${key}`}
-                                  className="environment-form__mini-command"
-                                  onClick={() => startEditVariable(key, value)}
-                                  title="Edit"
-                                  type="button"
-                                >
-                                  <Pencil aria-hidden="true" width={12} height={12} />
-                                </button>
-                                <button
-                                  aria-label={`Remove ${key}`}
-                                  className="environment-form__mini-command"
-                                  onClick={() => removeVariable(key)}
-                                  title="Remove"
-                                  type="button"
-                                >
-                                  <X aria-hidden="true" width={12} height={12} />
-                                </button>
-                              </>
-                            )}
-                          </li>
-                        ))}
+                                    title="Edit"
+                                    type="button"
+                                  >
+                                    <Pencil
+                                      aria-hidden="true"
+                                      width={12}
+                                      height={12}
+                                    />
+                                  </button>
+                                  <button
+                                    aria-label={`Remove ${key}`}
+                                    className="environment-form__mini-command"
+                                    onClick={() => removeVariable(key)}
+                                    title="Remove"
+                                    type="button"
+                                  >
+                                    <X
+                                      aria-hidden="true"
+                                      width={12}
+                                      height={12}
+                                    />
+                                  </button>
+                                </>
+                              )}
+                            </li>
+                          ),
+                        )}
                       </ul>
                     ) : (
-                      <div className="environment-form__empty">No variables defined</div>
+                      <div className="environment-form__empty">
+                        No variables defined
+                      </div>
                     )}
                   </div>
                 </div>
@@ -462,8 +553,12 @@ export function EnvironmentPage({
           role="status"
           aria-live="polite"
         >
-          {toast.type === "success" && <Check aria-hidden="true" width={14} height={14} />}
-          {toast.type === "error" && <X aria-hidden="true" width={14} height={14} />}
+          {toast.type === "success" && (
+            <Check aria-hidden="true" width={14} height={14} />
+          )}
+          {toast.type === "error" && (
+            <X aria-hidden="true" width={14} height={14} />
+          )}
           <span>{toast.message}</span>
         </div>
       )}

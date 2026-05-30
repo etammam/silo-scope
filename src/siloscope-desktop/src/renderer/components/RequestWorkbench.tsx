@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
 import { AlertTriangle, Play } from "lucide-react";
+import type * as Monaco from "monaco-editor";
+import { useMemo, useRef, useState } from "react";
 import type {
   EnvironmentProfile,
   GrainInterfaceDescriptor,
@@ -10,8 +11,13 @@ import type {
 } from "../../shared/types";
 import { findCatalogFunction, findCatalogSource } from "../catalog";
 import { classifyTokens, findMissingTokens } from "../envSubstitution";
+import {
+  findMockTokens,
+  hasMockTokens,
+  substituteMockTokens,
+} from "../mockTokens";
+import { InlineAutocomplete } from "./InlineAutocomplete";
 import { MonacoEditor } from "./MonacoEditor";
-import type * as Monaco from "monaco-editor";
 
 type RequestWorkbenchProps = {
   grains: GrainInterfaceDescriptor[];
@@ -60,18 +66,29 @@ export function RequestWorkbench({
   onInvoke,
 }: RequestWorkbenchProps) {
   const [activeTab, setActiveTab] = useState<RequestTab>("payload");
+  const grainKeyInputRef = useRef<HTMLInputElement>(null);
   const activeFunction = useMemo(
-    () => findCatalogFunction(sourceCatalog ?? { sources: [] }, selectedFunctionId ?? null),
+    () =>
+      findCatalogFunction(
+        sourceCatalog ?? { sources: [] },
+        selectedFunctionId ?? null,
+      ),
     [selectedFunctionId, sourceCatalog],
   );
   const activeSource = useMemo(
-    () => findCatalogSource(sourceCatalog ?? { sources: [] }, activeFunction?.sourceId ?? null),
+    () =>
+      findCatalogSource(
+        sourceCatalog ?? { sources: [] },
+        activeFunction?.sourceId ?? null,
+      ),
     [activeFunction, sourceCatalog],
   );
   const activeInterface = useMemo(
     () =>
-      activeSource?.interfaces.find((catalogInterface) => catalogInterface.interfaceId === activeFunction?.interfaceId) ??
-      null,
+      activeSource?.interfaces.find(
+        (catalogInterface) =>
+          catalogInterface.interfaceId === activeFunction?.interfaceId,
+      ) ?? null,
     [activeFunction, activeSource],
   );
 
@@ -80,14 +97,20 @@ export function RequestWorkbench({
     [grains, selectedGrain],
   );
   const methods = useMemo(
-    () => activeInterface?.methods.map(toGrainMethod) ?? activeGrain?.methods ?? [],
+    () =>
+      activeInterface?.methods.map(toGrainMethod) ?? activeGrain?.methods ?? [],
     [activeGrain, activeInterface],
   );
   const activeMethod = activeFunction
     ? toGrainMethod(activeFunction)
-    : methods.find((method) => method.name === selectedMethod) ?? null;
-  const payloadError = useMemo(() => validateJson(requestState.payload), [requestState.payload]);
-  const expectsSourceOwnedSelection = Boolean(sourceCatalog?.sources.some((source) => source.interfaces.length > 0));
+    : (methods.find((method) => method.name === selectedMethod) ?? null);
+  const payloadError = useMemo(
+    () => validateJson(requestState.payload),
+    [requestState.payload],
+  );
+  const expectsSourceOwnedSelection = Boolean(
+    sourceCatalog?.sources.some((source) => source.interfaces.length > 0),
+  );
 
   const activeEnvVars = useMemo(() => {
     const env = environments.find((e) => e.name === activeEnvironment);
@@ -103,7 +126,8 @@ export function RequestWorkbench({
     [requestState.payload, activeEnvVars],
   );
   const missingEnvKeys = useMemo(
-    () => Array.from(new Set([...missingGrainKeyTokens, ...missingPayloadTokens])),
+    () =>
+      Array.from(new Set([...missingGrainKeyTokens, ...missingPayloadTokens])),
     [missingGrainKeyTokens, missingPayloadTokens],
   );
 
@@ -112,13 +136,18 @@ export function RequestWorkbench({
     return classified.valid.length > 0;
   }, [requestState.grainKey, activeEnvVars]);
 
+  const hasMockGrainKeyTokens = useMemo(
+    () => hasMockTokens(requestState.grainKey),
+    [requestState.grainKey],
+  );
+
   const canInvoke = Boolean(
     (activeFunction || activeGrain) &&
-      activeMethod &&
-      (!expectsSourceOwnedSelection || activeFunction) &&
-      requestState.grainKey.trim() &&
-      !payloadError &&
-      missingEnvKeys.length === 0,
+    activeMethod &&
+    (!expectsSourceOwnedSelection || activeFunction) &&
+    requestState.grainKey.trim() &&
+    !payloadError &&
+    missingEnvKeys.length === 0,
   );
 
   function textToMonacoRange(text: string, start: number, end: number) {
@@ -128,24 +157,42 @@ export function RequestWorkbench({
     const lineStart = lines[lines.length - 1].length;
     const startColumn = lineStart + 1;
     const endColumn = lineStart + 1 + (end - start);
-    return { startLineNumber: lineNumber, startColumn, endLineNumber: lineNumber, endColumn };
+    return {
+      startLineNumber: lineNumber,
+      startColumn,
+      endLineNumber: lineNumber,
+      endColumn,
+    };
   }
 
   const { monacoMarkers, monacoDecorations } = useMemo(() => {
     const classified = classifyTokens(requestState.payload, activeEnvVars);
 
-    const markers: Monaco.editor.IMarkerData[] = classified.missing.map((match) => ({
-      severity: 8, // Error
-      message: `Missing environment variable: ${match.key}`,
-      ...textToMonacoRange(requestState.payload, match.start, match.end),
-    }));
+    const markers: Monaco.editor.IMarkerData[] = classified.missing.map(
+      (match) => ({
+        severity: 8,
+        message: `Missing environment variable: ${match.key}`,
+        ...textToMonacoRange(requestState.payload, match.start, match.end),
+      }),
+    );
 
-    const decorations = classified.valid.map((match) => ({
+    const envDecorations = classified.valid.map((match) => ({
       ...textToMonacoRange(requestState.payload, match.start, match.end),
       key: match.key,
+      className: "env-token-valid" as const,
     }));
 
-    return { monacoMarkers: markers, monacoDecorations: decorations };
+    const mockMatches = findMockTokens(requestState.payload);
+    const mockDecorations = mockMatches.map((match) => ({
+      ...textToMonacoRange(requestState.payload, match.start, match.end),
+      key: match.field,
+      className: "mock-token" as const,
+    }));
+
+    return {
+      monacoMarkers: markers,
+      monacoDecorations: [...envDecorations, ...mockDecorations],
+    };
   }, [requestState.payload, activeEnvVars]);
 
   const handleInvoke = () => {
@@ -155,10 +202,10 @@ export function RequestWorkbench({
 
     const request = {
       grainType: activeFunction?.interfaceId ?? activeGrain!.interfaceName,
-      grainKey: requestState.grainKey.trim(),
+      grainKey: substituteMockTokens(requestState.grainKey.trim()),
       keyType: requestState.keyType,
       method: activeFunction?.methodName ?? activeMethod.name,
-      payload: requestState.payload,
+      payload: substituteMockTokens(requestState.payload),
       ...(activeFunction
         ? {
             sourceId: activeFunction.sourceId,
@@ -171,28 +218,43 @@ export function RequestWorkbench({
   };
 
   return (
-    <section className="request-workbench" aria-labelledby="request-workbench-title">
-      <h2 className="request-workbench__sr-title" id="request-workbench-title">Request</h2>
+    <section
+      className="request-workbench"
+      aria-labelledby="request-workbench-title"
+    >
+      <h2 className="request-workbench__sr-title" id="request-workbench-title">
+        Request
+      </h2>
 
       <div className="request-workbench__request-line">
-        <label>
+        <label className="request-workbench__grain-id-label">
           <span>Grain ID</span>
-          <input
-            aria-invalid={missingGrainKeyTokens.length > 0}
-            autoComplete="off"
-            data-1p-ignore="true"
-            data-env-error={missingGrainKeyTokens.length > 0}
-            data-env-valid={hasValidGrainKeyTokens && missingGrainKeyTokens.length === 0}
-            placeholder="Primary key"
-            title={missingGrainKeyTokens.length > 0 ? `Missing: ${missingGrainKeyTokens.join(", ")}` : undefined}
-            value={requestState.grainKey}
-            onChange={(event) =>
-              onRequestStateChange({
-                ...requestState,
-                grainKey: event.target.value,
-              })
-            }
-          />
+          <InlineAutocomplete envVars={Object.keys(activeEnvVars)}>
+            <input
+              ref={grainKeyInputRef}
+              aria-invalid={missingGrainKeyTokens.length > 0}
+              autoComplete="off"
+              data-1p-ignore="true"
+              data-env-error={missingGrainKeyTokens.length > 0}
+              data-env-valid={
+                hasValidGrainKeyTokens && missingGrainKeyTokens.length === 0
+              }
+              data-mock-valid={hasMockGrainKeyTokens}
+              placeholder="Primary key"
+              title={
+                missingGrainKeyTokens.length > 0
+                  ? `Missing: ${missingGrainKeyTokens.join(", ")}`
+                  : undefined
+              }
+              value={requestState.grainKey}
+              onChange={(event) =>
+                onRequestStateChange({
+                  ...requestState,
+                  grainKey: event.target.value,
+                })
+              }
+            />
+          </InlineAutocomplete>
         </label>
 
         <label>
@@ -213,51 +275,109 @@ export function RequestWorkbench({
           </select>
         </label>
 
-        <div className="request-workbench__grain-summary" aria-label="Grain selection summary">
+        <div
+          className="request-workbench__grain-summary"
+          aria-label="Grain selection summary"
+        >
           <div>
             <span>Grain</span>
             <small>{requestState.keyType} key</small>
           </div>
-          <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
-          <small>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</small>
+          <strong>
+            {activeFunction?.methodName ??
+              activeMethod?.name ??
+              "No method selected"}
+          </strong>
+          <small>
+            {activeFunction?.interfaceName ??
+              activeGrain?.interfaceName ??
+              "No grain selected"}
+          </small>
         </div>
 
-        <button className="request-workbench__invoke-button" disabled={!canInvoke} onClick={handleInvoke} type="button">
+        <button
+          className="request-workbench__invoke-button"
+          disabled={!canInvoke}
+          onClick={handleInvoke}
+          type="button"
+        >
           <Play aria-hidden="true" width={12} height={12} />
           Invoke Grain
         </button>
       </div>
 
-      <div className="request-workbench__tabs" aria-label="Request sections" role="tablist">
-        <button aria-selected={activeTab === "payload"} onClick={() => setActiveTab("payload")} role="tab" type="button">
+      <div
+        className="request-workbench__tabs"
+        aria-label="Request sections"
+        role="tablist"
+      >
+        <button
+          aria-selected={activeTab === "payload"}
+          onClick={() => setActiveTab("payload")}
+          role="tab"
+          type="button"
+        >
           Payload
         </button>
-        <button aria-selected={activeTab === "context"} onClick={() => setActiveTab("context")} role="tab" type="button">
+        <button
+          aria-selected={activeTab === "context"}
+          onClick={() => setActiveTab("context")}
+          role="tab"
+          type="button"
+        >
           Context
         </button>
-        <button aria-selected={activeTab === "docs"} onClick={() => setActiveTab("docs")} role="tab" type="button">
+        <button
+          aria-selected={activeTab === "docs"}
+          onClick={() => setActiveTab("docs")}
+          role="tab"
+          type="button"
+        >
           Docs
         </button>
       </div>
 
       {activeTab === "payload" && (
         <>
-          <div className="request-workbench__selection" aria-label="Selected function">
+          <div
+            className="request-workbench__selection"
+            aria-label="Selected function"
+          >
             <div>
               <span>Interface</span>
-              <strong>{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "No grain selected"}</strong>
+              <strong>
+                {activeFunction?.interfaceName ??
+                  activeGrain?.interfaceName ??
+                  "No grain selected"}
+              </strong>
             </div>
             <div>
               <span>Method</span>
-              <strong>{activeFunction?.methodName ?? activeMethod?.name ?? "No method selected"}</strong>
+              <strong>
+                {activeFunction?.methodName ??
+                  activeMethod?.name ??
+                  "No method selected"}
+              </strong>
             </div>
             <div>
               <span>Return</span>
-              <strong>{activeFunction?.returnType ?? activeMethod?.returnType ?? "unknown"}</strong>
+              <strong>
+                {activeFunction?.returnType ??
+                  activeMethod?.returnType ??
+                  "unknown"}
+              </strong>
             </div>
             <div>
               <span>Parameters</span>
-              <strong>{formatParameterList(visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []))}</strong>
+              <strong>
+                {formatParameterList(
+                  visibleParameters(
+                    activeFunction?.parameters ??
+                      activeMethod?.parameters ??
+                      [],
+                  ),
+                )}
+              </strong>
             </div>
           </div>
 
@@ -267,15 +387,24 @@ export function RequestWorkbench({
             </div>
             <MonacoEditor
               value={requestState.payload}
-              onChange={(payload) => onRequestStateChange({ ...requestState, payload })}
+              onChange={(payload) =>
+                onRequestStateChange({ ...requestState, payload })
+              }
               theme={theme}
               markers={monacoMarkers}
               decorations={monacoDecorations}
+              envVars={Object.keys(activeEnvVars)}
             />
           </div>
 
           <div className="request-workbench__trigger-bar">
-            <span className={payloadError ? "request-workbench__status request-workbench__status--error" : "request-workbench__status"}>
+            <span
+              className={
+                payloadError
+                  ? "request-workbench__status request-workbench__status--error"
+                  : "request-workbench__status"
+              }
+            >
               {payloadError ?? "JSON valid"}
             </span>
           </div>
@@ -284,10 +413,14 @@ export function RequestWorkbench({
             <div className="request-workbench__env-error-banner" role="alert">
               <AlertTriangle aria-hidden="true" width={14} height={14} />
               <div>
-                <strong>Missing environment variable{missingEnvKeys.length > 1 ? "s" : ""}</strong>
+                <strong>
+                  Missing environment variable
+                  {missingEnvKeys.length > 1 ? "s" : ""}
+                </strong>
                 <span>{missingEnvKeys.join(", ")}</span>
                 <small>
-                  {missingGrainKeyTokens.length > 0 && missingPayloadTokens.length > 0
+                  {missingGrainKeyTokens.length > 0 &&
+                  missingPayloadTokens.length > 0
                     ? "(in Grain ID and Payload)"
                     : missingGrainKeyTokens.length > 0
                       ? "(in Grain ID)"
@@ -305,12 +438,12 @@ export function RequestWorkbench({
         <div className="request-workbench__docs" aria-label="Documentation">
           <div className="docs-section">
             <h3>Method Signature</h3>
-            <p>
-              Full C# method signature for invoking this grain method.
-            </p>
+            <p>Full C# method signature for invoking this grain method.</p>
             <div className="docs-signature">
               <code>
-                {activeFunction?.signature ?? activeMethod?.signature ?? "Task InvokeAsync(string grainId, object payload)"}
+                {activeFunction?.signature ??
+                  activeMethod?.signature ??
+                  "Task InvokeAsync(string grainId, object payload)"}
               </code>
             </div>
           </div>
@@ -318,12 +451,25 @@ export function RequestWorkbench({
           <div className="docs-section">
             <h3>Request Payload</h3>
             <p>
-              The request payload is a JSON object containing the method parameters. Map each parameter name to its
-              corresponding value using the appropriate C# type.
+              The request payload is a JSON object containing the method
+              parameters. Map each parameter name to its corresponding value
+              using the appropriate C# type.
             </p>
             <div className="docs-parameters">
-              <h4>Parameters ({visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []).length})</h4>
-              {visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []).length > 0 ? (
+              <h4>
+                Parameters (
+                {
+                  visibleParameters(
+                    activeFunction?.parameters ??
+                      activeMethod?.parameters ??
+                      [],
+                  ).length
+                }
+                )
+              </h4>
+              {visibleParameters(
+                activeFunction?.parameters ?? activeMethod?.parameters ?? [],
+              ).length > 0 ? (
                 <table className="docs-params-table">
                   <thead>
                     <tr>
@@ -333,17 +479,32 @@ export function RequestWorkbench({
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleParameters(activeFunction?.parameters ?? activeMethod?.parameters ?? []).map((param) => (
+                    {visibleParameters(
+                      activeFunction?.parameters ??
+                        activeMethod?.parameters ??
+                        [],
+                    ).map((param) => (
                       <tr key={param.name}>
-                        <td><code>{param.name}</code></td>
-                        <td><span className="docs-cs-type">{param.typeName}</span></td>
-                        <td><span className="docs-json-example">{defaultJsonValue(param.typeName)}</span></td>
+                        <td>
+                          <code>{param.name}</code>
+                        </td>
+                        <td>
+                          <span className="docs-cs-type">{param.typeName}</span>
+                        </td>
+                        <td>
+                          <span className="docs-json-example">
+                            {defaultJsonValue(param.typeName)}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="docs-empty">No parameters required - send an empty JSON object <code>{"{}"}</code></p>
+                <p className="docs-empty">
+                  No parameters required - send an empty JSON object{" "}
+                  <code>{"{}"}</code>
+                </p>
               )}
             </div>
           </div>
@@ -351,18 +512,25 @@ export function RequestWorkbench({
           <div className="docs-section">
             <h3>Response Payload</h3>
             <p>
-              The response payload contains the return value from the grain method. The JSON structure depends on the
-              return type of the method.
+              The response payload contains the return value from the grain
+              method. The JSON structure depends on the return type of the
+              method.
             </p>
             <div className="docs-response">
               <h4>Return Type</h4>
               <code className="docs-cs-type">
-                {activeFunction?.returnType ?? activeMethod?.returnType ?? "Task (async void)"}
+                {activeFunction?.returnType ??
+                  activeMethod?.returnType ??
+                  "Task (async void)"}
               </code>
               <div className="docs-response-example">
                 <h4>Example Response</h4>
                 <pre>
-{formatResponseExample(activeFunction?.returnType ?? activeMethod?.returnType ?? "void")}
+                  {formatResponseExample(
+                    activeFunction?.returnType ??
+                      activeMethod?.returnType ??
+                      "void",
+                  )}
                 </pre>
               </div>
             </div>
@@ -373,19 +541,29 @@ export function RequestWorkbench({
             <div className="docs-key-info">
               <div className="docs-info-row">
                 <span className="docs-info-label">Grain Interface</span>
-                <span className="docs-info-value">{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "N/A"}</span>
+                <span className="docs-info-value">
+                  {activeFunction?.interfaceName ??
+                    activeGrain?.interfaceName ??
+                    "N/A"}
+                </span>
               </div>
               <div className="docs-info-row">
                 <span className="docs-info-label">Namespace</span>
-                <span className="docs-info-value">{activeFunction?.namespace ?? "N/A"}</span>
+                <span className="docs-info-value">
+                  {activeFunction?.namespace ?? "N/A"}
+                </span>
               </div>
               <div className="docs-info-row">
                 <span className="docs-info-label">Key Type</span>
-                <span className="docs-info-value">{activeFunction?.keyType ?? activeMethod?.keyType ?? "String"}</span>
+                <span className="docs-info-value">
+                  {activeFunction?.keyType ?? activeMethod?.keyType ?? "String"}
+                </span>
               </div>
               <div className="docs-info-row">
                 <span className="docs-info-label">Source</span>
-                <span className="docs-info-value">{activeSource?.sourceId ?? "N/A"}</span>
+                <span className="docs-info-value">
+                  {activeSource?.sourceId ?? "N/A"}
+                </span>
               </div>
             </div>
           </div>
@@ -399,7 +577,9 @@ export function RequestWorkbench({
             <div className="context-grid">
               <div className="context-item">
                 <span className="context-label">Grain ID</span>
-                <span className="context-value code">{requestState.grainKey || "(enter grain key)"}</span>
+                <span className="context-value code">
+                  {requestState.grainKey || "(enter grain key)"}
+                </span>
               </div>
               <div className="context-item">
                 <span className="context-label">Key Type</span>
@@ -407,11 +587,17 @@ export function RequestWorkbench({
               </div>
               <div className="context-item">
                 <span className="context-label">Interface</span>
-                <span className="context-value code">{activeFunction?.interfaceName ?? activeGrain?.interfaceName ?? "N/A"}</span>
+                <span className="context-value code">
+                  {activeFunction?.interfaceName ??
+                    activeGrain?.interfaceName ??
+                    "N/A"}
+                </span>
               </div>
               <div className="context-item">
                 <span className="context-label">Method</span>
-                <span className="context-value code">{activeFunction?.methodName ?? activeMethod?.name ?? "N/A"}</span>
+                <span className="context-value code">
+                  {activeFunction?.methodName ?? activeMethod?.name ?? "N/A"}
+                </span>
               </div>
             </div>
           </div>
@@ -421,15 +607,21 @@ export function RequestWorkbench({
             <div className="context-grid">
               <div className="context-item">
                 <span className="context-label">Source ID</span>
-                <span className="context-value code">{activeSource?.sourceId ?? "N/A"}</span>
+                <span className="context-value code">
+                  {activeSource?.sourceId ?? "N/A"}
+                </span>
               </div>
               <div className="context-item">
                 <span className="context-label">Source Type</span>
-                <span className="context-value">{activeSource?.sourceType ?? "N/A"}</span>
+                <span className="context-value">
+                  {activeSource?.sourceType ?? "N/A"}
+                </span>
               </div>
               <div className="context-item full-width">
                 <span className="context-label">Discovery Status</span>
-                <span className={`context-value status status--${activeSource?.discoveryStatus?.toLowerCase() ?? "unknown"}`}>
+                <span
+                  className={`context-value status status--${activeSource?.discoveryStatus?.toLowerCase() ?? "unknown"}`}
+                >
                   {activeSource?.discoveryStatus ?? "Unknown"}
                 </span>
               </div>
@@ -441,15 +633,25 @@ export function RequestWorkbench({
             <div className="context-details">
               <div className="context-detail-row">
                 <span className="context-label">Full Signature</span>
-                <code className="context-signature">{activeFunction?.signature ?? activeMethod?.signature ?? "N/A"}</code>
+                <code className="context-signature">
+                  {activeFunction?.signature ??
+                    activeMethod?.signature ??
+                    "N/A"}
+                </code>
               </div>
               <div className="context-detail-row">
                 <span className="context-label">Return Type</span>
-                <span className="context-value code">{activeFunction?.returnType ?? activeMethod?.returnType ?? "Task"}</span>
+                <span className="context-value code">
+                  {activeFunction?.returnType ??
+                    activeMethod?.returnType ??
+                    "Task"}
+                </span>
               </div>
               <div className="context-detail-row">
                 <span className="context-label">Function ID</span>
-                <span className="context-value code">{activeFunction?.functionId ?? "N/A"}</span>
+                <span className="context-value code">
+                  {activeFunction?.functionId ?? "N/A"}
+                </span>
               </div>
             </div>
           </div>
@@ -459,7 +661,9 @@ export function RequestWorkbench({
   );
 }
 
-function toGrainMethod(catalogFunction: SourceCatalogFunction): GrainMethodDescriptor {
+function toGrainMethod(
+  catalogFunction: SourceCatalogFunction,
+): GrainMethodDescriptor {
   return {
     name: catalogFunction.methodName,
     parameters: visibleParameters(catalogFunction.parameters),
@@ -469,7 +673,9 @@ function toGrainMethod(catalogFunction: SourceCatalogFunction): GrainMethodDescr
   };
 }
 
-export function createPayloadTemplate(catalogFunction: SourceCatalogFunction): string {
+export function createPayloadTemplate(
+  catalogFunction: SourceCatalogFunction,
+): string {
   const parameters = visibleParameters(catalogFunction.parameters);
   if (parameters.length === 0) {
     return "{\n}";
@@ -482,19 +688,30 @@ export function createPayloadTemplate(catalogFunction: SourceCatalogFunction): s
   return `{\n${lines.join(",\n")}\n}`;
 }
 
-function formatParameterList(parameters: GrainMethodDescriptor["parameters"]): string {
+function formatParameterList(
+  parameters: GrainMethodDescriptor["parameters"],
+): string {
   if (parameters.length === 0) {
     return "none";
   }
 
-  return parameters.map((parameter) => `${parameter.name}: ${parameter.typeName}`).join(", ");
+  return parameters
+    .map((parameter) => `${parameter.name}: ${parameter.typeName}`)
+    .join(", ");
 }
 
-function visibleParameters<T extends { name: string; typeName: string }>(parameters: T[]): T[] {
-  return parameters.filter((parameter) => !isCancellationTokenParameter(parameter));
+function visibleParameters<T extends { name: string; typeName: string }>(
+  parameters: T[],
+): T[] {
+  return parameters.filter(
+    (parameter) => !isCancellationTokenParameter(parameter),
+  );
 }
 
-function isCancellationTokenParameter(parameter: { name: string; typeName: string }): boolean {
+function isCancellationTokenParameter(parameter: {
+  name: string;
+  typeName: string;
+}): boolean {
   return (
     parameter.typeName === "CancellationToken" ||
     parameter.typeName === "System.Threading.CancellationToken" ||
@@ -504,7 +721,12 @@ function isCancellationTokenParameter(parameter: { name: string; typeName: strin
 
 function defaultJsonValue(typeName: string): string {
   const normalizedType = typeName.toLowerCase();
-  if (normalizedType.includes("int") || normalizedType.includes("double") || normalizedType.includes("float") || normalizedType.includes("decimal")) {
+  if (
+    normalizedType.includes("int") ||
+    normalizedType.includes("double") ||
+    normalizedType.includes("float") ||
+    normalizedType.includes("decimal")
+  ) {
     return "0";
   }
 
@@ -512,16 +734,21 @@ function defaultJsonValue(typeName: string): string {
     return "false";
   }
 
-  if (normalizedType.endsWith("[]") || normalizedType.includes("list") || normalizedType.includes("array")) {
+  if (
+    normalizedType.endsWith("[]") ||
+    normalizedType.includes("list") ||
+    normalizedType.includes("array")
+  ) {
     return "[]";
   }
 
-  return "\"\"";
+  return '""';
 }
 
 function validateJson(value: string): string | null {
   try {
-    JSON.parse(value);
+    const substituted = substituteMockTokens(value);
+    JSON.parse(substituted);
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : "Invalid JSON";
@@ -529,7 +756,12 @@ function validateJson(value: string): string | null {
 }
 
 function formatResponseExample(returnType: string | null | undefined): string {
-  if (!returnType || returnType === "void" || returnType === "Task" || returnType === "ValueTask") {
+  if (
+    !returnType ||
+    returnType === "void" ||
+    returnType === "Task" ||
+    returnType === "ValueTask"
+  ) {
     return `{
   "isSuccess": true,
   "error": null
@@ -545,7 +777,13 @@ function formatResponseExample(returnType: string | null | undefined): string {
 }`;
   }
 
-  if (normalized.includes("int") || normalized.includes("long") || normalized.includes("double") || normalized.includes("float") || normalized.includes("decimal")) {
+  if (
+    normalized.includes("int") ||
+    normalized.includes("long") ||
+    normalized.includes("double") ||
+    normalized.includes("float") ||
+    normalized.includes("decimal")
+  ) {
     return `{
   "isSuccess": true,
   "value": 42
@@ -559,7 +797,12 @@ function formatResponseExample(returnType: string | null | undefined): string {
 }`;
   }
 
-  if (normalized.endsWith("[]") || normalized.includes("list") || normalized.includes("collection") || normalized.includes("array")) {
+  if (
+    normalized.endsWith("[]") ||
+    normalized.includes("list") ||
+    normalized.includes("collection") ||
+    normalized.includes("array")
+  ) {
     return `{
   "isSuccess": true,
   "value": [

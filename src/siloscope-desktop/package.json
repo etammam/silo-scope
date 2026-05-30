@@ -17,6 +17,7 @@
     "build:stable": "electrobun build --env=stable"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.4.0",
     "@monaco-editor/react": "^4.7.0",
     "autoprefixer": "^10.5.0",
     "electrobun": "1.18.1",
