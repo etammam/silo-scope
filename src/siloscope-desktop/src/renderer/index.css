@@ -16,63 +16,33 @@
 	--screen-padding-inline: 22px;
 	--screen-padding-block: 18px;
 	--splitter-size: 1px;
-	--ui-0: #101010;
-	--ui-1: #161616;
-	--ui-2: #1f1f1f;
+	--ui-0: #1f1f1f;
+	--ui-1: #181818;
+	--ui-2: #313131;
 	--ui-3: #2b2b2b;
-	--ui-4: #3d3d3d;
-	--ui-5: #8d8d8d;
-	--ui-6: #d4d4d4;
-	--ui-7: #f5f5f5;
-	--accent: #d97706;
-	--accent-strong: #f59e0b;
-	--accent-contrast: #171717;
-	--panel-shadow: 0 0 0 1px rgb(255 255 255 / 0.02);
-	--danger: #d16969;
-	--focus-ring: #b7b7b7;
-	--warning: #d7ba7d;
+	--ui-4: #3c3c3c;
+	--ui-5: #9d9d9d;
+	--ui-6: #cccccc;
+	--ui-7: #ffffff;
+	--accent: #0078d4;
+	--accent-strong: #026ec1;
+	--accent-contrast: #ffffff;
+	--panel-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+	--danger: #f85149;
+	--focus-ring: #0078d4;
+	--warning: #e2c08d;
 	--success: #4ec9b0;
 	--success-dim: rgb(78 201 176 / 0.13);
 	--green: var(--success);
 	--green-dim: var(--success-dim);
 	--yellow: var(--warning);
-	--yellow-dim: rgb(215 186 125 / 0.13);
+	--yellow-dim: rgb(226 192 141 / 0.13);
 	--red: var(--danger);
-	--red-dim: rgb(209 105 105 / 0.14);
+	--red-dim: rgb(248 81 73 / 0.14);
 	--purple: #c586c0;
 	--shadow-popover: 0 12px 34px rgb(0 0 0 / 0.26);
 	--shadow-modal: 0 24px 70px rgb(0 0 0 / 0.34);
-	--select-chevron: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-}
-
-[data-theme="light"] {
-	--ui-0: #ffffff;
-	--ui-1: #f7f7f4;
-	--ui-2: #efefec;
-	--ui-3: #deded9;
-	--ui-4: #c8c8c2;
-	--ui-5: #777770;
-	--ui-6: #31312f;
-	--ui-7: #181817;
-	--accent: #d97706;
-	--accent-strong: #b45309;
-	--accent-contrast: #ffffff;
-	--panel-shadow: 0 0 0 1px rgb(0 0 0 / 0.02);
-	--danger: #a31515;
-	--focus-ring: #565654;
-	--warning: #795e26;
-	--success: #267f99;
-	--success-dim: rgb(38 127 153 / 0.12);
-	--green: #098658;
-	--green-dim: rgb(9 134 88 / 0.12);
-	--yellow: var(--warning);
-	--yellow-dim: rgb(121 94 38 / 0.12);
-	--red: var(--danger);
-	--red-dim: rgb(163 21 21 / 0.11);
-	--purple: #af00db;
-	--shadow-popover: 0 12px 34px rgb(0 0 0 / 0.16);
-	--shadow-modal: 0 24px 70px rgb(0 0 0 / 0.22);
-	--select-chevron: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23737371' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	--select-chevron: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239d9d9d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 [data-theme="vscode-dark"] {
@@ -133,6 +103,66 @@
 	--select-chevron: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23616161' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
+[data-theme="github-dark"] {
+	--ui-0: #0d1117;
+	--ui-1: #010409;
+	--ui-2: #161b22;
+	--ui-3: #30363d;
+	--ui-4: #21262d;
+	--ui-5: #7d8590;
+	--ui-6: #e6edf3;
+	--ui-7: #ffffff;
+	--accent: #1f6feb;
+	--accent-strong: #2f81f7;
+	--accent-contrast: #ffffff;
+	--panel-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+	--danger: #f85149;
+	--focus-ring: #1f6feb;
+	--warning: #d29922;
+	--success: #3fb950;
+	--success-dim: rgb(63 185 80 / 0.13);
+	--green: var(--success);
+	--green-dim: var(--success-dim);
+	--yellow: var(--warning);
+	--yellow-dim: rgb(210 153 34 / 0.13);
+	--red: var(--danger);
+	--red-dim: rgb(248 81 73 / 0.14);
+	--purple: #d2a8ff;
+	--shadow-popover: 0 12px 34px rgb(0 0 0 / 0.34);
+	--shadow-modal: 0 24px 70px rgb(0 0 0 / 0.42);
+	--select-chevron: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237d8590' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+[data-theme="github-light"] {
+	--ui-0: #ffffff;
+	--ui-1: #f6f8fa;
+	--ui-2: #f3f4f6;
+	--ui-3: #d0d7de;
+	--ui-4: #afb8c1;
+	--ui-5: #656d76;
+	--ui-6: #1f2328;
+	--ui-7: #010409;
+	--accent: #0969da;
+	--accent-strong: #0550ae;
+	--accent-contrast: #ffffff;
+	--panel-shadow: 0 0 0 1px rgb(0 0 0 / 0.04);
+	--danger: #cf222e;
+	--focus-ring: #0969da;
+	--warning: #9a6700;
+	--success: #1a7f37;
+	--success-dim: rgb(26 127 55 / 0.12);
+	--green: var(--success);
+	--green-dim: var(--success-dim);
+	--yellow: var(--warning);
+	--yellow-dim: rgb(154 103 0 / 0.12);
+	--red: var(--danger);
+	--red-dim: rgb(207 34 46 / 0.11);
+	--purple: #8250df;
+	--shadow-popover: 0 12px 34px rgb(0 0 0 / 0.16);
+	--shadow-modal: 0 24px 70px rgb(0 0 0 / 0.22);
+	--select-chevron: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23656d76' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
 html,
 body,
 #root {
@@ -154,15 +184,19 @@ body {
 	-webkit-user-select: none;
 }
 
-[data-theme="light"] {
-	color-scheme: light;
-}
-
 [data-theme="vscode-dark"] {
 	color-scheme: dark;
 }
 
 [data-theme="vscode-light"] {
+	color-scheme: light;
+}
+
+[data-theme="github-dark"] {
+	color-scheme: dark;
+}
+
+[data-theme="github-light"] {
 	color-scheme: light;
 }
 
@@ -3446,8 +3480,13 @@ textarea,
 	color: #4ec9b0 !important;
 }
 
-[data-theme="light"] .env-token-valid,
-[data-theme="vscode-light"] .env-token-valid {
+[data-theme="github-dark"] .env-token-valid {
+	background: rgba(63, 185, 80, 0.15);
+	color: #3fb950 !important;
+}
+
+[data-theme="vscode-light"] .env-token-valid,
+[data-theme="github-light"] .env-token-valid {
 	background: rgba(9, 134, 88, 0.12);
 	color: #098658 !important;
 }
@@ -3459,8 +3498,13 @@ textarea,
 	font-weight: 600 !important;
 }
 
-[data-theme="light"] .mock-token,
-[data-theme="vscode-light"] .mock-token {
+[data-theme="github-dark"] .mock-token {
+	background: rgba(210, 153, 34, 0.18);
+	color: #d29922 !important;
+}
+
+[data-theme="vscode-light"] .mock-token,
+[data-theme="github-light"] .mock-token {
 	background: rgba(180, 83, 9, 0.14);
 	color: #b45309 !important;
 }
@@ -3995,56 +4039,6 @@ textarea,
 	white-space: nowrap;
 }
 
-/* Codex Dark editor mockup */
-.theme-card[data-theme="dark"] .theme-card__editor {
-	background: #101010;
-}
-.theme-card[data-theme="dark"] .theme-card__line:nth-child(1) {
-	background: #4ec9b0;
-	width: 28px;
-}
-.theme-card[data-theme="dark"] .theme-card__line:nth-child(2) {
-	background: #d4d4d4;
-	width: 56px;
-}
-.theme-card[data-theme="dark"] .theme-card__line:nth-child(3) {
-	background: #d4d4d4;
-	width: 40px;
-}
-.theme-card[data-theme="dark"] .theme-card__line:nth-child(4) {
-	background: #d7ba7d;
-	width: 36px;
-}
-.theme-card[data-theme="dark"] .theme-card__line:nth-child(5) {
-	background: #d4d4d4;
-	width: 48px;
-}
-
-/* Codex Light editor mockup */
-.theme-card[data-theme="light"] .theme-card__editor {
-	background: #ffffff;
-}
-.theme-card[data-theme="light"] .theme-card__line:nth-child(1) {
-	background: #267f99;
-	width: 28px;
-}
-.theme-card[data-theme="light"] .theme-card__line:nth-child(2) {
-	background: #31312f;
-	width: 56px;
-}
-.theme-card[data-theme="light"] .theme-card__line:nth-child(3) {
-	background: #31312f;
-	width: 40px;
-}
-.theme-card[data-theme="light"] .theme-card__line:nth-child(4) {
-	background: #795e26;
-	width: 36px;
-}
-.theme-card[data-theme="light"] .theme-card__line:nth-child(5) {
-	background: #31312f;
-	width: 48px;
-}
-
 /* VS Code Dark editor mockup */
 .theme-card[data-theme="vscode-dark"] .theme-card__editor {
 	background: #1f1f1f;
@@ -4092,6 +4086,56 @@ textarea,
 }
 .theme-card[data-theme="vscode-light"] .theme-card__line:nth-child(5) {
 	background: #3b3b3b;
+	width: 48px;
+}
+
+/* GitHub Dark editor mockup */
+.theme-card[data-theme="github-dark"] .theme-card__editor {
+	background: #0d1117;
+}
+.theme-card[data-theme="github-dark"] .theme-card__line:nth-child(1) {
+	background: #ff7b72;
+	width: 28px;
+}
+.theme-card[data-theme="github-dark"] .theme-card__line:nth-child(2) {
+	background: #e6edf3;
+	width: 56px;
+}
+.theme-card[data-theme="github-dark"] .theme-card__line:nth-child(3) {
+	background: #e6edf3;
+	width: 40px;
+}
+.theme-card[data-theme="github-dark"] .theme-card__line:nth-child(4) {
+	background: #a5d6ff;
+	width: 36px;
+}
+.theme-card[data-theme="github-dark"] .theme-card__line:nth-child(5) {
+	background: #e6edf3;
+	width: 48px;
+}
+
+/* GitHub Light editor mockup */
+.theme-card[data-theme="github-light"] .theme-card__editor {
+	background: #ffffff;
+}
+.theme-card[data-theme="github-light"] .theme-card__line:nth-child(1) {
+	background: #cf222e;
+	width: 28px;
+}
+.theme-card[data-theme="github-light"] .theme-card__line:nth-child(2) {
+	background: #1f2328;
+	width: 56px;
+}
+.theme-card[data-theme="github-light"] .theme-card__line:nth-child(3) {
+	background: #1f2328;
+	width: 40px;
+}
+.theme-card[data-theme="github-light"] .theme-card__line:nth-child(4) {
+	background: #0a3069;
+	width: 36px;
+}
+.theme-card[data-theme="github-light"] .theme-card__line:nth-child(5) {
+	background: #1f2328;
 	width: 48px;
 }
 

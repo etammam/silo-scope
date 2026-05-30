@@ -1,16 +1,16 @@
 import { Download, RefreshCw, RotateCcw } from "lucide-react";
 import type { AppUpdateState } from "../../shared/types";
 
-type WorkbenchTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
+type WorkbenchTheme = "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
 
 const lightThemes: { id: WorkbenchTheme; label: string }[] = [
-  { id: "light", label: "Codex Light" },
   { id: "vscode-light", label: "VS Code Light" },
+  { id: "github-light", label: "GitHub Light" },
 ];
 
 const darkThemes: { id: WorkbenchTheme; label: string }[] = [
-  { id: "dark", label: "Codex Dark" },
   { id: "vscode-dark", label: "VS Code Dark" },
+  { id: "github-dark", label: "GitHub Dark" },
 ];
 
 type SettingsPageProps = {

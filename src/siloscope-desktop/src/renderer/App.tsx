@@ -61,14 +61,14 @@ import { WorkspacesPage } from "./components/WorkspacesPage";
 import { useAppStore } from "./store";
 
 type PaneLayout = "horizontal" | "vertical";
-type WorkbenchTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
+type WorkbenchTheme = "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
 
 const themeStorageKey = "siloscope.theme";
 const workbenchThemes = [
-  "dark",
-  "light",
   "vscode-dark",
   "vscode-light",
+  "github-dark",
+  "github-light",
 ] as const;
 const applicationMenuEventName = "siloscope:application-menu-action";
 const closeApplicationRequestEventName = "siloscope:request-application-close";
@@ -1693,13 +1693,19 @@ function uniqueStrings(values: string[]): string[] {
 
 function readStoredTheme(): WorkbenchTheme {
   if (typeof window === "undefined") {
-    return "light";
+    return "vscode-light";
   }
 
   const storedTheme = window.localStorage.getItem(themeStorageKey);
-  return workbenchThemes.includes(storedTheme as WorkbenchTheme)
-    ? (storedTheme as WorkbenchTheme)
-    : "light";
+  if (workbenchThemes.includes(storedTheme as WorkbenchTheme)) {
+    return storedTheme as WorkbenchTheme;
+  }
+
+  // Migrate removed themes to their VS Code equivalents
+  if (storedTheme === "dark") return "vscode-dark";
+  if (storedTheme === "light") return "vscode-light";
+
+  return "vscode-light";
 }
 
 async function setActiveWorkspace(workspace: Workspace): Promise<boolean> {

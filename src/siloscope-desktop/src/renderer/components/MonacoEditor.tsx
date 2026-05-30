@@ -3,7 +3,7 @@ import type * as Monaco from "monaco-editor";
 import { useEffect, useRef, useState } from "react";
 import { FAKER_FIELDS, FAKER_LOCALES, hasMockTokens } from "../mockTokens";
 
-type AppTheme = "dark" | "light" | "vscode-dark" | "vscode-light";
+type AppTheme = "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
 
 function mapToMonacoTheme(theme: AppTheme): string {
   return `siloscope-${theme}`;
@@ -38,7 +38,7 @@ export function MonacoEditor({
   onChange,
   readOnly = false,
   language = "json",
-  theme = "dark",
+  theme = "vscode-dark",
   fontFamily,
   fontSize,
   markers,
@@ -247,50 +247,6 @@ export function MonacoEditor({
       });
     }
 
-    monaco.editor.defineTheme("siloscope-dark", {
-      base: "vs-dark",
-      inherit: true,
-      rules: [],
-      colors: {
-        "editor.background": "#101010",
-        "editor.foreground": "#d0d0d0",
-        "editorLineNumber.foreground": "#8a8a8a",
-        "editorLineNumber.activeForeground": "#d0d0d0",
-        "editorCursor.foreground": "#d0d0d0",
-        "editor.selectionBackground": "#3a3a3a",
-        "editor.inactiveSelectionBackground": "#2a2a2a",
-        "editor.lineHighlightBackground": "#171717",
-        "editor.lineHighlightBorder": "#00000000",
-        "editorGutter.background": "#101010",
-        "editorIndentGuide.background1": "#2a2a2a",
-        "editorIndentGuide.activeBackground1": "#3a3a3a",
-        "scrollbarSlider.background": "#3a3a3a99",
-        "scrollbarSlider.hoverBackground": "#8a8a8a66",
-        "scrollbarSlider.activeBackground": "#8a8a8a99",
-      },
-    });
-    monaco.editor.defineTheme("siloscope-light", {
-      base: "vs",
-      inherit: true,
-      rules: [],
-      colors: {
-        "editor.background": "#f7f7f6",
-        "editor.foreground": "#30302f",
-        "editorLineNumber.foreground": "#737371",
-        "editorLineNumber.activeForeground": "#30302f",
-        "editorCursor.foreground": "#30302f",
-        "editor.selectionBackground": "#d7d7d5",
-        "editor.inactiveSelectionBackground": "#e8e8e7",
-        "editor.lineHighlightBackground": "#efefee",
-        "editor.lineHighlightBorder": "#00000000",
-        "editorGutter.background": "#f7f7f6",
-        "editorIndentGuide.background1": "#d7d7d5",
-        "editorIndentGuide.activeBackground1": "#737371",
-        "scrollbarSlider.background": "#bdbdbb99",
-        "scrollbarSlider.hoverBackground": "#73737166",
-        "scrollbarSlider.activeBackground": "#73737199",
-      },
-    });
     monaco.editor.defineTheme("siloscope-vscode-dark", {
       base: "vs-dark",
       inherit: true,
@@ -298,14 +254,21 @@ export function MonacoEditor({
       colors: {
         "editor.background": "#1F1F1F",
         "editor.foreground": "#CCCCCC",
+        "editorCursor.foreground": "#CCCCCC",
+        "editor.selectionBackground": "#264F78",
         "editor.inactiveSelectionBackground": "#3A3D41",
         "editor.selectionHighlightBackground": "#ADD6FF26",
+        "editor.lineHighlightBackground": "#2A2D2E",
+        "editor.lineHighlightBorder": "#00000000",
         "editorLineNumber.foreground": "#6E7681",
         "editorLineNumber.activeForeground": "#CCCCCC",
         "editorGutter.background": "#1F1F1F",
         "editorIndentGuide.background1": "#404040",
         "editorIndentGuide.activeBackground1": "#707070",
         "editorOverviewRuler.border": "#010409",
+        "scrollbarSlider.background": "#4D4D4D99",
+        "scrollbarSlider.hoverBackground": "#7A7A7A66",
+        "scrollbarSlider.activeBackground": "#BFBFBF99",
         focusBorder: "#0078D4",
       },
     });
@@ -316,15 +279,72 @@ export function MonacoEditor({
       colors: {
         "editor.background": "#FFFFFF",
         "editor.foreground": "#3B3B3B",
+        "editorCursor.foreground": "#3B3B3B",
+        "editor.selectionBackground": "#ADD6FF",
         "editor.inactiveSelectionBackground": "#E5EBF1",
         "editor.selectionHighlightBackground": "#ADD6FF80",
+        "editor.lineHighlightBackground": "#F1F4F5",
+        "editor.lineHighlightBorder": "#00000000",
         "editorLineNumber.foreground": "#6E7681",
         "editorLineNumber.activeForeground": "#171184",
         "editorGutter.background": "#FFFFFF",
         "editorIndentGuide.background1": "#D3D3D3",
         "editorIndentGuide.activeBackground1": "#939393",
         "editorOverviewRuler.border": "#E5E5E5",
+        "scrollbarSlider.background": "#BFBFBF99",
+        "scrollbarSlider.hoverBackground": "#8A8A8A66",
+        "scrollbarSlider.activeBackground": "#7A7A7A99",
         focusBorder: "#005FB8",
+      },
+    });
+    monaco.editor.defineTheme("siloscope-github-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#0D1117",
+        "editor.foreground": "#E6EDF3",
+        "editorCursor.foreground": "#2F81F7",
+        "editor.selectionBackground": "#1A3361",
+        "editor.inactiveSelectionBackground": "#0F1B2E",
+        "editor.selectionHighlightBackground": "#2B4A30",
+        "editor.lineHighlightBackground": "#1B2128",
+        "editor.lineHighlightBorder": "#00000000",
+        "editorLineNumber.foreground": "#8B949E",
+        "editorLineNumber.activeForeground": "#E6EDF3",
+        "editorGutter.background": "#0D1117",
+        "editorIndentGuide.background1": "#2A3036",
+        "editorIndentGuide.activeBackground1": "#41474D",
+        "editorOverviewRuler.border": "#010409",
+        "scrollbarSlider.background": "#2D353F",
+        "scrollbarSlider.hoverBackground": "#333B45",
+        "scrollbarSlider.activeBackground": "#39414B",
+        focusBorder: "#1F6FEB",
+      },
+    });
+    monaco.editor.defineTheme("siloscope-github-light", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#FFFFFF",
+        "editor.foreground": "#1F2328",
+        "editorCursor.foreground": "#0969DA",
+        "editor.selectionBackground": "#D4E2F5",
+        "editor.inactiveSelectionBackground": "#EDF2F9",
+        "editor.selectionHighlightBackground": "#DAF5E0",
+        "editor.lineHighlightBackground": "#F3F5F7",
+        "editor.lineHighlightBorder": "#00000000",
+        "editorLineNumber.foreground": "#8C959F",
+        "editorLineNumber.activeForeground": "#1F2328",
+        "editorGutter.background": "#FFFFFF",
+        "editorIndentGuide.background1": "#DFE1E3",
+        "editorIndentGuide.activeBackground1": "#C4C6C9",
+        "editorOverviewRuler.border": "#FFFFFF",
+        "scrollbarSlider.background": "#D5D8DB",
+        "scrollbarSlider.hoverBackground": "#D0D3D7",
+        "scrollbarSlider.activeBackground": "#CBCED2",
+        focusBorder: "#0969DA",
       },
     });
   };

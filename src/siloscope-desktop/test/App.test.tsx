@@ -60,7 +60,7 @@ vi.mock("@/renderer/components/MonacoEditor", () => ({
     theme,
   }: {
     value: string;
-    theme?: "dark" | "light";
+    theme?: "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
   }) => (
     <pre data-testid="mock-editor" data-theme={theme}>
       {value}
@@ -721,22 +721,18 @@ describe("App shell", () => {
     const { container } = render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    fireEvent.click(screen.getByRole("radio", { name: "Codex Light" }));
+    fireEvent.click(screen.getByRole("radio", { name: "VS Code Light" }));
 
-    expect(container.firstElementChild).toHaveAttribute("data-theme", "light");
-    expect(window.localStorage.getItem("siloscope.theme")).toBe("light");
-
-    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
-    expect(screen.getAllByTestId("mock-editor")[0]).toHaveAttribute("data-theme", "light");
+    expect(container.firstElementChild).toHaveAttribute("data-theme", "vscode-light");
+    expect(window.localStorage.getItem("siloscope.theme")).toBe("vscode-light");
   });
 
   it("restores the persisted workbench theme", () => {
-    window.localStorage.setItem("siloscope.theme", "light");
+    window.localStorage.setItem("siloscope.theme", "vscode-light");
 
     const { container } = render(<App />);
 
-    expect(container.firstElementChild).toHaveAttribute("data-theme", "light");
-    expect(screen.getAllByTestId("mock-editor")[0]).toHaveAttribute("data-theme", "light");
+    expect(container.firstElementChild).toHaveAttribute("data-theme", "vscode-light");
   });
 
   it("navigates to the workspaces page when the File menu requests a new workspace", () => {

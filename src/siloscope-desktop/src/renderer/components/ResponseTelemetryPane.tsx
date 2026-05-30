@@ -14,7 +14,7 @@ type ResponseTelemetryPaneProps = {
   activeTab: ResponsePaneTab;
   onTabChange: (tab: ResponsePaneTab) => void;
   result: InvocationResult | null;
-  theme: "dark" | "light" | "vscode-dark" | "vscode-light";
+  theme: "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
   invocationHistory?: InvocationHistoryEntry[];
   fontFamily?: string;
   fontSize?: number;
