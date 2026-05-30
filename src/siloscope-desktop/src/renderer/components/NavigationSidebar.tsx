@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import {
+  AlertCircle,
+  Briefcase,
   CheckCircle2,
   ChevronRight,
   ChevronDown,
@@ -119,6 +121,10 @@ export function NavigationSidebar({
 function WorkspaceNavigator({
   grains,
   isConnected,
+  onConnectCluster,
+  onDiscoverGrains,
+  onLoadWorkspace,
+  onNewWorkspace,
   onSelectFunction,
   selectedGrain,
   selectedFunctionId,
@@ -151,6 +157,7 @@ function WorkspaceNavigator({
   const catalogMetrics = useMemo(() => getCatalogMetrics(catalog.sources), [catalog.sources]);
   const visibleMetrics = useMemo(() => getCatalogMetrics(filteredSources), [filteredSources]);
   const hasCatalogQuery = catalogQuery.trim().length > 0;
+  const hasAnyInterfaces = filteredSources.some((source) => source.interfaces.length > 0);
   const isLargeCatalog =
     catalogMetrics.functions > largeCatalogFunctionThreshold ||
     catalogMetrics.interfaces > largeCatalogInterfaceThreshold;
@@ -246,7 +253,7 @@ function WorkspaceNavigator({
               : "All discovered functions visible"}
         </div>
         <div className="navigation-sidebar__sources-container">
-          {filteredSources.length > 0 ? (
+          {hasAnyInterfaces ? (
             <ul className="navigation-sidebar__tree navigation-sidebar__catalog">
             {filteredSources.map((source) => (
               <li key={source.sourceId} className="navigation-sidebar__source-item">
@@ -317,17 +324,77 @@ function WorkspaceNavigator({
               </li>
             ))}
           </ul>
-        ) : (
-            <div className="navigation-sidebar__empty">
-              {hasCatalogQuery
-                ? `No functions match "${catalogQuery.trim()}"`
-                : workspace
-                ? isConnected
-                  ? "No functions discovered"
-                  : "Connect to discover source functions"
-                : "No cluster loaded"}
+        ) : hasCatalogQuery ? (
+          <div className="navigation-sidebar__empty">
+            No functions match &quot;{catalogQuery.trim()}&quot;
+          </div>
+        ) : !workspace ? (
+          <div className="navigation-sidebar__empty-state">
+            <div className="navigation-sidebar__empty-icon">
+              <Briefcase aria-hidden="true" width={32} height={32} />
             </div>
-          )}
+            <strong>No cluster loaded</strong>
+            <span>Load or create a cluster to start discovering grain functions.</span>
+            <div className="navigation-sidebar__empty-actions">
+              {onLoadWorkspace && (
+                <button
+                  className="navigation-sidebar__empty-action"
+                  onClick={onLoadWorkspace}
+                  type="button"
+                >
+                  Load Cluster
+                </button>
+              )}
+              {onNewWorkspace && (
+                <button
+                  className="navigation-sidebar__empty-action navigation-sidebar__empty-action--secondary"
+                  onClick={onNewWorkspace}
+                  type="button"
+                >
+                  New Cluster
+                </button>
+              )}
+            </div>
+          </div>
+        ) : !isConnected ? (
+          <div className="navigation-sidebar__empty-state">
+            <div className="navigation-sidebar__empty-icon">
+              <AlertCircle aria-hidden="true" width={32} height={32} />
+            </div>
+            <strong>Cluster not connected</strong>
+            <span>Connect to your cluster to discover and browse available grain functions.</span>
+            {onConnectCluster && (
+              <div className="navigation-sidebar__empty-actions">
+                <button
+                  className="navigation-sidebar__empty-action"
+                  onClick={onConnectCluster}
+                  type="button"
+                >
+                  Connect
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="navigation-sidebar__empty-state">
+            <div className="navigation-sidebar__empty-icon">
+              <Search aria-hidden="true" width={32} height={32} />
+            </div>
+            <strong>No functions discovered</strong>
+            <span>Your cluster is connected but no grain interfaces were found.</span>
+            {onDiscoverGrains && (
+              <div className="navigation-sidebar__empty-actions">
+                <button
+                  className="navigation-sidebar__empty-action"
+                  onClick={onDiscoverGrains}
+                  type="button"
+                >
+                  Discover Grains
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         </div>
       </section>
 

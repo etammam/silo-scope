@@ -2,26 +2,30 @@ import {
   Box,
   Briefcase,
   Folder,
+  Layers,
   Package,
+  Play,
   Search,
+  Square,
   X,
   type LucideIcon,
 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  EnvironmentProfile,
   NugetFeed,
   SourceCatalogFunction,
   SourceOwnedCatalog,
   Workspace,
 } from "../../shared/types";
 
-type SearchResultType = "workspace" | "feed" | "interface" | "function";
+type SearchResultType =
+  | "workspace"
+  | "feed"
+  | "interface"
+  | "function"
+  | "command"
+  | "environment";
 
 interface SearchResult {
   id: string;
@@ -38,10 +42,17 @@ interface QuickAccessPanelProps {
   workspaces: Workspace[];
   feeds: NugetFeed[];
   sourceCatalog: SourceOwnedCatalog;
+  workspace: Workspace | null;
+  isConnected: boolean;
+  environments: EnvironmentProfile[];
+  activeEnvironment: string | null;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectFeed: () => void;
   onSelectInterface: (interfaceId: string) => void;
   onSelectFunction: (functionId: string) => void;
+  onConnectCluster: () => void;
+  onDisconnectCluster: () => void;
+  onSwitchEnvironment: (envName: string) => void;
 }
 
 export function QuickAccessPanel({
@@ -50,10 +61,17 @@ export function QuickAccessPanel({
   workspaces,
   feeds,
   sourceCatalog,
+  workspace,
+  isConnected,
+  environments,
+  activeEnvironment,
   onSelectWorkspace,
   onSelectFeed,
   onSelectInterface,
   onSelectFunction,
+  onConnectCluster,
+  onDisconnectCluster,
+  onSwitchEnvironment,
 }: QuickAccessPanelProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -64,9 +82,58 @@ export function QuickAccessPanel({
     const normalizedQuery = query.trim().toLowerCase();
     const allResults: SearchResult[] = [];
 
+    // Commands
+    if (workspace && !isConnected) {
+      const text = `connect cluster ${workspace.name}`.toLowerCase();
+      if (!normalizedQuery || text.includes(normalizedQuery)) {
+        allResults.push({
+          id: "command:connect",
+          type: "command",
+          title: "Connect cluster",
+          subtitle: `Connect to ${workspace.name}`,
+          icon: Play,
+          data: "connect",
+        });
+      }
+    }
+
+    if (isConnected) {
+      const text = "disconnect cluster".toLowerCase();
+      if (!normalizedQuery || text.includes(normalizedQuery)) {
+        allResults.push({
+          id: "command:disconnect",
+          type: "command",
+          title: "Disconnect cluster",
+          subtitle: "Disconnect from current cluster",
+          icon: Square,
+          data: "disconnect",
+        });
+      }
+    }
+
+    // Environments
+    for (const env of environments) {
+      const text =
+        `${env.name} environment ${activeEnvironment === env.name ? "active" : ""}`.toLowerCase();
+      if (!normalizedQuery || text.includes(normalizedQuery)) {
+        allResults.push({
+          id: `environment:${env.name}`,
+          type: "environment",
+          title: env.name,
+          subtitle:
+            activeEnvironment === env.name
+              ? "Active environment"
+              : "Environment profile",
+          icon: Layers,
+          data: env,
+        });
+      }
+    }
+
     // Workspaces / clusters
     for (const workspace of workspaces) {
-      const text = `${workspace.name} ${workspace.siloAddress} ${workspace.clusterId ?? ""}`.toLowerCase();
+      const text =
+        `${workspace.name} ${workspace.siloAddress} ${workspace.clusterId ?? ""}`.toLowerCase();
       if (!normalizedQuery || text.includes(normalizedQuery)) {
         allResults.push({
           id: `workspace:${workspace.id}`,
@@ -97,7 +164,8 @@ export function QuickAccessPanel({
     // Interfaces and functions from source catalog
     for (const source of sourceCatalog.sources) {
       for (const catalogInterface of source.interfaces) {
-        const interfaceText = `${catalogInterface.interfaceName} ${catalogInterface.namespace}`.toLowerCase();
+        const interfaceText =
+          `${catalogInterface.interfaceName} ${catalogInterface.namespace}`.toLowerCase();
         if (!normalizedQuery || interfaceText.includes(normalizedQuery)) {
           allResults.push({
             id: `interface:${catalogInterface.interfaceId}`,
@@ -113,7 +181,8 @@ export function QuickAccessPanel({
         }
 
         for (const method of catalogInterface.methods) {
-          const methodText = `${method.methodName} ${method.signature} ${method.returnType}`.toLowerCase();
+          const methodText =
+            `${method.methodName} ${method.signature} ${method.returnType}`.toLowerCase();
           const paramText = method.parameters
             .map((p) => `${p.name} ${p.typeName}`)
             .join(" ")
@@ -137,7 +206,16 @@ export function QuickAccessPanel({
     }
 
     return allResults;
-  }, [query, workspaces, feeds, sourceCatalog]);
+  }, [
+    query,
+    workspaces,
+    feeds,
+    sourceCatalog,
+    workspace,
+    isConnected,
+    environments,
+    activeEnvironment,
+  ]);
 
   // Reset selection when results change
   useEffect(() => {
@@ -170,17 +248,13 @@ export function QuickAccessPanel({
 
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        setSelectedIndex((prev) =>
-          prev < results.length - 1 ? prev + 1 : 0,
-        );
+        setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : 0));
         return;
       }
 
       if (event.key === "ArrowUp") {
         event.preventDefault();
-        setSelectedIndex((prev) =>
-          prev > 0 ? prev - 1 : results.length - 1,
-        );
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : results.length - 1));
         return;
       }
 
@@ -237,10 +311,33 @@ export function QuickAccessPanel({
           onSelectFunction(method.functionId);
           break;
         }
+        case "command": {
+          const command = result.data as string;
+          if (command === "connect") {
+            onConnectCluster();
+          } else if (command === "disconnect") {
+            onDisconnectCluster();
+          }
+          break;
+        }
+        case "environment": {
+          const env = result.data as EnvironmentProfile;
+          onSwitchEnvironment(env.name);
+          break;
+        }
       }
       onClose();
     },
-    [onSelectWorkspace, onSelectFeed, onSelectInterface, onSelectFunction, onClose],
+    [
+      onSelectWorkspace,
+      onSelectFeed,
+      onSelectInterface,
+      onSelectFunction,
+      onConnectCluster,
+      onDisconnectCluster,
+      onSwitchEnvironment,
+      onClose,
+    ],
   );
 
   if (!isOpen) {
@@ -271,10 +368,10 @@ export function QuickAccessPanel({
           />
           <input
             ref={inputRef}
-            aria-label="Search feeds, clusters, interfaces and grains"
+            aria-label="Search commands, environments, feeds, clusters, interfaces and grains"
             className="quick-access-input"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search feeds, clusters, interfaces and grains..."
+            placeholder="Search commands, environments, feeds, clusters, interfaces and grains..."
             type="text"
             value={query}
           />
@@ -376,6 +473,8 @@ interface GroupedResults {
 
 function groupResults(results: SearchResult[]): GroupedResults[] {
   const order: SearchResultType[] = [
+    "command",
+    "environment",
     "workspace",
     "feed",
     "interface",
@@ -402,6 +501,10 @@ function groupResults(results: SearchResult[]): GroupedResults[] {
 
 function formatGroupLabel(type: SearchResultType): string {
   switch (type) {
+    case "command":
+      return "Commands";
+    case "environment":
+      return "Environments";
     case "workspace":
       return "Clusters";
     case "feed":
@@ -415,6 +518,10 @@ function formatGroupLabel(type: SearchResultType): string {
 
 function formatTypeLabel(type: SearchResultType): string {
   switch (type) {
+    case "command":
+      return "Command";
+    case "environment":
+      return "Environment";
     case "workspace":
       return "Cluster";
     case "feed":
