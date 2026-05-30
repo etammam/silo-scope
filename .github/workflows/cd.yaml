@@ -102,4 +102,4 @@ jobs:
       - name: Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx -p semantic-release -p @semantic-release/changelog -p @semantic-release/git semantic-release
+        run: npx -p semantic-release -p @semantic-release/changelog -p @semantic-release/git -p conventional-changelog-conventionalcommits semantic-release
