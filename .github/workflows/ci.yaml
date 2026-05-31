@@ -86,7 +86,7 @@ jobs:
           dotnet list package --outdated --format json > outdated-packages.json || echo '{"projects":[]}' > outdated-packages.json
 
       - name: Upload outdated package list
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: outdated-packages
           path: outdated-packages.json
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload test and coverage results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-coverage-results-${{ github.run_number }}
           path: ./TestResults/coverage
@@ -144,7 +144,7 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
 
       - name: Upload Core sidecar artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: siloscope-core-${{ matrix.runtime }}
           path: artifacts/core/${{ matrix.runtime }}
@@ -239,7 +239,7 @@ jobs:
         run: bun run build:stable
 
       - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: |
