@@ -154,7 +154,7 @@ const grains: GrainInterfaceDescriptor[] = sourceCatalog.sources.flatMap(
     })),
 );
 
-const workspaces: Workspace[] = [
+let persistedWorkspaces: Workspace[] = [
   {
     id: "ws:banking",
     name: "Banking Sample Cluster",
@@ -350,8 +350,8 @@ function echoInvocation(payload: string): InvocationResult {
   };
 }
 
-// ponytail: in-memory persistence only; replaced by real storage when IPC lands.
-let persistedWorkspace = workspaces[0];
+// ponytail: in-memory persistence; delegates to window.api.clusters when available.
+let persistedWorkspace: Workspace | null = persistedWorkspaces[0] ?? null;
 let persistedFeeds = [...nugetFeeds];
 let persistedEnvironments: EnvironmentConfig = {
   profiles: environments,
@@ -362,19 +362,32 @@ export const rpc = {
   request: {
     loadWorkspace: async (params?: {
       path?: string;
-    }): Promise<{ workspace: Workspace }> => ({
-      workspace: persistedWorkspace,
-    }),
+    }): Promise<{ workspace: Workspace }> => {
+      if (!persistedWorkspace) {
+        throw new Error("No workspace available.");
+      }
+      return { workspace: persistedWorkspace };
+    },
     setActiveWorkspace: async (params: {
       workspace: Workspace;
-    }): Promise<{ workspace: Workspace }> => ({
-      workspace: params.workspace,
-    }),
+    }): Promise<{ workspace: Workspace }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        return window.api.clusters.setActive(params.workspace);
+      }
+      return { workspace: params.workspace };
+    },
     saveWorkspace: async (params: {
       workspace: Workspace;
       path?: string;
     }): Promise<{ success: boolean }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        const saved = await window.api.clusters.save(params.workspace);
+        persistedWorkspaces = upsertById(persistedWorkspaces, saved);
+        persistedWorkspace = saved;
+        return { success: true };
+      }
       persistedWorkspace = params.workspace;
+      persistedWorkspaces = upsertById(persistedWorkspaces, params.workspace);
       return { success: true };
     },
     getEnvironments: async (params: {
@@ -399,10 +412,16 @@ export const rpc = {
     connectCluster: async (params: {
       workspace: Workspace;
     }): Promise<{ message: string }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        return window.api.clusters.connect(params.workspace);
+      }
       await delay(500);
       return { message: "Connected to cluster via gateway localhost:30000." };
     },
     disconnectCluster: async (): Promise<{ success: boolean }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        return window.api.clusters.disconnect();
+      }
       await delay(150);
       return { success: true };
     },
@@ -412,19 +431,29 @@ export const rpc = {
       grains: GrainInterfaceDescriptor[];
       sourceCatalog: SourceOwnedCatalog;
     }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        return window.api.clusters.discoverGrains(params.workspaceId);
+      }
       await delay(600);
       return { grains, sourceCatalog };
     },
     getGrains: async (): Promise<{
       grains: GrainInterfaceDescriptor[];
       sourceCatalog: SourceOwnedCatalog;
-    }> => ({
-      grains,
-      sourceCatalog,
-    }),
+    }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        return window.api.clusters.getGrains();
+      }
+      return { grains, sourceCatalog };
+    },
     getSourceCatalog: async (): Promise<{
       sourceCatalog: SourceOwnedCatalog;
-    }> => ({ sourceCatalog }),
+    }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        return window.api.clusters.getSourceCatalog();
+      }
+      return { sourceCatalog };
+    },
     listNugetFeeds: async (): Promise<{ feeds: NugetFeed[] }> => ({
       feeds: persistedFeeds,
     }),
@@ -493,9 +522,12 @@ export const rpc = {
       gateway?: string;
       sourceUrl?: string;
       feedName?: string;
-    }): Promise<{ workspace: Workspace }> => ({
-      workspace: persistedWorkspace,
-    }),
+    }): Promise<{ workspace: Workspace }> => {
+      if (!persistedWorkspace) {
+        throw new Error("No workspace available.");
+      }
+      return { workspace: persistedWorkspace };
+    },
     invokeGrain: async (params: {
       grainType: string;
       method: string;
@@ -504,6 +536,9 @@ export const rpc = {
       sourceId?: string;
       functionId?: string;
     }): Promise<InvocationResult> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        return window.api.clusters.invokeGrain(params);
+      }
       await delay(300 + Math.random() * 500);
       if (params.grainKey.toLowerCase() === "fail") {
         return {
@@ -515,9 +550,28 @@ export const rpc = {
       }
       return echoInvocation(params.payload);
     },
-    getWorkspaces: async (): Promise<{ workspaces: Workspace[] }> => ({
-      workspaces,
-    }),
+    getWorkspaces: async (): Promise<{ workspaces: Workspace[] }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        const clusters = await window.api.clusters.list();
+        persistedWorkspaces = clusters;
+        return { workspaces: clusters };
+      }
+      return { workspaces: persistedWorkspaces };
+    },
+    deleteWorkspace: async (params: {
+      id: string;
+    }): Promise<{ success: boolean }> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        await window.api.clusters.remove(params.id);
+      }
+      persistedWorkspaces = persistedWorkspaces.filter(
+        (w) => w.id !== params.id,
+      );
+      if (persistedWorkspace?.id === params.id) {
+        persistedWorkspace = persistedWorkspaces[0] ?? null;
+      }
+      return { success: true };
+    },
     getBackendLogs: async (): Promise<{ entries: LogEntry[] }> => ({
       entries: backendLogs,
     }),
@@ -547,15 +601,22 @@ export const rpc = {
     closeWindow: async (): Promise<{ success: boolean }> => ({ success: true }),
   },
   send: {
-    openFileDialog: (options?: {
+    openFileDialog: async (options?: {
       allowedFileTypes?: string;
       canChooseFiles?: boolean;
       canChooseDirectories?: boolean;
       allowsMultipleSelection?: boolean;
-    }): void => {
+    }): Promise<void> => {
+      let paths: string[] = [];
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        const picked = await window.api.clusters.pickSourceFile();
+        paths = picked ? [picked] : [];
+      } else {
+        paths = ["/tmp/mock-workspace.json"];
+      }
       window.dispatchEvent(
         new CustomEvent("filePicked", {
-          detail: { paths: ["/tmp/mock-workspace.json"] },
+          detail: { paths },
         }),
       );
     },
@@ -567,3 +628,11 @@ export const rpc = {
     },
   },
 };
+
+function upsertById<T extends { id: string }>(list: T[], item: T): T[] {
+  const idx = list.findIndex((c) => c.id === item.id);
+  if (idx === -1) return [...list, item];
+  const updated = [...list];
+  updated[idx] = item;
+  return updated;
+}

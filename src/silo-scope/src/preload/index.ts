@@ -57,6 +57,55 @@ const api: RendererApi = {
         config,
       }),
   },
+  sidecar: {
+    status: () => ipcRenderer.invoke("siloscope:sidecar-status"),
+    restart: () => ipcRenderer.invoke("siloscope:sidecar-restart"),
+  },
+  onSidecarLog: (
+    callback: (entry: {
+      timestamp: string;
+      level: string;
+      category?: string;
+      message: string;
+    }) => void,
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      entry: {
+        timestamp: string;
+        level: string;
+        category?: string;
+        message: string;
+      },
+    ) => callback(entry);
+    ipcRenderer.on("siloscope:sidecar-log", handler);
+    return () => {
+      ipcRenderer.removeListener("siloscope:sidecar-log", handler);
+    };
+  },
+  clusters: {
+    list: () => ipcRenderer.invoke("siloscope:clusters-list"),
+    save: (cluster) =>
+      ipcRenderer.invoke("siloscope:clusters-save", { cluster }),
+    remove: (id: string) =>
+      ipcRenderer.invoke("siloscope:clusters-delete", { id }),
+    pickSourceFile: () =>
+      ipcRenderer.invoke("siloscope:select-source-file"),
+    connect: (cluster) =>
+      ipcRenderer.invoke("siloscope:connect-cluster", { workspace: cluster }),
+    disconnect: () =>
+      ipcRenderer.invoke("siloscope:disconnect-cluster"),
+    setActive: (cluster) =>
+      ipcRenderer.invoke("siloscope:set-active-workspace", { workspace: cluster }),
+    discoverGrains: (workspaceId: string) =>
+      ipcRenderer.invoke("siloscope:discover-grains", { workspaceId }),
+    getGrains: () =>
+      ipcRenderer.invoke("siloscope:get-grains"),
+    getSourceCatalog: () =>
+      ipcRenderer.invoke("siloscope:get-source-catalog"),
+    invokeGrain: (params) =>
+      ipcRenderer.invoke("siloscope:invoke-grain", params),
+  },
 };
 
 contextBridge.exposeInMainWorld("api", api);

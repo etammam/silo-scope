@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Layers,
   LayoutTemplate,
+  Loader2,
   PanelLeftClose,
   PanelRightClose,
   Play,
@@ -55,6 +56,8 @@ import { QuickAccessPanel } from "./components/QuickAccessPanel";
 import { EnvironmentPage } from "./components/EnvironmentPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { WorkspacesPage } from "./components/WorkspacesPage";
+import { ConnectionStatusBar } from "./components/ConnectionStatusBar";
+import { SidecarStatus } from "./components/SidecarStatus";
 import { useAppStore } from "./store";
 
 type PaneLayout = "horizontal" | "vertical";
@@ -94,6 +97,10 @@ function App() {
     grains,
     invocationResult,
     isConnected,
+    connectionStatus,
+    connectionStep,
+    connectionError,
+    setConnectionStatus,
     selectedGrain,
     selectedFunctionId,
     selectedMethod,
@@ -205,10 +212,11 @@ function App() {
     (path: string) => {
       setStoragePath(path);
       setStorageReady(true);
-      // Refresh feeds now that storage is ready
+      // Refresh persisted data now that storage is ready
       void refreshNugetFeeds();
+      void refreshPersistedWorkspaces().then(setWorkspaces);
     },
-    [setStoragePath, setStorageReady],
+    [setStoragePath, setStorageReady, setWorkspaces],
   );
 
   const handleChangeStorage = useCallback(async (): Promise<string | null> => {
@@ -229,18 +237,48 @@ function App() {
     setStoragePath(selectedPath);
     setStorageReady(true);
     void refreshNugetFeeds();
+    void refreshPersistedWorkspaces().then(setWorkspaces);
     return selectedPath;
-  }, [setStoragePath, setStorageReady]);
+  }, [setStoragePath, setStorageReady, setWorkspaces]);
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
 
   useEffect(() => {
-    void refreshPersistedWorkspaces();
+    void refreshPersistedWorkspaces().then(setWorkspaces);
     void refreshAppUpdateState();
     void refreshBackendLogs();
     void refreshEnvironments(workspace?.id ?? null);
     void initializeStorage(); // calls refreshNugetFeeds() internally once storage is ready
+  }, []);
+
+  // Forward sidecar log messages to connection status during connect
+  useEffect(() => {
+    if (!window.api?.onSidecarLog) return;
+    return window.api.onSidecarLog((entry) => {
+      const store = useAppStore.getState();
+      if (store.connectionStatus !== "connecting") return;
+
+      const msg = entry.message;
+      // Map known sidecar log messages to user-friendly steps
+      if (msg.includes("Restoring NuGet package") || msg.includes("restore")) {
+        const match = msg.match(/Restoring NuGet package (.+?) /);
+        store.setConnectionStatus("connecting", `Downloading ${match?.[1] ?? "packages"}…`);
+      } else if (msg.includes("Downloading ")) {
+        const match = msg.match(/Downloading (.+?) from/);
+        store.setConnectionStatus("connecting", `Downloading ${match?.[1] ?? "package"}…`);
+      } else if (msg.includes("Package extracted")) {
+        store.setConnectionStatus("connecting", "Extracting package…");
+      } else if (msg.includes("Connecting to cluster")) {
+        store.setConnectionStatus("connecting", "Connecting to Orleans cluster…");
+      } else if (msg.includes("Loading entry")) {
+        const match = msg.match(/Loading entry \d+: type=(.+?),/);
+        store.setConnectionStatus("connecting", `Loading ${match?.[1] ?? "source"}…`);
+      } else if (msg.includes("discovered") && msg.includes("grains")) {
+        const match = msg.match(/(\d+) grains/);
+        store.setConnectionStatus("connecting", `Discovered ${match?.[1] ?? ""} grains`);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -293,9 +331,20 @@ function App() {
       setSelectedGrain(null);
       setSelectedMethod(null);
     }
+    // Keep connectionStatus in sync with isConnected when set from outside
+    // connectCluster / disconnectCluster
+    if (!previousIsConnected.current && isConnected) {
+      useAppStore
+        .getState()
+        .setConnectionStatus("connected", `Connected — ${workspace?.name ?? "cluster"}`);
+    }
+    if (previousIsConnected.current && !isConnected) {
+      useAppStore.getState().setConnectionStatus("disconnected");
+    }
     previousIsConnected.current = isConnected;
   }, [
     isConnected,
+    workspace?.name,
     setSelectedFunction,
     setSelectedGrain,
     setSelectedMethod,
@@ -842,6 +891,14 @@ function App() {
         setHydratedWorkspaceId(null);
         void refreshEnvironments(null);
       }
+      // Best-effort disk delete (fire-and-forget)
+      void rpc.request.deleteWorkspace({ id: workspaceId }).catch(() => {
+        useAppStore.getState().addLog({
+          timestamp: new Date().toISOString(),
+          level: "error",
+          message: "Failed to delete cluster from disk.",
+        });
+      });
     },
     [setWorkspace, workspace],
   );
@@ -981,35 +1038,6 @@ function App() {
             <span>{workspace?.name ?? "My Workspace"}</span>
             <ChevronDown aria-hidden="true" width={12} height={12} />
           </button>
-          <span
-            className={`workspace-connection-state ${isConnected ? "workspace-connection-state--connected" : ""}`}
-            title={isConnected ? "Connected" : "Disconnected"}
-          >
-            <span aria-hidden="true" />
-            {isConnected ? "Connected" : "Disconnected"}
-          </span>
-          <button
-            aria-label={isConnected ? "Disconnect cluster" : "Connect cluster"}
-            aria-pressed={isConnected}
-            className="workspace-connection-toggle"
-            disabled={!workspace || (!isConnected && !workspace)}
-            onClick={() => {
-              if (isConnected) {
-                void disconnectCluster();
-                return;
-              }
-
-              void connectCluster();
-            }}
-            title={isConnected ? "Disconnect cluster" : "Connect cluster"}
-            type="button"
-          >
-            {isConnected ? (
-              <Square aria-hidden="true" width={12} height={12} />
-            ) : (
-              <Play aria-hidden="true" width={12} height={12} />
-            )}
-          </button>
           {isWorkspaceMenuOpen && (
             <div className="workspace-menu" role="menu">
               {workspaces.length === 0 ? (
@@ -1050,6 +1078,27 @@ function App() {
               )}
             </div>
           )}
+          <button
+            className={`app-titlebar__connect electrobun-webkit-app-region-no-drag ${isConnected ? "app-titlebar__connect--connected" : ""} ${connectionStatus === "connecting" ? "app-titlebar__connect--connecting" : ""}`}
+            disabled={!workspace || connectionStatus === "connecting"}
+            onClick={() => {
+              if (isConnected) {
+                void disconnectCluster();
+                return;
+              }
+              void connectCluster();
+            }}
+            title={isConnected ? "Disconnect" : connectionStatus === "connecting" ? connectionStep : "Connect"}
+            type="button"
+          >
+            {isConnected ? (
+              <Square aria-hidden="true" fill="currentColor" width={12} height={12} />
+            ) : connectionStatus === "connecting" ? (
+              <Loader2 aria-hidden="true" className="app-titlebar__connect-spinner" width={13} height={13} />
+            ) : (
+              <Play aria-hidden="true" fill="currentColor" width={12} height={12} />
+            )}
+          </button>
         </div>
         <button
           className="app-titlebar__command electrobun-webkit-app-region-no-drag"
@@ -1443,17 +1492,27 @@ function App() {
         />
       )}
       <footer className="global-status-bar">
-        <div className="global-status-bar__workspace">
-          <span data-connected={isConnected}>
-            {isConnected ? "Online" : "Offline"}
-          </span>
-          <small>{workspace?.name ?? "No active cluster"}</small>
-        </div>
-        <div className="global-status-bar__center">
-          <span className="global-status-bar__version">
-            v0.1.0 • Electron {window.api?.versions?.electron ?? "browser"}
-          </span>
-        </div>
+        <span className="global-status-bar__label">Cluster</span>
+        <ConnectionStatusBar
+          status={connectionStatus}
+          step={connectionStep}
+          error={connectionError}
+          clusterName={workspace?.name}
+          onDismissError={() => setConnectionStatus("disconnected")}
+        />
+        <span className="global-status-bar__sep" aria-hidden="true" />
+        <span className="global-status-bar__label">Core</span>
+        <SidecarStatus
+          checkStatus={async () => {
+            if (window.api?.sidecar) return window.api.sidecar.status();
+            return { running: true };
+          }}
+          restart={async () => {
+            if (window.api?.sidecar) return window.api.sidecar.restart();
+            return { running: true };
+          }}
+        />
+        <span className="global-status-bar__spacer" />
         <BackendLogStatusButton
           entries={logs}
           isOpen={isLogPanelVisible}
@@ -1785,23 +1844,24 @@ function upsertWorkspace(
   );
 }
 
-async function refreshPersistedWorkspaces() {
+async function refreshPersistedWorkspaces(): Promise<Workspace[]> {
   try {
     const response = await rpc.request.getWorkspaces();
     const store = useAppStore.getState();
-    const workspaces = response.workspaces;
+    const loaded = response.workspaces;
 
     window.dispatchEvent(
       new CustomEvent<Workspace[]>("siloscope:workspaces-loaded", {
-        detail: workspaces,
+        detail: loaded,
       }),
     );
-    if (!store.workspace && workspaces.length > 0) {
-      const firstWorkspace = workspaces[0];
+    if (!store.workspace && loaded.length > 0) {
+      const firstWorkspace = loaded[0];
       store.setWorkspace(firstWorkspace);
       await setActiveWorkspace(firstWorkspace);
       void refreshEnvironments(firstWorkspace.id);
     }
+    return loaded;
   } catch (error) {
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
@@ -1811,6 +1871,7 @@ async function refreshPersistedWorkspaces() {
           ? error.message
           : "Failed to load persisted workspaces.",
     });
+    return [];
   }
 }
 
@@ -1970,68 +2031,74 @@ async function connectCluster() {
     return;
   }
 
+  const store = useAppStore.getState();
+  store.setConnectionStatus("connecting", "Setting active workspace…");
+
   try {
     if (!(await setActiveWorkspace(workspace))) {
+      store.setConnectionStatus("error", "", "Failed to set active workspace.");
       return;
     }
 
+    store.setConnectionStatus("connecting", "Connecting to cluster…");
     const response = await rpc.request.connectCluster({
       workspace,
     });
-    const store = useAppStore.getState();
     store.setIsConnected(true);
     store.addLog({
       timestamp: new Date().toISOString(),
       level: "info",
       message: response.message,
     });
+
+    store.setConnectionStatus("connecting", "Discovering grain interfaces…");
     await refreshWorkspaceCatalog(workspace.id);
+    store.setConnectionStatus("connected", `Connected — ${workspace.name}`);
   } catch (error) {
-    const store = useAppStore.getState();
+    const message =
+      error instanceof Error ? error.message : "Failed to connect cluster.";
     store.setIsConnected(false);
+    store.setConnectionStatus("error", "", message);
     store.addLog({
       timestamp: new Date().toISOString(),
       level: "error",
-      message:
-        error instanceof Error ? error.message : "Failed to connect cluster.",
+      message,
     });
   }
 }
 
 async function disconnectCluster() {
+  const store = useAppStore.getState();
+  store.setConnectionStatus("connecting", "Disconnecting…");
   try {
     await rpc.request.disconnectCluster();
-    const store = useAppStore.getState();
     store.setGrains([]);
     store.setSourceCatalog({ sources: [] });
     store.setInvocationResult(null);
     store.setIsConnected(false);
+    store.setConnectionStatus("disconnected");
     store.addLog({
       timestamp: new Date().toISOString(),
       level: "info",
       message: "Cluster disconnected.",
     });
   } catch (error) {
-    useAppStore.getState().addLog({
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to disconnect cluster.";
+    store.setIsConnected(false);
+    store.setConnectionStatus("error", "", message);
+    store.addLog({
       timestamp: new Date().toISOString(),
       level: "error",
-      message:
-        error instanceof Error
-          ? error.message
-          : "Failed to disconnect cluster.",
+      message,
     });
   }
 }
 
 async function refreshWorkspaceCatalog(workspaceId: string) {
   try {
-    const workspace = useAppStore.getState().workspace;
-    if (workspace) {
-      if (!(await setActiveWorkspace(workspace))) {
-        return;
-      }
-    }
-
     const response = await rpc.request.discoverGrains({
       workspaceId,
     });

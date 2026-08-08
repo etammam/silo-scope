@@ -154,6 +154,13 @@ export const workspaceSchema = z.object({
 });
 export type Workspace = z.infer<typeof workspaceSchema>;
 
+// ─── Cluster persistence ─────────────────────────────────────────────────────
+
+/** Persisted cluster config — same shape as the runtime Workspace schema. */
+export const clusterConfigSchema = workspaceSchema;
+export type ClusterConfig = z.infer<typeof clusterConfigSchema>;
+export const clusterConfigArraySchema = z.array(clusterConfigSchema);
+
 // ─── Environment ─────────────────────────────────────────────────────────────
 
 export const environmentProfileSchema = z.object({

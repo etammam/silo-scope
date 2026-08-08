@@ -273,6 +273,16 @@ textarea,
 	grid-template-columns: minmax(0, 1fr);
 }
 
+/* ─── Window drag region (custom titlebar on macOS) ────────────── */
+
+.electrobun-webkit-app-region-drag {
+	-webkit-app-region: drag;
+}
+
+.electrobun-webkit-app-region-no-drag {
+	-webkit-app-region: no-drag;
+}
+
 .app-titlebar {
 	align-items: center;
 	background: linear-gradient(
@@ -385,9 +395,10 @@ textarea,
 .app-titlebar__workspace {
 	align-items: center;
 	display: flex;
-	gap: 5px;
+	gap: 3px;
 	left: 80px;
 	height: 26px;
+	margin-right: 20px;
 	position: absolute;
 	top: 50%;
 	transform: translateY(-50%);
@@ -606,6 +617,108 @@ textarea,
 	cursor: not-allowed;
 	opacity: 0.35;
 }
+
+/* ─── Connection status — instrument readout ─────────────────── */
+
+.conn-status {
+	align-items: center;
+	color: #64748b;
+	display: inline-flex;
+	gap: 5px;
+	font-size: 10px;
+	font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+	max-width: 240px;
+}
+
+.conn-status__text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Pulse dot — tiny indicator, heartbeat animation when live */
+.conn-status__pulse {
+	border-radius: 50%;
+	flex-shrink: 0;
+	height: 5px;
+	width: 5px;
+}
+.conn-status__pulse--idle  { background: #64748b; }
+.conn-status__pulse--live  { background: #10b981; animation: heartbeat 1.2s ease-in-out infinite; }
+.conn-status__pulse--fault { background: #ef4444; }
+
+.conn-status--locked    { color: #10b981; }
+.conn-status--acquiring { color: #f59e0b; }
+.conn-status--fault     { color: #ef4444; }
+
+.conn-status--acquiring .conn-status__text {
+	animation: conn-pulse 1.4s ease-in-out infinite;
+}
+
+.conn-status__spinner {
+	flex-shrink: 0;
+	animation: spin 0.9s linear infinite;
+}
+
+.conn-status__dismiss {
+	flex-shrink: 0;
+	background: none;
+	border: none;
+	color: inherit;
+	cursor: pointer;
+	font-size: 13px;
+	line-height: 1;
+	margin-left: 1px;
+	opacity: 0.5;
+	padding: 0;
+}
+.conn-status__dismiss:hover { opacity: 1; }
+
+@keyframes heartbeat {
+	0%, 100% { transform: scale(1);   opacity: 1; }
+	15%      { transform: scale(1.6); opacity: 0.7; }
+	30%      { transform: scale(1);   opacity: 1; }
+	45%      { transform: scale(1.35); opacity: 0.8; }
+	60%      { transform: scale(1);   opacity: 1; }
+}
+
+/* ─── Sidecar status — control ───────────────────────────────── */
+
+.sidecar-status {
+	align-items: center;
+	appearance: none;
+	background: transparent;
+	border: none;
+	color: #64748b;
+	cursor: pointer;
+	display: inline-flex;
+	gap: 4px;
+	font-size: 10px;
+	font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+	padding: 0;
+}
+.sidecar-status:hover { color: #94a3b8; }
+.sidecar-status:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.sidecar-status--live       { color: #10b981; }
+.sidecar-status--dead       { color: #64748b; }
+.sidecar-status--restarting { color: #f59e0b; }
+
+.sidecar-status__dot {
+	border-radius: 50%;
+	flex-shrink: 0;
+	height: 5px;
+	width: 5px;
+}
+.sidecar-status__dot--live       { background: #10b981; }
+.sidecar-status__dot--dead       { background: #64748b; }
+.sidecar-status__dot--restarting { background: #f59e0b; animation: conn-pulse 0.8s ease-in-out infinite; }
+
+.sidecar-status__text { font-size: 10px; }
+
+.sidecar-status__icon { opacity: 0.4; }
+.sidecar-status:hover .sidecar-status__icon { opacity: 0.8; }
+.sidecar-status__icon--spin { animation: spin 1.2s linear infinite; opacity: 0.8; }
 
 .workspace-menu {
 	background: var(--ui-0);
@@ -2242,6 +2355,45 @@ textarea,
 	max-width: 36px !important;
 	min-width: 36px !important;
 	padding: 0 !important;
+}
+
+/* ─── Titlebar connect button (icon-only, VS Code run/debug style) ── */
+
+.app-titlebar__connect {
+	align-items: center;
+	appearance: none;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	color: var(--success, #3fb950);
+	cursor: pointer;
+	display: inline-flex;
+	flex-shrink: 0;
+	justify-content: center;
+	height: 26px;
+	width: 26px;
+	transition: background 120ms ease;
+}
+
+.app-titlebar__connect:hover {
+	background: color-mix(in srgb, var(--ui-7) 6%, transparent);
+}
+
+.app-titlebar__connect:disabled {
+	opacity: 0.25;
+	cursor: not-allowed;
+}
+
+.app-titlebar__connect--connected {
+	color: #e5484d;
+}
+
+.app-titlebar__connect--connecting {
+	color: var(--accent);
+}
+
+.app-titlebar__connect-spinner {
+	animation: spin 0.9s linear infinite;
 }
 
 .close-confirmation {
@@ -5584,7 +5736,60 @@ textarea,
 	color: var(--danger);
 }
 
-.workspaces-page__empty {
+.workspaces-page__empty-full {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	padding: 60px 40px;
+	gap: 12px;
+	grid-column: 1 / -1;
+	min-height: 320px;
+}
+
+.workspaces-page__empty-icon {
+	color: var(--ui-5);
+	margin-bottom: 4px;
+	opacity: 0.7;
+}
+
+.workspaces-page__empty-full h3 {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--ui-7);
+	margin: 0;
+}
+
+.workspaces-page__empty-full p {
+	font-size: 13px;
+	color: var(--ui-5);
+	margin: 0;
+	max-width: 340px;
+	line-height: 1.5;
+}
+
+.workspaces-page__empty-action {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	padding: 8px 16px;
+	border-radius: var(--radius-md, 6px);
+	background: var(--accent);
+	color: #fff;
+	border: none;
+	cursor: pointer;
+	margin-top: 8px;
+}
+
+.workspaces-page__empty-action:hover,
+.workspaces-page__empty-action:focus-visible {
+	filter: brightness(1.1);
+}
+
+.workspaces-page__empty-sidebar {
 	color: var(--ui-5);
 	font-size: 12px;
 	line-height: 1.5;
@@ -5886,6 +6091,11 @@ textarea,
 	to { transform: rotate(360deg); }
 }
 
+@keyframes conn-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.5; }
+}
+
 .workspace-form__source-form {
 	align-items: end;
 	display: grid;
@@ -5984,6 +6194,18 @@ textarea,
 	color: var(--ui-5);
 	font-size: 13px;
 	padding: 10px 0;
+}
+
+.workspace-form__errors {
+	color: #e5484d;
+	font-size: 12px;
+	list-style: none;
+	margin: 0 0 8px;
+	padding: 0;
+}
+
+.workspace-form__errors li {
+	margin-bottom: 2px;
 }
 
 .workspace-form__footer {
@@ -9007,46 +9229,38 @@ button:not(:disabled) {
 	padding: 1px 5px;
 }
 
-/* Global status bar and bottom log panel */
 .global-status-bar {
 	align-items: center;
 	background: var(--ui-1);
 	border-top: 1px solid var(--ui-3);
 	color: var(--ui-6);
 	display: flex;
-	font-size: 11px;
+	font-size: 10px;
+	gap: 10px;
 	grid-column: 1 / -1;
 	grid-row: -2 / -1;
-	justify-content: space-between;
 	min-width: 0;
-	padding: 0 4px;
+	padding: 0 10px;
 	z-index: 6;
+	height: 24px;
 }
 
-.global-status-bar__workspace {
-	align-items: center;
-	display: flex;
-	gap: 2px;
-	min-width: 0;
-	padding: 0 4px;
-}
-
-.global-status-bar__workspace span {
+.global-status-bar__label {
 	color: var(--ui-5);
-	font-weight: 650;
+	font-size: 10px;
+	font-weight: 600;
+	opacity: 0.7;
 }
 
-.global-status-bar__workspace span[data-connected="true"] {
-	color: var(--success);
-	text-shadow: 0 0 8px color-mix(in srgb, var(--success) 40%, transparent);
+.global-status-bar__sep {
+	background: color-mix(in srgb, var(--ui-4) 25%, transparent);
+	height: 14px;
+	width: 1px;
+	flex-shrink: 0;
 }
 
-.global-status-bar__workspace small {
-	color: var(--ui-5);
-	font: inherit;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+.global-status-bar__spacer {
+	flex: 1;
 }
 
 .global-status-bar__center {

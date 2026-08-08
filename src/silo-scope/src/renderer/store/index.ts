@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Workspace, EnvironmentProfile, GrainInterfaceDescriptor, InvocationResult, LogEntry, NugetFeed, NugetPackage, SourceOwnedCatalog } from "../../shared/types";
 
+export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
+
 interface AppState {
   workspace: Workspace | null;
   grains: GrainInterfaceDescriptor[];
@@ -13,6 +15,9 @@ interface AppState {
   nugetFeeds: NugetFeed[];
   nugetPackages: NugetPackage[];
   isConnected: boolean;
+  connectionStatus: ConnectionStatus;
+  connectionStep: string;
+  connectionError: string | null;
   fontFamily: string;
   fontSize: number;
   environments: EnvironmentProfile[];
@@ -34,6 +39,11 @@ interface AppState {
   setNugetFeeds: (feeds: NugetFeed[]) => void;
   setNugetPackages: (packages: NugetPackage[]) => void;
   setIsConnected: (connected: boolean) => void;
+  setConnectionStatus: (
+    status: ConnectionStatus,
+    step?: string,
+    error?: string | null,
+  ) => void;
   setFontFamily: (fontFamily: string) => void;
   setFontSize: (fontSize: number) => void;
   setEnvironments: (environments: EnvironmentProfile[]) => void;
@@ -55,6 +65,9 @@ export const useAppStore = create<AppState>((set) => ({
   nugetFeeds: [],
   nugetPackages: [],
   isConnected: false,
+  connectionStatus: "disconnected" as ConnectionStatus,
+  connectionStep: "",
+  connectionError: null,
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
   fontSize: 13,
   environments: [],
@@ -81,6 +94,8 @@ export const useAppStore = create<AppState>((set) => ({
   setNugetFeeds: (nugetFeeds) => set({ nugetFeeds }),
   setNugetPackages: (nugetPackages) => set({ nugetPackages }),
   setIsConnected: (isConnected) => set({ isConnected }),
+  setConnectionStatus: (connectionStatus, connectionStep = "", connectionError = null) =>
+    set({ connectionStatus, connectionStep, connectionError }),
   setFontFamily: (fontFamily) => set({ fontFamily }),
   setFontSize: (fontSize) => set({ fontSize }),
   setEnvironments: (environments) => set({ environments }),

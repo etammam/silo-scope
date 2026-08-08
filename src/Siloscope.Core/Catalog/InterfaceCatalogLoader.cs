@@ -262,8 +262,14 @@ public sealed class InterfaceCatalogLoader(
                 packageVersion
             );
 
+            // Download the direct package + its direct dependencies (one level only).
+            // This ensures runtime assembly references are available when GetExportedTypes() runs.
             var restoreResult = _nugetManager
-                .RestorePackagesAsync([(packageId, packageVersion)], feedName: feedName)
+                .RestorePackagesAsync(
+                    [(packageId, packageVersion)],
+                    feedName: feedName,
+                    maxDepth: 1
+                )
                 .ConfigureAwait(false)
                 .GetAwaiter()
                 .GetResult();

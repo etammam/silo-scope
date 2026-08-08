@@ -1,4 +1,13 @@
-import type { CreateNugetFeedRequest, EnvironmentProfile, NugetFeed, NugetPackage } from "./types";
+import type {
+  CreateNugetFeedRequest,
+  EnvironmentProfile,
+  GrainInterfaceDescriptor,
+  InvocationResult,
+  NugetFeed,
+  NugetPackage,
+  SourceOwnedCatalog,
+  Workspace,
+} from "./types";
 
 export interface EnvironmentConfig {
   profiles: EnvironmentProfile[];
@@ -47,5 +56,45 @@ export interface RendererApi {
       workspaceId: string,
       config: EnvironmentConfig,
     ) => Promise<boolean>;
+  };
+  sidecar: {
+    status: () => Promise<{ running: boolean }>;
+    restart: () => Promise<{ running: boolean }>;
+  };
+  onSidecarLog: (
+    callback: (entry: {
+      timestamp: string;
+      level: string;
+      category?: string;
+      message: string;
+    }) => void,
+  ) => () => void;
+  clusters: {
+    list: () => Promise<Workspace[]>;
+    save: (cluster: Workspace) => Promise<Workspace>;
+    remove: (id: string) => Promise<{ success: boolean }>;
+    pickSourceFile: () => Promise<string | null>;
+    connect: (cluster: Workspace) => Promise<{ message: string }>;
+    disconnect: () => Promise<{ success: boolean }>;
+    setActive: (cluster: Workspace) => Promise<{ workspace: Workspace }>;
+    discoverGrains: (workspaceId: string) => Promise<{
+      grains: GrainInterfaceDescriptor[];
+      sourceCatalog: SourceOwnedCatalog;
+    }>;
+    getGrains: () => Promise<{
+      grains: GrainInterfaceDescriptor[];
+      sourceCatalog: SourceOwnedCatalog;
+    }>;
+    getSourceCatalog: () => Promise<{
+      sourceCatalog: SourceOwnedCatalog;
+    }>;
+    invokeGrain: (params: {
+      grainType: string;
+      method: string;
+      grainKey: string;
+      payload: string;
+      sourceId?: string;
+      functionId?: string;
+    }) => Promise<InvocationResult>;
   };
 }

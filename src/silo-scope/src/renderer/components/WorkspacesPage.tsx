@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Briefcase, FolderOpen, Import, Trash2, FolderSearch, Search, Loader2, Plus, X } from "lucide-react";
 import type { ClusterConnectionProvider, ClusterType, NugetFeed, NugetPackage, Workspace, WorkspaceSource } from "../../shared/types";
+import { workspaceSchema } from "../../shared/schemas";
 
 type ClusterConnectionMode = "Local" | ClusterConnectionProvider;
 
@@ -60,14 +61,33 @@ export function WorkspacesPage({
   getNugetPackageVersions,
 }: WorkspacesPageProps) {
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const isCreating = editingWorkspace === null;
+
+  // Reset editor when the edited workspace is deleted
+  useEffect(() => {
+    if (editingWorkspace && !workspaces.some((w) => w.id === editingWorkspace.id)) {
+      setEditingWorkspace(null);
+      setShowCreateForm(false);
+    }
+  }, [workspaces, editingWorkspace]);
+
+  // Auto-show the create form when there are no clusters and user clicks New
+  useEffect(() => {
+    if (workspaces.length === 0) {
+      setEditingWorkspace(null);
+      setShowCreateForm(false);
+    }
+  }, [workspaces.length]);
 
   const handleCreateNew = useCallback(() => {
     setEditingWorkspace(null);
+    setShowCreateForm(true);
   }, []);
 
   const handleEdit = useCallback((workspace: Workspace) => {
     setEditingWorkspace(workspace);
+    setShowCreateForm(true);
   }, []);
 
   const handleActivate = useCallback(
@@ -98,91 +118,118 @@ export function WorkspacesPage({
       </header>
 
       <div className="workspaces-page__body">
-      <nav
-        className="workspaces-page__sidebar"
-        aria-label="Cluster list"
-      >
-        <button
-          className="workspaces-page__create-button"
-          onClick={handleCreateNew}
-          type="button"
-        >
-          <Plus aria-hidden="true" width={14} height={14} />
-          New cluster
-        </button>
-          <ul className="workspaces-page__list" role="list">
-            {workspaces.map((ws) => (
-              <li
-                key={ws.id}
-                className={`workspaces-page__list-item ${editingWorkspace?.id === ws.id ? "workspaces-page__list-item--active" : ""} ${activeWorkspace?.id === ws.id ? "workspaces-page__list-item--current" : ""}`}
-              >
-                <button
-                  aria-label={`Edit ${ws.name}`}
-                  className="workspaces-page__list-button"
-                  onClick={() => handleEdit(ws)}
-                  type="button"
-                >
-                  <Briefcase
-                    aria-hidden="true"
-                    width={14}
-                    height={14}
-                  />
-                  <span className="workspaces-page__list-main">
-                    <span className="workspaces-page__list-name">
-                      {ws.name}
-                    </span>
-                    <span className="workspaces-page__list-meta">
-                      {ws.clusterId || ws.siloAddress}
-                    </span>
-                  </span>
-                  {activeWorkspace?.id === ws.id && (
-                    <span className="workspaces-page__list-badge">
-                      Active
-                    </span>
-                  )}
-                </button>
-                <div className="workspaces-page__list-actions">
-                  <button
-                    aria-label={`Activate ${ws.name}`}
-                    className="workspaces-page__list-action"
-                    onClick={() => handleActivate(ws.id)}
-                    title="Activate"
-                    type="button"
-                  >
-                    <FolderOpen aria-hidden="true" width={13} height={13} />
-                  </button>
-                  <button
-                    aria-label={`Delete ${ws.name}`}
-                    className="workspaces-page__list-action workspaces-page__list-action--danger"
-                    onClick={() => onDeleteWorkspace(ws.id)}
-                    title="Delete"
-                    type="button"
-                  >
-                    <Trash2 aria-hidden="true" width={13} height={13} />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-          {workspaces.length === 0 && (
-            <div className="workspaces-page__empty">
-              No clusters yet. Create or import one to get started.
+        {workspaces.length === 0 && !showCreateForm ? (
+          <div className="workspaces-page__empty-full">
+            <div className="workspaces-page__empty-icon">
+              <Briefcase aria-hidden="true" width={32} height={32} />
             </div>
-          )}
-        </nav>
+            <h3>No clusters yet</h3>
+            <p>
+              Create a cluster to connect to an Orleans silo, discover grain
+              interfaces, and invoke grain methods.
+            </p>
+            <button
+              className="workspaces-page__empty-action"
+              onClick={handleCreateNew}
+              type="button"
+            >
+              <Plus aria-hidden="true" width={14} height={14} />
+              Create your first cluster
+            </button>
+          </div>
+        ) : (
+          <>
+            <nav
+              className="workspaces-page__sidebar"
+              aria-label="Cluster list"
+            >
+              <button
+                className="workspaces-page__create-button"
+                onClick={handleCreateNew}
+                type="button"
+              >
+                <Plus aria-hidden="true" width={14} height={14} />
+                New cluster
+              </button>
+              <ul className="workspaces-page__list" role="list">
+                {workspaces.map((ws) => (
+                  <li
+                    key={ws.id}
+                    className={`workspaces-page__list-item ${editingWorkspace?.id === ws.id ? "workspaces-page__list-item--active" : ""} ${activeWorkspace?.id === ws.id ? "workspaces-page__list-item--current" : ""}`}
+                  >
+                    <button
+                      aria-label={`Edit ${ws.name}`}
+                      className="workspaces-page__list-button"
+                      onClick={() => handleEdit(ws)}
+                      type="button"
+                    >
+                      <Briefcase
+                        aria-hidden="true"
+                        width={14}
+                        height={14}
+                      />
+                      <span className="workspaces-page__list-main">
+                        <span className="workspaces-page__list-name">
+                          {ws.name}
+                        </span>
+                        <span className="workspaces-page__list-meta">
+                          {ws.clusterId || ws.siloAddress}
+                        </span>
+                      </span>
+                      {activeWorkspace?.id === ws.id && (
+                        <span className="workspaces-page__list-badge">
+                          Active
+                        </span>
+                      )}
+                    </button>
+                    <div className="workspaces-page__list-actions">
+                      <button
+                        aria-label={`Activate ${ws.name}`}
+                        className="workspaces-page__list-action"
+                        onClick={() => handleActivate(ws.id)}
+                        title="Activate"
+                        type="button"
+                      >
+                        <FolderOpen aria-hidden="true" width={13} height={13} />
+                      </button>
+                      <button
+                        aria-label={`Delete ${ws.name}`}
+                        className="workspaces-page__list-action workspaces-page__list-action--danger"
+                        onClick={() => onDeleteWorkspace(ws.id)}
+                        title="Delete"
+                        type="button"
+                      >
+                        <Trash2 aria-hidden="true" width={13} height={13} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {workspaces.length === 0 && (
+                <div className="workspaces-page__empty-sidebar">
+                  No clusters yet.
+                </div>
+              )}
+            </nav>
 
-        <div className="workspaces-page__form-area">
-          <WorkspaceForm
-            key={isCreating ? "create" : editingWorkspace.id}
-            initialWorkspace={editingWorkspace}
-            isCreating={isCreating}
-            onSave={isCreating ? onCreateWorkspace : onUpdateWorkspace}
-            onPickFile={onPickFile}
-            nugetFeeds={nugetFeeds}
-            searchNugetPackages={searchNugetPackages}
-            getNugetPackageVersions={getNugetPackageVersions}
-          />
-        </div>
+            <div className="workspaces-page__form-area">
+              <WorkspaceForm
+                key={isCreating ? "create" : editingWorkspace?.id ?? "create"}
+                initialWorkspace={editingWorkspace}
+                isCreating={isCreating}
+                onSave={(ws) => {
+                  setEditingWorkspace(ws);
+                  setShowCreateForm(false);
+                  (isCreating ? onCreateWorkspace : onUpdateWorkspace)(ws);
+                }}
+                onPickFile={onPickFile}
+                nugetFeeds={nugetFeeds}
+                searchNugetPackages={searchNugetPackages}
+                getNugetPackageVersions={getNugetPackageVersions}
+              />
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
@@ -261,6 +308,7 @@ function WorkspaceForm({
   const [sourceVersion, setSourceVersion] = useState("");
   const [sourceGateway, setSourceGateway] = useState("");
   const [sourceFeed, setSourceFeed] = useState("");
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     setName(initialWorkspace?.name ?? "Untitled Cluster");
@@ -278,6 +326,7 @@ function WorkspaceForm({
     setSourceVersion("");
     setSourceGateway("");
     setSourceFeed("");
+    setValidationErrors([]);
   }, [initialWorkspace]);
 
   useEffect(() => {
@@ -296,9 +345,15 @@ function WorkspaceForm({
   const selectedConnectionOption =
     clusterConnectionOptions.find((option) => option.value === clusterConnection)
     ?? clusterConnectionOptions[0];
-  const canAddSource = Boolean(sourceReference.trim()) && (!requiresSourceGateways || Boolean(sourceGateway.trim()));
+  const canAddSource =
+    Boolean(sourceReference.trim()) &&
+    (sourceType !== "NuGet" || Boolean(sourceVersion.trim())) &&
+    (!requiresSourceGateways || Boolean(sourceGateway.trim()));
   const hasMissingSourceGateways =
     requiresSourceGateways && sources.some((source) => !source.gateway?.trim());
+  const hasMissingNuGetVersions = sources.some(
+    (s) => s.sourceType === "NuGet" && !s.version?.trim(),
+  );
   const sourceFormClassName = [
     "workspace-form__source-form",
     sourceType === "NuGet" ? "workspace-form__source-form--nuget" : "workspace-form__source-form--dll",
@@ -308,6 +363,7 @@ function WorkspaceForm({
   const addSource = () => {
     const reference = sourceReference.trim();
     if (!reference) return;
+    if (sourceType === "NuGet" && !sourceVersion.trim()) return;
     if (requiresSourceGateways && !sourceGateway.trim()) return;
 
     const source: WorkspaceSource = {
@@ -334,7 +390,8 @@ function WorkspaceForm({
     const [siloAddress, portRaw] = gatewayEndpoint.split(":");
     const gatewayPort = Number(portRaw);
     const workspace: Workspace = {
-      id: initialWorkspace?.id ?? `workspace-${Date.now()}`,
+      // Use crypto.randomUUID() for stable folder identity (never changes)
+      id: initialWorkspace?.id ?? crypto.randomUUID(),
       name: name.trim() || "Untitled Cluster",
       description: description.trim() || null,
       siloAddress: siloAddress || "127.0.0.1",
@@ -361,7 +418,18 @@ function WorkspaceForm({
       })),
     };
 
-    onSave(workspace);
+    // Validate before saving
+    const result = workspaceSchema.safeParse(workspace);
+    if (!result.success) {
+      setValidationErrors(
+        result.error.issues.map(
+          (issue) => `${issue.path.join(".") || "form"}: ${issue.message}`,
+        ),
+      );
+      return;
+    }
+    setValidationErrors([]);
+    onSave(result.data);
   };
 
   return (
@@ -377,6 +445,14 @@ function WorkspaceForm({
           )}
         </div>
       </div>
+
+      {validationErrors.length > 0 && (
+        <ul className="workspace-form__errors" role="alert">
+          {validationErrors.map((err) => (
+            <li key={err}>{err}</li>
+          ))}
+        </ul>
+      )}
 
       <div className="workspace-form__grid">
         <section className="workspace-form__section">
@@ -596,6 +672,7 @@ function WorkspaceForm({
             !name.trim()
             || (clusterConnection !== "Local" && !clusterConnectionString.trim())
             || hasMissingSourceGateways
+            || hasMissingNuGetVersions
           }
           onClick={handleSave}
           type="button"

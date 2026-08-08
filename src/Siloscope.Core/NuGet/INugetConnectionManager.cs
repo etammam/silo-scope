@@ -76,6 +76,7 @@ public interface INugetConnectionManager
         string version,
         string? sourceUrl = null,
         NugetFeedSourceAuthentication? credentials = null,
+        string? feedName = null,
         CancellationToken cancellationToken = default
     );
 
@@ -91,6 +92,7 @@ public interface INugetConnectionManager
         IEnumerable<(string Id, string Version)> packages,
         string? sourceUrl = null,
         string? feedName = null,
+        int maxDepth = int.MaxValue,
         CancellationToken cancellationToken = default
     );
 
