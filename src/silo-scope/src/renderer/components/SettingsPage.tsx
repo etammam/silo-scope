@@ -4,14 +4,14 @@ import type { AppUpdateState } from "../../shared/types";
 
 type WorkbenchTheme = "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
 
-const lightThemes: { id: WorkbenchTheme; label: string }[] = [
-  { id: "vscode-light", label: "VS Code Light" },
-  { id: "github-light", label: "GitHub Light" },
+const lightThemes: { id: WorkbenchTheme; label: string; swatches: string[] }[] = [
+  { id: "vscode-light", label: "VS Code Light", swatches: ["#ffffff", "#f8f8f8", "#f3f3f3", "#e5e5e5", "#cecece"] },
+  { id: "github-light", label: "GitHub Light", swatches: ["#ffffff", "#f6f8fa", "#f3f4f6", "#d0d7de", "#afb8c1"] },
 ];
 
-const darkThemes: { id: WorkbenchTheme; label: string }[] = [
-  { id: "vscode-dark", label: "VS Code Dark" },
-  { id: "github-dark", label: "GitHub Dark" },
+const darkThemes: { id: WorkbenchTheme; label: string; swatches: string[] }[] = [
+  { id: "vscode-dark", label: "VS Code Dark", swatches: ["#1f1f1f", "#181818", "#313131", "#2b2b2b", "#3c3c3c"] },
+  { id: "github-dark", label: "GitHub Dark", swatches: ["#0d1117", "#010409", "#161b22", "#30363d", "#21262d"] },
 ];
 
 type SettingsPageProps = {
@@ -72,23 +72,20 @@ export function SettingsPage({
   return (
     <section className="settings-page" aria-label="Settings">
       <header className="settings-page__header">
-        <div>
-          <span>Settings</span>
-          <h2 id="settings-title">Appearance</h2>
-          <p>Theme and response panel preferences.</p>
-        </div>
+        <h2>Settings</h2>
+        <p>Configure your workbench. Changes take effect immediately.</p>
       </header>
 
       <div className="settings-page__body">
         <section className="settings-page__section" aria-labelledby="settings-theme-title">
           <div className="settings-page__section-heading">
-            <h3 id="settings-theme-title">Color Theme</h3>
-            <p>Choose the workbench palette.</p>
+            <h3 id="settings-theme-title">Color theme</h3>
+            <p>Pick the palette for the workbench. Each theme is tuned for long reading sessions with the grain inspector.</p>
           </div>
 
           <div className="settings-page__theme-stack">
             <div className="settings-page__theme-group">
-              <h4>Light</h4>
+              <h4 className="settings-page__theme-group-label">Light</h4>
               <div
                 className="settings-page__theme-grid"
                 role="radiogroup"
@@ -106,7 +103,7 @@ export function SettingsPage({
             </div>
 
             <div className="settings-page__theme-group">
-              <h4>Dark</h4>
+              <h4 className="settings-page__theme-group-label">Dark</h4>
               <div
                 className="settings-page__theme-grid"
                 role="radiogroup"
@@ -127,11 +124,11 @@ export function SettingsPage({
 
         <section className="settings-page__section" aria-labelledby="settings-response-title">
           <div className="settings-page__section-heading">
-            <h3 id="settings-response-title">Response Panel</h3>
-            <p>Control response text rendering.</p>
+            <h3 id="settings-response-title">Response panel</h3>
+            <p>Control how invocation results are displayed in the telemetry pane.</p>
           </div>
-          <div className="settings-page__form-row">
-            <label className="settings-page__input-label">
+          <div className="settings-page__form-grid">
+            <label className="settings-page__field">
               <span>Font family</span>
               <input
                 aria-label="Response panel font family"
@@ -140,8 +137,9 @@ export function SettingsPage({
                 onChange={(event) => onFontFamilyChange(event.target.value)}
                 placeholder="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas"
               />
+              <small>Any system monospace font or a comma-separated stack.</small>
             </label>
-            <label className="settings-page__input-label settings-page__input-label--narrow">
+            <label className="settings-page__field settings-page__field--narrow">
               <span>Font size</span>
               <input
                 aria-label="Response panel font size"
@@ -153,14 +151,15 @@ export function SettingsPage({
                   onFontSizeChange(Number(event.target.value))
                 }
               />
+              <small>Between 8 and 32 pixels.</small>
             </label>
           </div>
         </section>
 
         <section className="settings-page__section" aria-labelledby="settings-storage-title">
           <div className="settings-page__section-heading">
-            <h3 id="settings-storage-title">Data Storage</h3>
-            <p>Where your feeds, workspaces, and environments are saved on disk.</p>
+            <h3 id="settings-storage-title">Data storage</h3>
+            <p>Where your workspaces, feeds, and environments are saved on disk.</p>
           </div>
           <div className="settings-page__storage-panel">
             <div className="settings-page__storage-path">
@@ -192,8 +191,8 @@ export function SettingsPage({
 
         <section className="settings-page__section" aria-labelledby="settings-updates-title">
           <div className="settings-page__section-heading">
-            <h3 id="settings-updates-title">Software Updates</h3>
-            <p>Current build and release channel.</p>
+            <h3 id="settings-updates-title">Software updates</h3>
+            <p>Current build, release channel, and update management.</p>
           </div>
           <div className="settings-page__update-panel">
             <div className="settings-page__update-summary" data-kind={statusKind(updateInfo, latestStatus?.status)}>
@@ -346,7 +345,7 @@ function ThemeCard({
   isSelected,
   onSelect,
 }: {
-  theme: { id: WorkbenchTheme; label: string };
+  theme: { id: WorkbenchTheme; label: string; swatches: string[] };
   isSelected: boolean;
   onSelect: () => void;
 }) {
@@ -361,15 +360,18 @@ function ThemeCard({
       role="radio"
       type="button"
     >
-      <span className="theme-card__editor" aria-hidden="true">
-        <span className="theme-card__line" />
-        <span className="theme-card__line" />
-        <span className="theme-card__line" />
-        <span className="theme-card__line" />
-        <span className="theme-card__line" />
+      <span className="theme-card__swatches" aria-hidden="true">
+        {theme.swatches.map((color, i) => (
+          <span
+            key={i}
+            className="theme-card__swatch"
+            style={{ "--swatch-color": color } as React.CSSProperties}
+          />
+        ))}
+        <span className="theme-card__accent" />
       </span>
       <span className="theme-card__label">{theme.label}</span>
-      <span className="theme-card__check" aria-hidden="true" />
+      <span className="theme-card__indicator" aria-hidden="true" />
     </button>
   );
 }
