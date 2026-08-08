@@ -1,4 +1,14 @@
-import { AlertTriangle, Braces, Check, Globe, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Braces,
+  Check,
+  Globe,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EnvironmentProfile } from "../../shared/types";
 import { InlineAutocomplete } from "./InlineAutocomplete";
@@ -107,8 +117,10 @@ export function EnvironmentPage({
   const validateEnvKey = (key: string): string | null => {
     if (key.length === 0) return null;
     if (/\s/.test(key)) return "Variable names cannot contain spaces.";
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) return "Only English letters, digits, and underscores.";
-    if (key.length > 64) return "Variable names must be 64 characters or fewer.";
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key))
+      return "Only English letters, digits, and underscores.";
+    if (key.length > 64)
+      return "Variable names must be 64 characters or fewer.";
     return null;
   };
 
@@ -177,7 +189,7 @@ export function EnvironmentPage({
   };
 
   const renameProfile = (newName: string) => {
-    const trimmed = newName.trim();
+    const trimmed = newName;
     if (
       !trimmed ||
       draftProfiles.some(
@@ -269,9 +281,7 @@ export function EnvironmentPage({
       setToast("Environments saved");
     } catch (error) {
       setSaveError(
-        error instanceof Error
-          ? error.message
-          : "Failed to save environments",
+        error instanceof Error ? error.message : "Failed to save environments",
       );
     } finally {
       setIsSaving(false);
@@ -282,7 +292,10 @@ export function EnvironmentPage({
     <section className="environment-page" aria-label="Environments">
       <header className="environment-page__header">
         <h2>Environments</h2>
-        <p>Manage variable sets for your grain invocations. Switch between environments from the titlebar selector.</p>
+        <p>
+          Manage variable sets for your grain invocations. Switch between
+          environments from the titlebar selector.
+        </p>
       </header>
 
       <div className="environment-page__body">
@@ -320,7 +333,10 @@ export function EnvironmentPage({
           <>
             <div className="environment-page__sidebar">
               <div className="environment-page__sidebar-header">
-                <span>{draftProfiles.length} {draftProfiles.length === 1 ? "profile" : "profiles"}</span>
+                <span>
+                  {draftProfiles.length}{" "}
+                  {draftProfiles.length === 1 ? "profile" : "profiles"}
+                </span>
                 <button
                   className="environment-page__create-btn"
                   disabled={!hasWorkspace}
@@ -395,7 +411,11 @@ export function EnvironmentPage({
                   {saveError && (
                     <div className="environment-form__error" role="alert">
                       <div className="environment-form__error-header">
-                        <AlertTriangle aria-hidden="true" width={14} height={14} />
+                        <AlertTriangle
+                          aria-hidden="true"
+                          width={14}
+                          height={14}
+                        />
                         <span>Save failed</span>
                         <button
                           aria-label="Dismiss error"
@@ -406,7 +426,9 @@ export function EnvironmentPage({
                           <X aria-hidden="true" width={12} height={12} />
                         </button>
                       </div>
-                      <p className="environment-form__error-message">{saveError}</p>
+                      <p className="environment-form__error-message">
+                        {saveError}
+                      </p>
                     </div>
                   )}
 
@@ -428,8 +450,15 @@ export function EnvironmentPage({
                           }}
                         />
                         {keyError && (
-                          <span className="environment-form__var-error" role="alert">
-                            <AlertTriangle aria-hidden="true" width={10} height={10} />
+                          <span
+                            className="environment-form__var-error"
+                            role="alert"
+                          >
+                            <AlertTriangle
+                              aria-hidden="true"
+                              width={10}
+                              height={10}
+                            />
                             {keyError}
                           </span>
                         )}
@@ -495,8 +524,15 @@ export function EnvironmentPage({
                                       autoFocus
                                     />
                                     {editKeyError && (
-                                      <span className="environment-form__var-error" role="alert">
-                                        <AlertTriangle aria-hidden="true" width={10} height={10} />
+                                      <span
+                                        className="environment-form__var-error"
+                                        role="alert"
+                                      >
+                                        <AlertTriangle
+                                          aria-hidden="true"
+                                          width={10}
+                                          height={10}
+                                        />
                                         {editKeyError}
                                       </span>
                                     )}
@@ -612,7 +648,11 @@ export function EnvironmentPage({
                         type="button"
                       >
                         <Save aria-hidden="true" width={14} height={14} />
-                        {isSaving ? "Saving…" : hasChanges ? "Save changes" : "Saved"}
+                        {isSaving
+                          ? "Saving…"
+                          : hasChanges
+                            ? "Save changes"
+                            : "Saved"}
                       </button>
                     </div>
                   )}
@@ -628,11 +668,7 @@ export function EnvironmentPage({
       </div>
 
       {toast && (
-        <div
-          className="environment-toast"
-          role="status"
-          aria-live="polite"
-        >
+        <div className="environment-toast" role="status" aria-live="polite">
           <Check aria-hidden="true" width={14} height={14} />
           <span>{toast}</span>
         </div>
