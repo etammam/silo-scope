@@ -197,7 +197,7 @@ function App() {
       }
 
       const target = event.target as HTMLElement;
-      if (target.closest(".electrobun-webkit-app-region-no-drag")) {
+      if (target.closest(".app-region-no-drag")) {
         return;
       }
       void handleMaximize();
@@ -998,7 +998,7 @@ function App() {
   const closeConfirmationItems = dirtyRequestSummaries;
   const titlebarClassName = usesNativeWindowFrame
     ? "app-titlebar app-titlebar--toolbar"
-    : "app-titlebar electrobun-webkit-app-region-drag";
+    : "app-titlebar app-region-drag";
 
   return (
     <div
@@ -1028,7 +1028,7 @@ function App() {
         className={titlebarClassName}
         onDoubleClick={handleTitleBarDoubleClick}
       >
-        <div className="app-titlebar__workspace electrobun-webkit-app-region-no-drag">
+        <div className="app-titlebar__workspace app-region-no-drag">
           <button
             aria-expanded={isWorkspaceMenuOpen}
             aria-haspopup="menu"
@@ -1081,7 +1081,7 @@ function App() {
             </div>
           )}
           <button
-            className={`app-titlebar__connect electrobun-webkit-app-region-no-drag ${isConnected ? "app-titlebar__connect--connected" : ""} ${connectionStatus === "connecting" ? "app-titlebar__connect--connecting" : ""}`}
+            className={`app-titlebar__connect app-region-no-drag ${isConnected ? "app-titlebar__connect--connected" : ""} ${connectionStatus === "connecting" ? "app-titlebar__connect--connecting" : ""}`}
             disabled={!workspace || connectionStatus === "connecting"}
             onClick={() => {
               if (isConnected) {
@@ -1103,7 +1103,7 @@ function App() {
           </button>
         </div>
         <button
-          className="app-titlebar__command electrobun-webkit-app-region-no-drag"
+          className="app-titlebar__command app-region-no-drag"
           onClick={() => setIsQuickAccessOpen(true)}
           type="button"
         >
@@ -1111,7 +1111,7 @@ function App() {
         </button>
         <div className="app-titlebar__actions">
           {workspace && environments.length > 0 && (
-            <div className="titlebar-environment-selector electrobun-webkit-app-region-no-drag">
+            <div className="titlebar-environment-selector app-region-no-drag">
               <button
                 aria-expanded={isEnvironmentMenuOpen}
                 aria-haspopup="menu"
@@ -1181,7 +1181,7 @@ function App() {
                 : "Expand navigation panel"
             }
             aria-pressed={!isNavigationVisible}
-            className="titlebar-action titlebar-action--navigation electrobun-webkit-app-region-no-drag"
+            className="titlebar-action titlebar-action--navigation app-region-no-drag"
             onClick={() => setIsNavigationVisible((visible) => !visible)}
             title={
               isNavigationVisible
@@ -1204,7 +1204,7 @@ function App() {
                 : "Place request and response panels side by side"
             }
             aria-pressed={paneLayout === "vertical"}
-            className="titlebar-action titlebar-action--layout electrobun-webkit-app-region-no-drag"
+            className="titlebar-action titlebar-action--layout app-region-no-drag"
             onClick={() =>
               setPaneLayout((layout) =>
                 layout === "horizontal" ? "vertical" : "horizontal",
@@ -1231,7 +1231,7 @@ function App() {
                 : "Expand response panel"
             }
             aria-pressed={!isResponseVisible}
-            className="titlebar-action titlebar-action--response electrobun-webkit-app-region-no-drag"
+            className="titlebar-action titlebar-action--response app-region-no-drag"
             onClick={() => setIsResponseVisible((visible) => !visible)}
             title={
               isResponseVisible

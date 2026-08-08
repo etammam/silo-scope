@@ -21,20 +21,18 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-desktop:
-    name: Build Desktop (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
+  build-core:
+    name: Publish Core (${{ matrix.runtime }})
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            name: linux-x64
-          - os: macos-latest
-            name: macos-arm64
-          - os: windows-latest
-            name: win-x64
+        runtime:
+          - linux-x64
+          - osx-x64
+          - osx-arm64
+          - win-x64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,41 +42,82 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Restore
+        run: dotnet restore src/Siloscope.Core/Siloscope.Core.csproj --runtime ${{ matrix.runtime }} --verbosity minimal
+
+      - name: Publish self-contained sidecar
+        run: >
+          dotnet publish src/Siloscope.Core/Siloscope.Core.csproj
+          --configuration Release
+          --runtime ${{ matrix.runtime }}
+          --self-contained true
+          --no-restore
+          --output artifacts/core/${{ matrix.runtime }}
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Upload Core artifact
+        uses: actions/upload-artifact@v4
         with:
-          bun-version: latest
+          name: siloscope-core-${{ matrix.runtime }}
+          path: artifacts/core/${{ matrix.runtime }}
+          retention-days: 7
 
-      - name: Cache Bun dependencies
-        uses: actions/cache@v4
+  build-desktop:
+    name: Build Desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    needs: build-core
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x64
+            runtime: linux-x64
+          - os: macos-latest
+            name: macos-arm64
+            runtime: osx-arm64
+          - os: windows-latest
+            name: win-x64
+            runtime: win-x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          path: |
-            ~/.bun/install/cache
-            src/siloscope-desktop/node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('src/siloscope-desktop/bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/silo-scope/package-lock.json
 
-      - name: Install desktop dependencies
-        working-directory: src/siloscope-desktop
-        run: bun install --frozen-lockfile
+      - name: Download Core artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: siloscope-core-${{ matrix.runtime }}
+          path: src/silo-scope/resources/core
 
-      - name: Build stable desktop app
-        working-directory: src/siloscope-desktop
-        run: bun run build:stable
+      - name: Install dependencies
+        working-directory: src/silo-scope
+        run: npm ci
 
-      - name: Upload installer artifacts
+      - name: Build Electron app
+        working-directory: src/silo-scope
+        run: npm run build
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: siloscope-desktop-${{ matrix.name }}
-          path: src/siloscope-desktop/artifacts/*
-          retention-days: 5
+          path: src/silo-scope/out/
+          retention-days: 7
 
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [build-desktop]
+    needs: build-desktop
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -95,9 +134,6 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-
-      - name: Display artifacts
-        run: ls -la artifacts/
 
       - name: Semantic Release
         env:

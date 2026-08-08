@@ -1,5 +1,5 @@
-// ponytail: UI-only mock of the SiloScope RPC surface (electrobun's `electroview.rpc`).
-// Replace with real IPC handlers when wiring main process. No-op stubs: minimize/maximize/close, update flow.
+// ponytail: UI-only mock / browser-dev fallback for the SiloScope RPC surface.
+// Delegates to window.api.* when available (desktop), falls back to in-memory stubs otherwise.
 import type {
   AppUpdateState,
   CreateNugetFeedRequest,
