@@ -106,6 +106,67 @@ export function deleteCluster(storagePath: string, id: string): void {
   }
 }
 
+// ─── Request context persistence ─────────────────────────────────────────────
+
+export interface SavedRequest {
+  tabId: string;
+  grainId: string;
+  payload: unknown;
+  targetGrainClass: string;
+  targetMethod: string;
+}
+
+function requestsFilePath(storagePath: string, clusterId: string): string {
+  return join(storagePath, clusterId, "requests.json");
+}
+
+export function readRequests(
+  storagePath: string,
+  clusterId: string,
+): SavedRequest[] {
+  try {
+    const path = requestsFilePath(storagePath, clusterId);
+    if (!existsSync(path)) return [];
+    const raw = readFileSync(path, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (r: unknown) =>
+        typeof r === "object" && r !== null && "tabId" in r && "grainId" in r,
+    ) as SavedRequest[];
+  } catch {
+    return [];
+  }
+}
+
+function parsePayload(p: string): unknown {
+  try { return JSON.parse(p); } catch { return p; }
+}
+
+export function writeRequests(
+  storagePath: string,
+  clusterId: string,
+  requests: SavedRequest[],
+): void {
+  const path = requestsFilePath(storagePath, clusterId);
+  // Deduplicate by tabId, latest wins; parse payloads to avoid double-escaping
+  const seen = new Set<string>();
+  const deduped: Array<Record<string, unknown>> = [];
+  for (const r of requests) {
+    if (!seen.has(r.tabId)) {
+      seen.add(r.tabId);
+      deduped.push({
+        tabId: r.tabId,
+        grainId: r.grainId,
+        payload: typeof r.payload === "string" ? parsePayload(r.payload) : r.payload,
+        targetGrainClass: r.targetGrainClass,
+        targetMethod: r.targetMethod,
+      });
+    }
+  }
+  writeFileSync(path, JSON.stringify(deduped, null, 2), "utf-8");
+}
+
 // ─── Source file management ──────────────────────────────────────────────────
 
 /** Copy a DLL (or any file) into the cluster's sources/ folder. Returns the absolute destination path. */

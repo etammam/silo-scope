@@ -96,5 +96,20 @@ export interface RendererApi {
       sourceId?: string;
       functionId?: string;
     }) => Promise<InvocationResult>;
+    requests: {
+      list: (clusterId: string) => Promise<
+        Array<{
+          tabId: string;
+          grainId: string;
+          payload: string;
+          targetGrainClass: string;
+          targetMethod: string;
+        }>
+      >;
+      save: (
+        clusterId: string,
+        requests: Record<string, unknown>[],
+      ) => Promise<{ success: boolean }>;
+    };
   };
 }

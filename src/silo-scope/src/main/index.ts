@@ -14,6 +14,8 @@ import {
   deleteCluster,
   copySourceFile,
   isSourceManaged,
+  readRequests,
+  writeRequests,
 } from "./cluster-store";
 import { createNugetFeedRequestSchema } from "../shared/schemas";
 import type { NugetFeed, NugetPackage } from "../shared/schemas";
@@ -1099,6 +1101,33 @@ function registerClustersIpc(): void {
 
       const saved = writeCluster(storagePath, { ...cluster, sources });
       return saved;
+    },
+  );
+
+  // Request contexts for a cluster
+  ipcMain.handle(
+    "siloscope:clusters-requests-list",
+    (_event, params: { clusterId: string }) => {
+      try {
+        const storagePath = requireStoragePath();
+        return readRequests(storagePath, params.clusterId);
+      } catch (error) {
+        console.error("[clusters:requests-list]", error);
+        return [];
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "siloscope:clusters-requests-save",
+    (_event, params: { clusterId: string; requests: Record<string, unknown>[] }) => {
+      const storagePath = requireStoragePath();
+      writeRequests(
+        storagePath,
+        params.clusterId,
+        params.requests as unknown as import("./cluster-store").SavedRequest[],
+      );
+      return { success: true };
     },
   );
 

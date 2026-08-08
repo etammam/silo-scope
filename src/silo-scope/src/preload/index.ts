@@ -105,6 +105,12 @@ const api: RendererApi = {
       ipcRenderer.invoke("siloscope:get-source-catalog"),
     invokeGrain: (params) =>
       ipcRenderer.invoke("siloscope:invoke-grain", params),
+    requests: {
+      list: (clusterId: string) =>
+        ipcRenderer.invoke("siloscope:clusters-requests-list", { clusterId }),
+      save: (clusterId, requests) =>
+        ipcRenderer.invoke("siloscope:clusters-requests-save", { clusterId, requests }),
+    },
   },
 };
 

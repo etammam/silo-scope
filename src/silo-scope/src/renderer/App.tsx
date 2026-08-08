@@ -435,7 +435,7 @@ function App() {
 
       if (modifier && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        void saveCurrentWorkspace();
+        void saveAllUnsavedRequestContexts();
         return;
       }
 
@@ -843,9 +843,11 @@ function App() {
       setRequestStates({});
       setHydratedWorkspaceId(null);
       void refreshEnvironments(nextWorkspace.id);
+      void loadSavedRequests(nextWorkspace);
     },
     [setWorkspace, workspaces],
   );
+
 
   const handleCreateWorkspace = useCallback(
     (nextWorkspace: Workspace) => {
@@ -1381,7 +1383,7 @@ function App() {
                         onClick={(event) => {
                           event.stopPropagation();
                           handleSelectFunction(functionId);
-                          void saveCurrentWorkspace();
+                          void saveAllUnsavedRequestContexts();
                         }}
                         title="Save request context"
                         type="button"
@@ -1892,6 +1894,41 @@ async function refreshPersistedWorkspaces(): Promise<Workspace[]> {
   }
 }
 
+async function loadSavedRequests(ws: Workspace) {
+  try {
+    if (!window.api?.clusters?.requests) return;
+    const saved = await window.api.clusters.requests.list(ws.id);
+    if (saved.length === 0) return;
+
+    // Merge with existing savedContexts, deduplicating by tabId
+    const existing = ws.savedContexts ?? [];
+    const merged = [...existing];
+    for (const req of saved) {
+      if (!merged.some((c) => c.tabId === req.tabId)) {
+        const payloadStr =
+          typeof req.payload === "string"
+            ? req.payload
+            : JSON.stringify(req.payload, null, 2);
+        merged.push({
+          tabId: req.tabId,
+          isDefaultActive: false,
+          targetGrainClass: req.targetGrainClass,
+          targetMethod: req.targetMethod,
+          keyType: "String" as const,
+          grainId: String(req.grainId),
+          payload: payloadStr,
+        });
+      }
+    }
+
+    if (merged.length !== existing.length) {
+      useAppStore.getState().setWorkspace({ ...ws, savedContexts: merged });
+    }
+  } catch {
+    // best-effort
+  }
+}
+
 async function refreshBackendLogs() {
   try {
     const response = await rpc.request.getBackendLogs();
@@ -1909,8 +1946,10 @@ async function refreshBackendLogs() {
 
 async function persistWorkspace(workspace: Workspace) {
   try {
+    // savedContexts live in requests.json, not cluster.json
+    const { savedContexts: _, ...clean } = workspace;
     await rpc.request.saveWorkspace({
-      workspace,
+      workspace: clean as Workspace,
       path: undefined,
     });
     await setActiveWorkspace(workspace);
@@ -1977,8 +2016,10 @@ async function saveCurrentWorkspace(path?: string) {
     : workspace;
 
   try {
+    // savedContexts live in requests.json, not cluster.json
+    const { savedContexts: _, ...clean } = workspaceWithContext;
     await rpc.request.saveWorkspace({
-      workspace: workspaceWithContext,
+      workspace: clean as Workspace,
       path,
     });
     useAppStore.setState({ workspace: workspaceWithContext });
@@ -2007,16 +2048,26 @@ async function saveAllUnsavedRequestContexts(path?: string) {
     return;
   }
 
-  const workspaceWithContexts = workspaceWithSavedRequestContexts(
-    workspace,
-    unsavedContexts,
-  );
-
   try {
-    await rpc.request.saveWorkspace({
-      workspace: workspaceWithContexts,
-      path,
-    });
+    // Bulk-save all unsaved requests to requests.json
+    if (window.api?.clusters?.requests) {
+      await window.api.clusters.requests.save(
+        workspace.id,
+        unsavedContexts.map((ctx) => ({
+          tabId: ctx.tabId,
+          grainId: ctx.grainId,
+          payload: ctx.payload,
+          targetGrainClass: ctx.targetGrainClass,
+          targetMethod: ctx.targetMethod,
+        })),
+      );
+    }
+
+    // Also update the in-memory workspace
+    const workspaceWithContexts = workspaceWithSavedRequestContexts(
+      workspace,
+      unsavedContexts,
+    );
     useAppStore.setState({ workspace: workspaceWithContexts });
     addWorkspaceToSession(workspaceWithContexts);
     useAppStore.getState().addLog({
