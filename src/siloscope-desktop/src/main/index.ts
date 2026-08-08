@@ -1310,6 +1310,8 @@ function createMainWindow() {
       width: 1400,
       height: 900,
     },
+    minWidth: 520,
+    minHeight: 400,
   });
 
   Electrobun.events.on(`close-${window.id}`, () => {
