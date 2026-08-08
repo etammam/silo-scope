@@ -7,7 +7,6 @@ import {
   Key,
   Loader2,
   Package,
-  PackageSearch,
   Pencil,
   Plus,
   Search,
@@ -107,7 +106,7 @@ export function PackageFeedsPage({
   const [feedHealth, setFeedHealth] = useState<Record<string, FeedHealth>>({});
   const [testingFeedName, setTestingFeedName] = useState<string | null>(null);
 
-  // Search state (secondary)
+  // Search state
   const [query, setQuery] = useState("");
   const [selectedFeedName, setSelectedFeedName] = useState<string | null>(null);
   const [results, setResults] = useState<NugetPackage[]>([]);
@@ -177,7 +176,6 @@ export function PackageFeedsPage({
   }, [form]);
 
   const handleTestFeed = useCallback(async (feed?: NugetFeed) => {
-    // If a specific feed card is being tested (not the form)
     if (feed && onTestFeed) {
       setTestingFeedName(feed.name);
       setFeedHealth((prev) => ({ ...prev, [feed.name]: "unknown" }));
@@ -192,7 +190,6 @@ export function PackageFeedsPage({
       return;
     }
 
-    // Form-based test
     if (!canSubmitForm || !onTestFeed) return;
     setTestState("testing");
     setTestMessage("Testing connection…");
@@ -224,7 +221,7 @@ export function PackageFeedsPage({
     }
   }, [canSubmitForm, isEditing, editingFeedName, onUpdateFeed, onCreateFeed, buildRequest, resetForm]);
 
-  // ─── Search (secondary) ─────────────────────────────────────────────
+  // ─── Search ─────────────────────────────────────────────────────────
 
   const performSearch = useCallback(
     async (searchQuery: string) => {
@@ -341,232 +338,234 @@ export function PackageFeedsPage({
   // ─── Render ──────────────────────────────────────────────────────────
 
   return (
-    <section className="pkg-feeds" aria-labelledby="pkg-feeds-title">
-      {/* ── Header ─────────────────────────────────────────────────── */}
+    <section className="pkg-feeds" aria-label="Package Feeds">
       <header className="pkg-feeds__header">
-        <div className="pkg-feeds__header-main">
-          <span className="pkg-feeds__eyebrow">NuGet</span>
-          <h2 id="pkg-feeds-title" className="pkg-feeds__title">
-            Package Feeds
-          </h2>
-          <p className="pkg-feeds__subtitle">
-            {customFeedCount > 0
-              ? `${formatCount(availableFeeds.length, "feed")} configured`
-              : "Add a NuGet registry to browse and install packages"}
-          </p>
-        </div>
-        <div className="pkg-feeds__header-actions">
-          <button
-            className="pkg-feeds__add-feed-btn"
-            onClick={startAddFeed}
-            type="button"
-            disabled={isAddingFeed}
-          >
-            <Plus aria-hidden="true" width={15} height={15} />
-            <span>Add feed</span>
-          </button>
-        </div>
+        <h2>Package Feeds</h2>
+        <p>
+          {customFeedCount > 0
+            ? `${formatCount(availableFeeds.length, "feed")} configured — connect to NuGet registries to browse and install packages.`
+            : "Connect to NuGet registries to browse and install packages directly from your feeds."}
+        </p>
       </header>
 
-      {/* ── Feed management (the hero) ─────────────────────────────── */}
       <div className="pkg-feeds__body">
-        <div className="pkg-feeds__main">
-          {/* Add/Edit form */}
-          {showForm && (
-            <div className="pkg-feeds__feed-form" role="form" aria-label={isEditing ? "Edit feed" : "Add feed"}>
-              <div className="pkg-feeds__feed-form-header">
-                <h3>{isEditing ? `Edit "${editingFeedName}"` : "Add a NuGet feed"}</h3>
-                <button
-                  aria-label="Close feed form"
-                  className="pkg-feeds__feed-form-close"
-                  onClick={resetForm}
-                  type="button"
-                >
-                  <X aria-hidden="true" width={16} height={16} />
-                </button>
-              </div>
-              <p className="pkg-feeds__feed-form-desc">
-                {isEditing
-                  ? "Update URL or rotate credentials for this feed."
-                  : "Connect to any NuGet-compatible registry — nuget.org, GitHub Packages, Azure Artifacts, or a private feed."}
-              </p>
+        {/* ── Feed management ──────────────────────────────────────── */}
+        <section className="pkg-feeds__section">
+          <div className="pkg-feeds__section-heading">
+            <h3>Configured feeds</h3>
+            <p>Manage your connected NuGet registries. Test connectivity, edit URLs, or rotate credentials.</p>
+          </div>
 
-              <div className="pkg-feeds__feed-form-fields">
-                <label>
-                  <span>Name</span>
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="github"
-                    autoFocus
-                  />
-                </label>
-                <label>
-                  <span>URL</span>
-                  <input
-                    value={form.url}
-                    onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                    placeholder="https://nuget.pkg.github.com/org/index.json"
-                  />
-                </label>
-                <div className="pkg-feeds__feed-form-row">
-                  <label>
-                    <span>Username</span>
+          <div className="pkg-feeds__section-content">
+            {/* Add/Edit form */}
+            {showForm && (
+              <div className="pkg-feeds__feed-form" role="form" aria-label={isEditing ? "Edit feed" : "Add feed"}>
+                <div className="pkg-feeds__feed-form-header">
+                  <h4>{isEditing ? `Edit "${editingFeedName}"` : "Add a NuGet feed"}</h4>
+                  <button
+                    aria-label="Close feed form"
+                    className="pkg-feeds__feed-form-close"
+                    onClick={resetForm}
+                    type="button"
+                  >
+                    <X aria-hidden="true" width={16} height={16} />
+                  </button>
+                </div>
+                <p className="pkg-feeds__feed-form-desc">
+                  {isEditing
+                    ? "Update the URL or rotate credentials for this feed."
+                    : "Connect to any NuGet-compatible registry — nuget.org, GitHub Packages, Azure Artifacts, or a private feed."}
+                </p>
+
+                <div className="pkg-feeds__feed-form-fields">
+                  <label className="pkg-feeds__form-field">
+                    <span>Name</span>
                     <input
-                      value={form.username}
-                      onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-                      placeholder="Optional"
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="github"
+                      autoFocus
                     />
                   </label>
-                  <label>
-                    <span>Token</span>
+                  <label className="pkg-feeds__form-field">
+                    <span>URL</span>
                     <input
-                      type="password"
-                      value={form.password}
-                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                      placeholder={isEditing ? "Leave blank to keep" : "Optional"}
+                      value={form.url}
+                      onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+                      placeholder="https://nuget.pkg.github.com/org/index.json"
                     />
                   </label>
+                  <div className="pkg-feeds__feed-form-row">
+                    <label className="pkg-feeds__form-field">
+                      <span>Username</span>
+                      <input
+                        value={form.username}
+                        onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+                        placeholder="Optional"
+                      />
+                    </label>
+                    <label className="pkg-feeds__form-field">
+                      <span>Token</span>
+                      <input
+                        type="password"
+                        value={form.password}
+                        onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                        placeholder={isEditing ? "Leave blank to keep" : "Optional"}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {testMessage && testState !== "idle" && (
+                  <div
+                    className={`pkg-feeds__feed-form-message pkg-feeds__feed-form-message--${testState}`}
+                    role="status"
+                  >
+                    {testState === "testing" && <Loader2 aria-hidden="true" width={14} height={14} />}
+                    {testState === "success" && <Check aria-hidden="true" width={14} height={14} />}
+                    {testState === "error" && <AlertCircle aria-hidden="true" width={14} height={14} />}
+                    <span>{testMessage}</span>
+                  </div>
+                )}
+
+                <div className="pkg-feeds__feed-form-actions">
+                  <button
+                    className="pkg-feeds__btn pkg-feeds__btn--secondary"
+                    onClick={() => handleTestFeed()}
+                    disabled={!canSubmitForm || testState === "testing" || !onTestFeed}
+                    type="button"
+                  >
+                    {testState === "testing" ? "Testing…" : "Test connection"}
+                  </button>
+                  <button
+                    className="pkg-feeds__btn pkg-feeds__btn--primary"
+                    onClick={handleSaveFeed}
+                    disabled={!canSubmitForm || feedSaveState === "saving" || (!onCreateFeed && !isEditing)}
+                    type="button"
+                  >
+                    {feedSaveState === "saving" ? "Saving…" : isEditing ? "Save changes" : "Connect and save"}
+                  </button>
+                  <button
+                    className="pkg-feeds__btn pkg-feeds__btn--ghost"
+                    onClick={resetForm}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
+            )}
 
-              {testMessage && testState !== "idle" && (
-                <div
-                  className={`pkg-feeds__feed-form-message pkg-feeds__feed-form-message--${testState}`}
-                  role="status"
-                >
-                  {testState === "testing" && <Loader2 aria-hidden="true" width={14} height={14} />}
-                  {testState === "success" && <Check aria-hidden="true" width={14} height={14} />}
-                  {testState === "error" && <AlertCircle aria-hidden="true" width={14} height={14} />}
-                  <span>{testMessage}</span>
-                </div>
-              )}
+            {/* Feed cards */}
+            <div className="pkg-feeds__feed-grid">
+              {availableFeeds.map((feed) => {
+                const health = feedHealth[feed.name] ?? "unknown";
+                const isTesting = testingFeedName === feed.name;
 
-              <div className="pkg-feeds__feed-form-actions">
-                <button
-                  className="pkg-feeds__btn pkg-feeds__btn--secondary"
-                  onClick={() => handleTestFeed()}
-                  disabled={!canSubmitForm || testState === "testing" || !onTestFeed}
-                  type="button"
-                >
-                  {testState === "testing" ? "Testing…" : "Test connection"}
-                </button>
-                <button
-                  className="pkg-feeds__btn pkg-feeds__btn--primary"
-                  onClick={handleSaveFeed}
-                  disabled={!canSubmitForm || feedSaveState === "saving" || (!onCreateFeed && !isEditing)}
-                  type="button"
-                >
-                  {feedSaveState === "saving" ? "Saving…" : isEditing ? "Save changes" : "Connect and save"}
-                </button>
-                <button
-                  className="pkg-feeds__btn pkg-feeds__btn--ghost"
-                  onClick={resetForm}
-                  type="button"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Feed cards — the primary UI */}
-          <div className="pkg-feeds__feed-grid">
-            {availableFeeds.map((feed) => {
-              const health = feedHealth[feed.name] ?? "unknown";
-              const isTesting = testingFeedName === feed.name;
-
-              return (
-                <div key={feed.name} className="pkg-feeds__feed-card">
-                  <div className="pkg-feeds__feed-card-top">
-                    <span className={`pkg-feeds__feed-card-icon ${feed.isDefault ? "pkg-feeds__feed-card-icon--default" : feed.hasCredentials ? "pkg-feeds__feed-card-icon--auth" : "pkg-feeds__feed-card-icon--public"}`} aria-hidden="true">
-                      {feed.isDefault ? <Shield width={15} height={15} /> : feed.hasCredentials ? <Key width={15} height={15} /> : <Globe width={15} height={15} />}
-                    </span>
-                    <div className="pkg-feeds__feed-card-info">
-                      <span className="pkg-feeds__feed-card-name">
-                        {feed.name}
-                        {feed.isDefault && <span className="pkg-feeds__feed-card-badge">Default</span>}
-                        {feed.hasCredentials && !feed.isDefault && <span className="pkg-feeds__feed-card-badge pkg-feeds__feed-card-badge--auth">Auth</span>}
+                return (
+                  <div key={feed.name} className="pkg-feeds__feed-card">
+                    <div className="pkg-feeds__feed-card-top">
+                      <span className={`pkg-feeds__feed-card-icon ${feed.isDefault ? "pkg-feeds__feed-card-icon--default" : feed.hasCredentials ? "pkg-feeds__feed-card-icon--auth" : "pkg-feeds__feed-card-icon--public"}`} aria-hidden="true">
+                        {feed.isDefault ? <Shield width={15} height={15} /> : feed.hasCredentials ? <Key width={15} height={15} /> : <Globe width={15} height={15} />}
                       </span>
-                      <span className="pkg-feeds__feed-card-url">{feed.url}</span>
+                      <div className="pkg-feeds__feed-card-info">
+                        <span className="pkg-feeds__feed-card-name">
+                          {feed.name}
+                          {feed.isDefault && <span className="pkg-feeds__feed-card-badge">Default</span>}
+                          {feed.hasCredentials && !feed.isDefault && <span className="pkg-feeds__feed-card-badge pkg-feeds__feed-card-badge--auth">Auth</span>}
+                        </span>
+                        <span className="pkg-feeds__feed-card-url">{feed.url}</span>
+                      </div>
+                      <div className="pkg-feeds__feed-card-health">
+                        {isTesting ? (
+                          <span className="pkg-feeds__health pkg-feeds__health--testing">
+                            <Loader2 aria-hidden="true" width={12} height={12} />
+                            Testing
+                          </span>
+                        ) : health === "healthy" ? (
+                          <span className="pkg-feeds__health pkg-feeds__health--ok">
+                            <Check aria-hidden="true" width={12} height={12} />
+                            Connected
+                          </span>
+                        ) : health === "unhealthy" ? (
+                          <span className="pkg-feeds__health pkg-feeds__health--bad">
+                            <AlertCircle aria-hidden="true" width={12} height={12} />
+                            Failed
+                          </span>
+                        ) : (
+                          <span className="pkg-feeds__health">
+                            <span className="pkg-feeds__health-dot" aria-hidden="true" />
+                            Untested
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="pkg-feeds__feed-card-health">
-                      {isTesting ? (
-                        <span className="pkg-feeds__health pkg-feeds__health--testing">
-                          <Loader2 aria-hidden="true" width={12} height={12} />
-                          Testing
-                        </span>
-                      ) : health === "healthy" ? (
-                        <span className="pkg-feeds__health pkg-feeds__health--ok">
-                          <Check aria-hidden="true" width={12} height={12} />
-                          Connected
-                        </span>
-                      ) : health === "unhealthy" ? (
-                        <span className="pkg-feeds__health pkg-feeds__health--bad">
-                          <AlertCircle aria-hidden="true" width={12} height={12} />
-                          Failed
-                        </span>
-                      ) : (
-                        <span className="pkg-feeds__health">
-                          <span className="pkg-feeds__health-dot" aria-hidden="true" />
-                          Untested
-                        </span>
+                    <div className="pkg-feeds__feed-card-actions">
+                      <button
+                        className="pkg-feeds__btn pkg-feeds__btn--secondary pkg-feeds__btn--small"
+                        onClick={() => handleTestFeed(feed)}
+                        disabled={isTesting || !onTestFeed}
+                        type="button"
+                      >
+                        {isTesting ? "Testing…" : "Test connection"}
+                      </button>
+                      {!feed.isDefault && (
+                        <button
+                          className="pkg-feeds__btn pkg-feeds__btn--ghost pkg-feeds__btn--small"
+                          onClick={() => startEditFeed(feed)}
+                          type="button"
+                        >
+                          <Pencil aria-hidden="true" width={12} height={12} />
+                          Edit
+                        </button>
                       )}
                     </div>
                   </div>
-                  <div className="pkg-feeds__feed-card-actions">
-                    <button
-                      className="pkg-feeds__btn pkg-feeds__btn--secondary pkg-feeds__btn--small"
-                      onClick={() => handleTestFeed(feed)}
-                      disabled={isTesting || !onTestFeed}
-                      type="button"
-                    >
-                      {isTesting ? "Testing…" : "Test connection"}
-                    </button>
-                    {!feed.isDefault && (
-                      <button
-                        className="pkg-feeds__btn pkg-feeds__btn--ghost pkg-feeds__btn--small"
-                        onClick={() => startEditFeed(feed)}
-                        type="button"
-                      >
-                        <Pencil aria-hidden="true" width={12} height={12} />
-                        Edit
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
 
-          {availableFeeds.length === 0 && (
-            <div className="pkg-feeds__empty-state">
-              <div className="pkg-feeds__empty-icon">
-                <Globe aria-hidden="true" width={36} height={36} />
+            {availableFeeds.length === 0 && !showForm && (
+              <div className="pkg-feeds__empty-state">
+                <div className="pkg-feeds__empty-icon">
+                  <Globe aria-hidden="true" width={28} height={28} />
+                </div>
+                <strong>No feeds configured</strong>
+                <span>Add a NuGet registry to start browsing packages. nuget.org is always available as a default — add it or connect a private feed.</span>
+                <button
+                  className="pkg-feeds__empty-action"
+                  onClick={startAddFeed}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" width={14} height={14} />
+                  Add your first feed
+                </button>
               </div>
-              <strong>No feeds configured</strong>
-              <span>Add a NuGet registry to start browsing packages. nuget.org is always available as a default — add it or connect a private feed.</span>
+            )}
+
+            {availableFeeds.length > 0 && !showForm && (
               <button
-                className="pkg-feeds__btn pkg-feeds__btn--primary"
+                className="pkg-feeds__add-feed-btn"
                 onClick={startAddFeed}
                 type="button"
               >
                 <Plus aria-hidden="true" width={14} height={14} />
-                Add your first feed
+                Add feed
               </button>
+            )}
+          </div>
+        </section>
+
+        {/* ── Package browser ──────────────────────────────────────── */}
+        {availableFeeds.length > 0 && (
+          <section className="pkg-feeds__section">
+            <div className="pkg-feeds__section-heading">
+              <h3>Browse packages</h3>
+              <p>Search across your connected feeds to discover and inspect packages.</p>
             </div>
-          )}
 
-          {/* Package search — secondary section */}
-          {availableFeeds.length > 0 && (
-            <details className="pkg-feeds__search-section">
-              <summary className="pkg-feeds__search-section-toggle">
-                <PackageSearch aria-hidden="true" width={15} height={15} />
-                <span>Browse packages</span>
-                <ChevronRight aria-hidden="true" width={13} height={13} className="pkg-feeds__search-section-chevron" />
-              </summary>
-
-              <div className="pkg-feeds__search-section-body">
+            <div className="pkg-feeds__section-content">
+              <div className="pkg-feeds__search-panel">
                 <div className="pkg-feeds__search-row">
                   <label className="pkg-feeds__search">
                     <span className="sr-only">Search packages across feeds</span>
@@ -619,7 +618,7 @@ export function PackageFeedsPage({
                   )}
                 </div>
 
-                {/* Results */}
+                {/* Search error */}
                 {searchError && (
                   <div className="pkg-feeds__browser-error">
                     <AlertCircle aria-hidden="true" width={18} height={18} />
@@ -631,6 +630,7 @@ export function PackageFeedsPage({
                   </div>
                 )}
 
+                {/* Results */}
                 {results.length > 0 && (
                   <>
                     <div className="pkg-feeds__results-summary">
@@ -704,9 +704,9 @@ export function PackageFeedsPage({
                   </div>
                 )}
               </div>
-            </details>
-          )}
-        </div>
+            </div>
+          </section>
+        )}
       </div>
     </section>
   );
