@@ -1,4 +1,5 @@
-import { Download, RefreshCw, RotateCcw } from "lucide-react";
+import { FolderOpen, RefreshCw, RotateCcw, Download } from "lucide-react";
+import { useCallback, useState } from "react";
 import type { AppUpdateState } from "../../shared/types";
 
 type WorkbenchTheme = "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
@@ -25,6 +26,8 @@ type SettingsPageProps = {
   onCheckForUpdate: () => void;
   onDownloadUpdate: () => void;
   onApplyUpdate: () => void;
+  storagePath: string | null;
+  onChangeStorage: () => Promise<string | null>;
 };
 
 export function SettingsPage({
@@ -39,6 +42,8 @@ export function SettingsPage({
   onCheckForUpdate,
   onDownloadUpdate,
   onApplyUpdate,
+  storagePath,
+  onChangeStorage,
 }: SettingsPageProps) {
   const updateInfo = updateState?.updateInfo ?? null;
   const latestStatus = updateState?.statusHistory.at(-1);
@@ -47,6 +52,22 @@ export function SettingsPage({
   const canDownload = Boolean(updateInfo?.updateAvailable && !updateInfo.updateReady);
   const canApply = Boolean(updateInfo?.updateReady);
   const isBusy = updateAction !== null;
+  const [isChangingStorage, setIsChangingStorage] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
+
+  const handleChangeStorage = useCallback(async () => {
+    setStorageError(null);
+    setIsChangingStorage(true);
+    try {
+      await onChangeStorage();
+    } catch (err) {
+      setStorageError(
+        err instanceof Error ? err.message : "Failed to change storage folder.",
+      );
+    } finally {
+      setIsChangingStorage(false);
+    }
+  }, [onChangeStorage]);
 
   return (
     <section className="settings-page" aria-label="Settings">
@@ -134,6 +155,39 @@ export function SettingsPage({
               />
             </label>
           </div>
+        </section>
+
+        <section className="settings-page__section" aria-labelledby="settings-storage-title">
+          <div className="settings-page__section-heading">
+            <h3 id="settings-storage-title">Data Storage</h3>
+            <p>Where your feeds, workspaces, and environments are saved on disk.</p>
+          </div>
+          <div className="settings-page__storage-panel">
+            <div className="settings-page__storage-path">
+              <span className="settings-page__storage-icon" aria-hidden="true">
+                <FolderOpen width={16} height={16} />
+              </span>
+              <div className="settings-page__storage-detail">
+                <strong>Storage folder</strong>
+                <code className="settings-page__storage-value">
+                  {storagePath ?? "Not configured — select a folder to get started."}
+                </code>
+              </div>
+            </div>
+            <button
+              className="settings-page__storage-action"
+              disabled={isChangingStorage}
+              onClick={handleChangeStorage}
+              type="button"
+            >
+              {isChangingStorage ? "Opening…" : "Change folder"}
+            </button>
+          </div>
+          {storageError && (
+            <p className="settings-page__storage-error" role="alert">
+              {storageError}
+            </p>
+          )}
         </section>
 
         <section className="settings-page__section" aria-labelledby="settings-updates-title">

@@ -40,6 +40,7 @@ import {
 } from "./components/BackendLogsPanel";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import { PackageFeedsPage } from "./components/PackageFeedsPage";
+import { SetupBanner } from "./components/SetupBanner";
 import {
   createPayloadTemplate,
   RequestWorkbench,
@@ -112,6 +113,10 @@ function App() {
     environments,
     activeEnvironment,
     setActiveEnvironment,
+    storagePath,
+    isStorageReady,
+    setStoragePath,
+    setStorageReady,
   } = useAppStore();
   const [activeView, setActiveView] = useState<ActivityView>("workspace");
   const [theme, setTheme] = useState<WorkbenchTheme>(() => readStoredTheme());
@@ -195,16 +200,47 @@ function App() {
   const handleNewWorkspace = useCallback(() => {
     setActiveView("workspaces");
   }, []);
+
+  const handleSetupComplete = useCallback(
+    (path: string) => {
+      setStoragePath(path);
+      setStorageReady(true);
+      // Refresh feeds now that storage is ready
+      void refreshNugetFeeds();
+    },
+    [setStoragePath, setStorageReady],
+  );
+
+  const handleChangeStorage = useCallback(async (): Promise<string | null> => {
+    if (typeof window.api?.storage?.selectFolder !== "function") {
+      throw new Error("Storage API not available. Are you running in the desktop app?");
+    }
+
+    const selectedPath = await window.api.storage.selectFolder();
+    if (!selectedPath) return null; // User cancelled — not an error
+
+    const isValid = await window.api.storage.verify(selectedPath);
+    if (!isValid) {
+      throw new Error(
+        "Cannot write to the selected folder. Choose a different location with write permissions.",
+      );
+    }
+
+    setStoragePath(selectedPath);
+    setStorageReady(true);
+    void refreshNugetFeeds();
+    return selectedPath;
+  }, [setStoragePath, setStorageReady]);
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, theme);
   }, [theme]);
 
   useEffect(() => {
-    void refreshNugetFeeds();
     void refreshPersistedWorkspaces();
     void refreshAppUpdateState();
     void refreshBackendLogs();
     void refreshEnvironments();
+    void initializeStorage(); // calls refreshNugetFeeds() internally once storage is ready
   }, []);
 
   useEffect(() => {
@@ -909,6 +945,7 @@ function App() {
       data-connected={isConnected}
       data-desktop={isDesktop}
       data-navigation-visible={isNavigationVisible}
+      data-storage-ready={isStorageReady}
       data-log-panel-visible={isLogPanelVisible}
       data-pane-layout={paneLayout}
       data-platform={platform}
@@ -919,6 +956,11 @@ function App() {
       {isActivityBarVisible && (
         <ActivityBar activeView={activeView} onViewChange={setActiveView} />
       )}
+
+      <SetupBanner
+        isStorageReady={isStorageReady}
+        onSetupComplete={handleSetupComplete}
+      />
 
       <header
         className={titlebarClassName}
@@ -1193,6 +1235,8 @@ function App() {
             onCheckForUpdate={handleCheckForUpdate}
             onDownloadUpdate={handleDownloadUpdate}
             onApplyUpdate={handleApplyUpdate}
+            storagePath={storagePath}
+            onChangeStorage={handleChangeStorage}
           />
         ) : activeView === "workspaces" ? (
           <WorkspacesPage
@@ -1400,6 +1444,11 @@ function App() {
             {isConnected ? "Online" : "Offline"}
           </span>
           <small>{workspace?.name ?? "No active cluster"}</small>
+        </div>
+        <div className="global-status-bar__center">
+          <span className="global-status-bar__version">
+            v0.1.0 • Electron {window.api?.versions?.electron ?? "browser"}
+          </span>
         </div>
         <BackendLogStatusButton
           entries={logs}
@@ -2029,6 +2078,10 @@ async function searchNugetPackages(
   take?: number,
 ) {
   try {
+    if (window.api?.feeds) {
+      return await window.api.feeds.search(query, feedName, take ?? 20);
+    }
+    // Fallback to mock
     const response = await rpc.request.searchNugetPackages({
       query,
       feedName,
@@ -2050,6 +2103,10 @@ async function searchNugetPackages(
 
 async function getNugetPackageVersions(packageId: string, feedName?: string) {
   try {
+    if (window.api?.feeds) {
+      return await window.api.feeds.getVersions(packageId, feedName);
+    }
+    // Fallback to mock
     const response = await rpc.request.getNugetPackageVersions({
       packageId,
       feedName,
@@ -2068,8 +2125,33 @@ async function getNugetPackageVersions(packageId: string, feedName?: string) {
   }
 }
 
+async function initializeStorage() {
+  try {
+    if (!window.api?.storage) return;
+    const storedPath = await window.api.storage.getPath();
+    if (storedPath) {
+      const isValid = await window.api.storage.verify(storedPath);
+      if (isValid) {
+        useAppStore.getState().setStoragePath(storedPath);
+        useAppStore.getState().setStorageReady(true);
+        // Storage is ready — load persisted data now
+        await refreshNugetFeeds();
+      }
+    }
+  } catch {
+    // Storage is not available (browser or error) — stay unconfigured
+  }
+}
+
 async function refreshNugetFeeds() {
   try {
+    if (!useAppStore.getState().isStorageReady) return;
+    if (window.api?.feeds) {
+      const feeds = await window.api.feeds.list();
+      useAppStore.getState().setNugetFeeds(feeds);
+      return;
+    }
+    // Fallback to mock during development / browser
     const response = await rpc.request.listNugetFeeds();
     useAppStore.getState().setNugetFeeds(response.feeds);
   } catch (error) {
@@ -2088,6 +2170,19 @@ async function createNugetFeed(request: {
   username?: string;
   password?: string;
 }) {
+  if (window.api?.feeds) {
+    const feed = await window.api.feeds.create({
+      ...request,
+      isPasswordClearText: true,
+    });
+    const store = useAppStore.getState();
+    store.setNugetFeeds([
+      ...store.nugetFeeds.filter((f) => f.name !== feed.name),
+      feed,
+    ]);
+    return;
+  }
+  // Fallback to mock
   const response = await rpc.request.createNugetFeed({
     ...request,
     isPasswordClearText: true,
@@ -2105,6 +2200,14 @@ async function testNugetFeed(request: {
   username?: string;
   password?: string;
 }) {
+  if (window.api?.feeds) {
+    await window.api.feeds.test({
+      ...request,
+      isPasswordClearText: true,
+    });
+    return;
+  }
+  // Fallback to mock
   await rpc.request.testNugetFeed({
     ...request,
     isPasswordClearText: true,
@@ -2120,6 +2223,21 @@ async function updateNugetFeed(
     password?: string;
   },
 ) {
+  if (window.api?.feeds) {
+    const feed = await window.api.feeds.update(name, {
+      ...request,
+      isPasswordClearText: true,
+    });
+    const store = useAppStore.getState();
+    store.setNugetFeeds([
+      ...store.nugetFeeds.filter(
+        (f) => f.name !== name && f.name !== feed.name,
+      ),
+      feed,
+    ]);
+    return;
+  }
+  // Fallback to mock
   const response = await rpc.request.updateNugetFeed({
     name,
     feed: {

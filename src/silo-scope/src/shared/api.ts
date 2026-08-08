@@ -1,3 +1,5 @@
+import type { CreateNugetFeedRequest, NugetFeed, NugetPackage } from "./types";
+
 export interface RendererApi {
   isDesktop: boolean;
   platform: NodeJS.Platform;
@@ -13,5 +15,25 @@ export interface RendererApi {
     onStateChange: (
       callback: (state: { isMaximized: boolean }) => void,
     ) => () => void;
+  };
+  storage: {
+    getPath: () => Promise<string | null>;
+    selectFolder: () => Promise<string | null>;
+    verify: (path: string) => Promise<boolean>;
+  };
+  feeds: {
+    list: () => Promise<NugetFeed[]>;
+    create: (request: CreateNugetFeedRequest) => Promise<NugetFeed>;
+    update: (
+      name: string,
+      request: CreateNugetFeedRequest,
+    ) => Promise<NugetFeed>;
+    test: (request: CreateNugetFeedRequest) => Promise<boolean>;
+    search: (
+      query: string,
+      feedName?: string,
+      take?: number,
+    ) => Promise<NugetPackage[]>;
+    getVersions: (packageId: string, feedName?: string) => Promise<string[]>;
   };
 }

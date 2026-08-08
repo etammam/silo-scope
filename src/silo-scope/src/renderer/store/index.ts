@@ -18,6 +18,8 @@ interface AppState {
   environments: EnvironmentProfile[];
   activeEnvironment: string | null;
   environmentErrors: string[];
+  storagePath: string | null;
+  isStorageReady: boolean;
 
   setWorkspace: (workspace: Workspace | null) => void;
   setGrains: (grains: GrainInterfaceDescriptor[]) => void;
@@ -37,6 +39,8 @@ interface AppState {
   setEnvironments: (environments: EnvironmentProfile[]) => void;
   setActiveEnvironment: (activeEnvironment: string | null) => void;
   setEnvironmentErrors: (environmentErrors: string[]) => void;
+  setStoragePath: (storagePath: string | null) => void;
+  setStorageReady: (isStorageReady: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -56,6 +60,8 @@ export const useAppStore = create<AppState>((set) => ({
   environments: [],
   activeEnvironment: null,
   environmentErrors: [],
+  storagePath: null,
+  isStorageReady: false,
 
   setWorkspace: (workspace) => set({ workspace, selectedFunctionId: null, selectedGrain: null, selectedMethod: null, environmentErrors: [] }),
   setGrains: (grains) => set({ grains }),
@@ -80,6 +86,8 @@ export const useAppStore = create<AppState>((set) => ({
   setEnvironments: (environments) => set({ environments }),
   setActiveEnvironment: (activeEnvironment) => set({ activeEnvironment }),
   setEnvironmentErrors: (environmentErrors) => set({ environmentErrors }),
+  setStoragePath: (storagePath) => set({ storagePath }),
+  setStorageReady: (isStorageReady) => set({ isStorageReady }),
 }));
 
 function logIdentity(entry: LogEntry): string {

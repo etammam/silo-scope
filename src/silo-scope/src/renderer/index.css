@@ -75,6 +75,9 @@
 	--yellow-dim: rgb(226 192 141 / 0.13);
 	--red: var(--danger);
 	--red-dim: rgb(248 81 73 / 0.14);
+	--orange: #ff8c00;
+	--orange-dim: rgb(255 140 0 / 0.12);
+	--orange-bright: #ffa500;
 	--purple: #c586c0;
 	--select-chevron: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239d9d9d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
@@ -88,6 +91,7 @@
 	--ui-5: #616161;
 	--ui-6: #3b3b3b;
 	--ui-7: #1f1f1f;
+	--ui-8: #0a0a0a;
 	--accent: #005fb8;
 	--accent-strong: #0258a8;
 	--accent-contrast: #ffffff;
@@ -106,6 +110,9 @@
 	--yellow-dim: rgb(137 85 3 / 0.12);
 	--red: var(--danger);
 	--red-dim: rgb(199 46 15 / 0.11);
+	--orange: #c75200;
+	--orange-dim: rgb(199 82 0 / 0.08);
+	--orange-bright: #a04400;
 	--purple: #af00db;
 	--shadow-popover: 0 12px 34px rgb(0 0 0 / 0.16);
 	--shadow-modal: 0 24px 70px rgb(0 0 0 / 0.22);
@@ -154,6 +161,7 @@
 	--ui-5: #656d76;
 	--ui-6: #1f2328;
 	--ui-7: #010409;
+	--ui-8: #000000;
 	--accent: #0969da;
 	--accent-strong: #0550ae;
 	--accent-contrast: #ffffff;
@@ -172,6 +180,9 @@
 	--yellow-dim: rgb(154 103 0 / 0.12);
 	--red: var(--danger);
 	--red-dim: rgb(207 34 46 / 0.11);
+	--orange: #bc4c00;
+	--orange-dim: rgb(188 76 0 / 0.08);
+	--orange-bright: #9a3f00;
 	--purple: #8250df;
 	--shadow-popover: 0 12px 34px rgb(0 0 0 / 0.16);
 	--shadow-modal: 0 24px 70px rgb(0 0 0 / 0.22);
@@ -9217,6 +9228,19 @@ button:not(:disabled) {
 	white-space: nowrap;
 }
 
+.global-status-bar__center {
+	align-items: center;
+	display: flex;
+	gap: 8px;
+}
+
+.global-status-bar__version {
+	color: var(--ui-4);
+	font-size: 10px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	white-space: nowrap;
+}
+
 .global-status-bar__logs {
 	align-items: center;
 	appearance: none;
@@ -10664,3 +10688,201 @@ button:not(:disabled) {
 		display: none !important;
 	}
 }
+
+/* ─── Settings: Storage Panel ──────────────────────────────────────────── */
+
+.settings-page__storage-panel {
+	align-items: center;
+	background: var(--ui-1);
+	border: 1px solid var(--ui-3);
+	border-radius: var(--radius-md);
+	display: flex;
+	gap: 16px;
+	justify-content: space-between;
+	padding: 14px 16px;
+}
+
+.settings-page__storage-path {
+	align-items: flex-start;
+	display: flex;
+	gap: 12px;
+	min-width: 0;
+}
+
+.settings-page__storage-icon {
+	align-items: center;
+	color: var(--ui-5);
+	display: flex;
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.settings-page__storage-detail {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 0;
+}
+
+.settings-page__storage-detail strong {
+	color: var(--ui-8);
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.settings-page__storage-value {
+	color: var(--ui-5);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 380px;
+}
+
+.settings-page__storage-action {
+	align-items: center;
+	background: var(--ui-2);
+	border: 1px solid var(--ui-3);
+	border-radius: var(--radius-md);
+	color: var(--ui-7);
+	cursor: pointer;
+	display: inline-flex;
+	flex-shrink: 0;
+	font-size: 12px;
+	font-weight: 700;
+	gap: 6px;
+	height: 30px;
+	justify-content: center;
+	min-width: 88px;
+	padding: 0 10px;
+}
+
+.settings-page__storage-action:not(:disabled):hover {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-contrast);
+}
+
+.settings-page__storage-action:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.settings-page__storage-error {
+	align-items: center;
+	color: var(--red);
+	display: flex;
+	font-size: 12px;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+/* ─── Setup Overlay ────────────────────────────────────────────────────── */
+
+.setup-overlay {
+	align-items: center;
+	background: var(--ui-0);
+	display: flex;
+	grid-column: 1 / -1;
+	grid-row: 2 / -2;
+	justify-content: center;
+	padding: 40px 24px;
+	z-index: 50;
+}
+
+.setup-card {
+	align-items: center;
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	max-width: 400px;
+	text-align: center;
+	width: 100%;
+}
+
+.setup-card__icon {
+	margin-bottom: 24px;
+}
+
+.setup-card__icon-ring {
+	align-items: center;
+	background: var(--ui-1);
+	border: 1px solid var(--ui-3);
+	border-radius: 50%;
+	color: var(--ui-5);
+	display: flex;
+	height: 64px;
+	justify-content: center;
+	width: 64px;
+}
+
+.setup-card__heading {
+	color: var(--ui-7);
+	font-family: var(--font-sans);
+	font-size: 20px;
+	font-weight: 650;
+	letter-spacing: -0.3px;
+	line-height: 1.25;
+	margin: 0 0 10px;
+}
+
+.setup-card__description {
+	color: var(--ui-5);
+	font-family: var(--font-sans);
+	font-size: 13px;
+	line-height: 1.55;
+	margin: 0 0 28px;
+	max-width: 340px;
+}
+
+.setup-card__button {
+	align-items: center;
+	background: var(--accent);
+	border: none;
+	border-radius: var(--radius-md);
+	color: var(--accent-contrast);
+	cursor: pointer;
+	display: inline-flex;
+	font-family: var(--font-sans);
+	font-size: 13px;
+	font-weight: 600;
+	gap: 8px;
+	height: 38px;
+	justify-content: center;
+	min-width: 200px;
+	padding: 0 20px;
+}
+
+.setup-card__button:not(:disabled):hover {
+	background: var(--accent-strong);
+}
+
+.setup-card__button:disabled {
+	cursor: not-allowed;
+	opacity: 0.7;
+}
+
+.setup-card__error {
+	align-items: center;
+	color: var(--red);
+	display: flex;
+	font-size: 12px;
+	gap: 7px;
+	margin-top: 18px;
+}
+
+.setup-card__error svg {
+	flex-shrink: 0;
+}
+
+.setup-card__spinner {
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+/* During setup, the overlay covers content — no extra dimming needed */
