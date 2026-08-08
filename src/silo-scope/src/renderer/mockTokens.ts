@@ -30,6 +30,9 @@ import {
 
 export const FAKER_TOKEN_REGEX = /\{\{faker\.([A-Za-z][A-Za-z0-9_]*)(?::([a-z]{2}))?\}\}/g;
 
+/** Matches env var tokens like {{MY_VAR}} (not faker tokens). */
+export const ENV_TOKEN_REGEX = /\{\{(?!faker\.)([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+
 export interface MockTokenMatch {
   raw: string;
   field: string;

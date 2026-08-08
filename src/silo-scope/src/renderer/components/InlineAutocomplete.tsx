@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FAKER_FIELDS, FAKER_LOCALES, findMockTokens } from "../mockTokens";
+import { ENV_TOKEN_REGEX, FAKER_FIELDS, FAKER_LOCALES, findMockTokens } from "../mockTokens";
 
 interface InlineAutocompleteProps {
   children: React.ReactElement<HTMLInputElement | HTMLTextAreaElement>;
   envVars?: string[];
+  warnUnresolved?: boolean;
 }
 
 type Suggestion = {
@@ -17,6 +18,7 @@ type Suggestion = {
 export function InlineAutocomplete({
   children,
   envVars = [],
+  warnUnresolved = false,
 }: InlineAutocompleteProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
@@ -311,12 +313,15 @@ export function InlineAutocomplete({
     },
   });
 
-  const hasFaker = highlightHtml !== null;
+  const hasFakerTokens = highlightHtml !== null;
+  const hasEnvTokens = warnUnresolved && ENV_TOKEN_REGEX.test(inputValue);
+  ENV_TOKEN_REGEX.lastIndex = 0; // reset
 
   return (
     <div ref={containerRef} className="inline-autocomplete">
       {React.cloneElement(clonedChild, {
-        "data-has-faker": hasFaker || undefined,
+        "data-has-faker": hasFakerTokens || undefined,
+        "data-unresolved-env": hasEnvTokens || undefined,
       })}
       {open && suggestions.length > 0 && (
         <div className="inline-autocomplete__dropdown" role="listbox">

@@ -10551,6 +10551,16 @@ button:not(:disabled) {
 	color: var(--orange-bright);
 }
 
+.inline-autocomplete > input[data-unresolved-env="true"],
+.inline-autocomplete > textarea[data-unresolved-env="true"] {
+	color: #ef4444;
+}
+
+.inline-autocomplete > input[data-unresolved-env="true"]:focus,
+.inline-autocomplete > textarea[data-unresolved-env="true"]:focus {
+	color: #ef4444;
+}
+
 .inline-autocomplete__dropdown {
 	background: var(--ui-0);
 	border: 1px solid color-mix(in srgb, var(--ui-4) 38%, transparent);

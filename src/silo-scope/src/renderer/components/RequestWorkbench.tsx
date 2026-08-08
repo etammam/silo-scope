@@ -250,7 +250,7 @@ export function RequestWorkbench({
 
         <label className="request-workbench__grain-id-label">
           <span>Grain ID</span>
-          <InlineAutocomplete envVars={Object.keys(activeEnvVars)}>
+          <InlineAutocomplete envVars={Object.keys(activeEnvVars)} warnUnresolved={!activeEnvironment}>
             <input
               ref={grainKeyInputRef}
               aria-invalid={missingGrainKeyTokens.length > 0}

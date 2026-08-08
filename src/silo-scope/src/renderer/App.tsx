@@ -1126,6 +1126,23 @@ function App() {
                   <div className="environment-menu__current">
                     <strong>Environments</strong>
                   </div>
+                  <button
+                    aria-pressed={activeEnvironment === null}
+                    className={`environment-menu__item ${activeEnvironment === null ? "environment-menu__item--active" : ""}`}
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setIsEnvironmentMenuOpen(false);
+                      setActiveEnvironment(null);
+                      void saveEnvironments(workspace?.id ?? null, environments, null);
+                    }}
+                  >
+                    <Layers aria-hidden="true" width={13} height={13} />
+                    <span className="environment-menu__item-name">(none)</span>
+                    {activeEnvironment === null && (
+                      <span className="environment-menu__item-status">Active</span>
+                    )}
+                  </button>
                   {environments.map((env) => (
                     <button
                       key={env.name}
