@@ -48,6 +48,15 @@ const api: RendererApi = {
         feedName,
       }),
   },
+  environments: {
+    list: (workspaceId: string) =>
+      ipcRenderer.invoke("siloscope:environments-list", workspaceId),
+    save: (workspaceId: string, config) =>
+      ipcRenderer.invoke("siloscope:environments-save", {
+        workspaceId,
+        config,
+      }),
+  },
 };
 
 contextBridge.exposeInMainWorld("api", api);

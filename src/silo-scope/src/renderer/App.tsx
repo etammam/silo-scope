@@ -239,7 +239,7 @@ function App() {
     void refreshPersistedWorkspaces();
     void refreshAppUpdateState();
     void refreshBackendLogs();
-    void refreshEnvironments();
+    void refreshEnvironments(workspace?.id ?? null);
     void initializeStorage(); // calls refreshNugetFeeds() internally once storage is ready
   }, []);
 
@@ -793,6 +793,7 @@ function App() {
       setFunctionTabs([]);
       setRequestStates({});
       setHydratedWorkspaceId(null);
+      void refreshEnvironments(nextWorkspace.id);
     },
     [setWorkspace, workspaces],
   );
@@ -810,6 +811,7 @@ function App() {
       setRequestStates({});
       setHydratedWorkspaceId(null);
       void persistWorkspace(nextWorkspace);
+      void refreshEnvironments(nextWorkspace.id);
     },
     [setWorkspace],
   );
@@ -838,6 +840,7 @@ function App() {
         setFunctionTabs([]);
         setRequestStates({});
         setHydratedWorkspaceId(null);
+        void refreshEnvironments(null);
       }
     },
     [setWorkspace, workspace],
@@ -1056,7 +1059,7 @@ function App() {
           Siloscope Workbench
         </button>
         <div className="app-titlebar__actions">
-          {environments.length > 0 && (
+          {workspace && environments.length > 0 && (
             <div className="titlebar-environment-selector electrobun-webkit-app-region-no-drag">
               <button
                 aria-expanded={isEnvironmentMenuOpen}
@@ -1085,7 +1088,7 @@ function App() {
                         setIsEnvironmentMenuOpen(false);
                         const envName = env.name || null;
                         setActiveEnvironment(envName);
-                        void saveEnvironments(environments, envName);
+                        void saveEnvironments(workspace?.id ?? null, environments, envName);
                       }}
                     >
                       <Layers aria-hidden="true" width={13} height={13} />
@@ -1257,10 +1260,11 @@ function App() {
           <EnvironmentPage
             environments={environments}
             activeEnvironment={activeEnvironment}
+            hasWorkspace={workspace !== null}
             onEnvironmentsChange={async (nextEnvironments, nextActive) => {
               useAppStore.getState().setEnvironments(nextEnvironments);
               useAppStore.getState().setActiveEnvironment(nextActive);
-              await saveEnvironments(nextEnvironments, nextActive);
+              await saveEnvironments(workspace?.id ?? null, nextEnvironments, nextActive);
             }}
           />
         ) : (
@@ -1488,7 +1492,7 @@ function App() {
         onDisconnectCluster={disconnectCluster}
         onSwitchEnvironment={(envName) => {
           setActiveEnvironment(envName);
-          void saveEnvironments(environments, envName);
+          void saveEnvironments(workspace?.id ?? null, environments, envName);
         }}
       />
       {isCloseConfirmationOpen && (
@@ -1729,11 +1733,14 @@ async function setActiveWorkspace(workspace: Workspace): Promise<boolean> {
 }
 
 async function saveEnvironments(
+  workspaceId: string | null,
   profiles: EnvironmentProfile[],
   activeEnvironment: string | null,
 ) {
+  if (!workspaceId) return;
   try {
     await rpc.request.saveEnvironments({
+      workspaceId,
       config: { profiles, activeEnvironment },
     });
   } catch (error) {
@@ -1746,9 +1753,14 @@ async function saveEnvironments(
   }
 }
 
-async function refreshEnvironments() {
+async function refreshEnvironments(workspaceId: string | null) {
+  if (!workspaceId) {
+    useAppStore.getState().setEnvironments([]);
+    useAppStore.getState().setActiveEnvironment(null);
+    return;
+  }
   try {
-    const envConfig = await rpc.request.getEnvironments();
+    const envConfig = await rpc.request.getEnvironments({ workspaceId });
     useAppStore.getState().setEnvironments(envConfig.profiles);
     useAppStore.getState().setActiveEnvironment(envConfig.activeEnvironment);
   } catch {
@@ -1788,6 +1800,7 @@ async function refreshPersistedWorkspaces() {
       const firstWorkspace = workspaces[0];
       store.setWorkspace(firstWorkspace);
       await setActiveWorkspace(firstWorkspace);
+      void refreshEnvironments(firstWorkspace.id);
     }
   } catch (error) {
     useAppStore.getState().addLog({

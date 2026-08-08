@@ -3,6 +3,10 @@ import { join } from "node:path";
 import { getStoragePath, setStoragePath } from "./storage";
 import { readFeeds, writeFeeds, verifyStoragePath } from "./feeds-store";
 import type { PersistedFeed } from "./feeds-store";
+import {
+  readEnvironments,
+  writeEnvironments,
+} from "./environments-store";
 import { createNugetFeedRequestSchema } from "../shared/schemas";
 import type { NugetFeed, NugetPackage } from "../shared/schemas";
 
@@ -648,12 +652,57 @@ function deduplicateAndSortVersions(
   return versions.map(({ _feedPriority, ...rest }) => rest.version);
 }
 
+// ─── Environments IPC ────────────────────────────────────────────────────────
+
+function registerEnvironmentsIpc(): void {
+  ipcMain.handle(
+    "siloscope:environments-list",
+    (_event, workspaceId: string) => {
+      try {
+        const storagePath = requireStoragePath();
+        return readEnvironments(storagePath, workspaceId);
+      } catch (error) {
+        console.error("[environments:list]", error);
+        return { profiles: [], activeEnvironment: null };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "siloscope:environments-save",
+    (
+      _event,
+      params: {
+        workspaceId: string;
+        config: { profiles: unknown[]; activeEnvironment: string | null };
+      },
+    ) => {
+      try {
+        const storagePath = requireStoragePath();
+        const config = {
+          profiles: params.config.profiles as Array<{
+            name: string;
+            variables: Record<string, string>;
+          }>,
+          activeEnvironment: params.config.activeEnvironment,
+        };
+        writeEnvironments(storagePath, params.workspaceId, config);
+        return true;
+      } catch (error) {
+        console.error("[environments:save]", error);
+        throw error;
+      }
+    },
+  );
+}
+
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
   registerWindowIpc();
   registerStorageIpc();
   registerFeedsIpc();
+  registerEnvironmentsIpc();
   createWindow();
 
   app.on("activate", () => {

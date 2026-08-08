@@ -1,4 +1,9 @@
-import type { CreateNugetFeedRequest, NugetFeed, NugetPackage } from "./types";
+import type { CreateNugetFeedRequest, EnvironmentProfile, NugetFeed, NugetPackage } from "./types";
+
+export interface EnvironmentConfig {
+  profiles: EnvironmentProfile[];
+  activeEnvironment: string | null;
+}
 
 export interface RendererApi {
   isDesktop: boolean;
@@ -35,5 +40,12 @@ export interface RendererApi {
       take?: number,
     ) => Promise<NugetPackage[]>;
     getVersions: (packageId: string, feedName?: string) => Promise<string[]>;
+  };
+  environments: {
+    list: (workspaceId: string) => Promise<EnvironmentConfig>;
+    save: (
+      workspaceId: string,
+      config: EnvironmentConfig,
+    ) => Promise<boolean>;
   };
 }

@@ -377,11 +377,22 @@ export const rpc = {
       persistedWorkspace = params.workspace;
       return { success: true };
     },
-    getEnvironments: async (): Promise<EnvironmentConfig> =>
-      persistedEnvironments,
+    getEnvironments: async (params: {
+      workspaceId: string;
+    }): Promise<EnvironmentConfig> => {
+      if (typeof window !== "undefined" && window.api?.environments) {
+        return window.api.environments.list(params.workspaceId);
+      }
+      return persistedEnvironments;
+    },
     saveEnvironments: async (params: {
+      workspaceId: string;
       config: EnvironmentConfig;
     }): Promise<{ success: boolean }> => {
+      if (typeof window !== "undefined" && window.api?.environments) {
+        await window.api.environments.save(params.workspaceId, params.config);
+        return { success: true };
+      }
       persistedEnvironments = params.config;
       return { success: true };
     },

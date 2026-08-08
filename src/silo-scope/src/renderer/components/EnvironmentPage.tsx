@@ -1,11 +1,12 @@
-import { Check, Globe, Pencil, Plus, Save, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Braces, Check, Globe, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EnvironmentProfile } from "../../shared/types";
 import { InlineAutocomplete } from "./InlineAutocomplete";
 
 type EnvironmentPageProps = {
   environments: EnvironmentProfile[];
   activeEnvironment: string | null;
+  hasWorkspace: boolean;
   onEnvironmentsChange: (
     environments: EnvironmentProfile[],
     activeEnvironment: string | null,
@@ -36,6 +37,7 @@ function profilesEqual(
 export function EnvironmentPage({
   environments,
   activeEnvironment,
+  hasWorkspace,
   onEnvironmentsChange,
 }: EnvironmentPageProps) {
   const [draftProfiles, setDraftProfiles] = useState<EnvironmentProfile[]>(
@@ -50,13 +52,13 @@ export function EnvironmentPage({
   const [envVarKey, setEnvVarKey] = useState("");
   const [envVarValue, setEnvVarValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editKeyDraft, setEditKeyDraft] = useState("");
   const [editValueDraft, setEditValueDraft] = useState("");
+  const [editKeyError, setEditKeyError] = useState<string | null>(null);
 
   const envVarValueRef = useRef<HTMLInputElement>(null);
   const editValueRef = useRef<HTMLInputElement>(null);
@@ -90,7 +92,7 @@ export function EnvironmentPage({
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 3000);
+    const timer = setTimeout(() => setToast(null), 2800);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -100,6 +102,25 @@ export function EnvironmentPage({
   const pendingKey = envVarKey.trim();
   const pendingValue = envVarValue.trim();
   const hasPendingInput = Boolean(pendingKey);
+  const isPendingKeyValid = hasPendingInput && keyError === null;
+
+  const validateEnvKey = (key: string): string | null => {
+    if (key.length === 0) return null;
+    if (/\s/.test(key)) return "Variable names cannot contain spaces.";
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) return "Only English letters, digits, and underscores.";
+    if (key.length > 64) return "Variable names must be 64 characters or fewer.";
+    return null;
+  };
+
+  const handleKeyChange = (value: string) => {
+    setEnvVarKey(value);
+    setKeyError(validateEnvKey(value.trim()));
+  };
+
+  const handleEditKeyChange = (value: string) => {
+    setEditKeyDraft(value);
+    setEditKeyError(validateEnvKey(value.trim()));
+  };
 
   const computeHasChanges = (): boolean => {
     if (draftActive !== activeEnvironment) return true;
@@ -109,6 +130,15 @@ export function EnvironmentPage({
   };
 
   const hasChanges = computeHasChanges();
+
+  const dismissSaveError = useCallback(() => setSaveError(null), []);
+
+  // Clear save error when the user starts making changes again
+  useEffect(() => {
+    if (hasChanges && saveError) {
+      setSaveError(null);
+    }
+  }, [hasChanges, saveError]);
 
   const flushPendingVariable = (): EnvironmentProfile[] => {
     if (!pendingKey || !currentProfile) return draftProfiles;
@@ -165,7 +195,7 @@ export function EnvironmentPage({
   };
 
   const addVariable = () => {
-    if (!pendingKey || !currentProfile) return;
+    if (!pendingKey || !currentProfile || !isPendingKeyValid) return;
     const next = draftProfiles.map((e) =>
       e.name === selectedProfile
         ? { ...e, variables: { ...e.variables, [pendingKey]: pendingValue } }
@@ -174,6 +204,7 @@ export function EnvironmentPage({
     setDraftProfiles(next);
     setEnvVarKey("");
     setEnvVarValue("");
+    setKeyError(null);
   };
 
   const removeVariable = (key: string) => {
@@ -197,6 +228,7 @@ export function EnvironmentPage({
     const newKey = editKeyDraft.trim();
     const newValue = editValueDraft.trim();
     if (!newKey) return;
+    if (validateEnvKey(newKey)) return;
 
     const next = draftProfiles.map((e) => {
       if (e.name !== selectedProfile) return e;
@@ -217,6 +249,7 @@ export function EnvironmentPage({
     setEditingKey(null);
     setEditKeyDraft("");
     setEditValueDraft("");
+    setEditKeyError(null);
   };
 
   const setActive = (name: string) => {
@@ -228,19 +261,18 @@ export function EnvironmentPage({
       ? flushPendingVariable()
       : draftProfiles;
     setIsSaving(true);
+    setSaveError(null);
     try {
       await onEnvironmentsChange(profilesToSave, draftActive);
       setEnvVarKey("");
       setEnvVarValue("");
-      setToast({ message: "Environments saved successfully", type: "success" });
+      setToast("Environments saved");
     } catch (error) {
-      setToast({
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to save environments",
-        type: "error",
-      });
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Failed to save environments",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -249,35 +281,31 @@ export function EnvironmentPage({
   return (
     <section className="environment-page" aria-label="Environments">
       <header className="environment-page__header">
-        <div>
-          <span>Environments</span>
-          <h2 id="environments-title">Environment Profiles</h2>
-          <p>{draftProfiles.length} configured</p>
-        </div>
-        {draftProfiles.length > 0 && (
-          <button
-            aria-label="Save environment changes"
-            className={`environment-page__save-button ${hasChanges ? "environment-page__save-button--dirty" : ""}`}
-            disabled={!hasChanges || isSaving}
-            onClick={handleSave}
-            type="button"
-          >
-            <Save aria-hidden="true" width={14} height={14} />
-            {isSaving ? "Saving..." : hasChanges ? "Save Changes" : "Saved"}
-          </button>
-        )}
+        <h2>Environments</h2>
+        <p>Manage variable sets for your grain invocations. Switch between environments from the titlebar selector.</p>
       </header>
 
       <div className="environment-page__body">
-        {draftProfiles.length === 0 ? (
+        {!hasWorkspace ? (
           <div className="environment-page__empty-full">
             <div className="environment-page__empty-icon">
-              <Globe aria-hidden="true" width={48} height={48} />
+              <Globe aria-hidden="true" width={32} height={32} />
+            </div>
+            <h3>No cluster selected</h3>
+            <p>
+              Environment profiles are scoped to a cluster. Select or create a
+              cluster to manage its environments.
+            </p>
+          </div>
+        ) : draftProfiles.length === 0 ? (
+          <div className="environment-page__empty-full">
+            <div className="environment-page__empty-icon">
+              <Globe aria-hidden="true" width={32} height={32} />
             </div>
             <h3>No environment profiles</h3>
             <p>
-              Environment profiles let you manage variable sets for your grain
-              invocations across all clusters.
+              Define sets of variables to switch between when invoking grains.
+              Each profile holds key-value pairs scoped to this cluster.
             </p>
             <button
               className="environment-page__empty-action"
@@ -291,14 +319,17 @@ export function EnvironmentPage({
         ) : (
           <>
             <div className="environment-page__sidebar">
-              <button
-                className="environment-page__create-button"
-                onClick={addProfile}
-                type="button"
-              >
-                <Plus aria-hidden="true" width={14} height={14} />
-                New profile
-              </button>
+              <div className="environment-page__sidebar-header">
+                <span>{draftProfiles.length} {draftProfiles.length === 1 ? "profile" : "profiles"}</span>
+                <button
+                  className="environment-page__create-btn"
+                  disabled={!hasWorkspace}
+                  onClick={addProfile}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" width={14} height={14} />
+                </button>
+              </div>
               <ul className="environment-page__list" role="list">
                 {draftProfiles.map((env) => (
                   <li
@@ -327,57 +358,82 @@ export function EnvironmentPage({
             <div className="environment-page__form-area">
               {currentProfile ? (
                 <div className="environment-form">
-                  <div className="environment-form__header">
-                    <div className="environment-form__toolbar">
-                      <label className="environment-form__field">
-                        <span>Profile name</span>
-                        <input
-                          aria-label="Environment profile name"
-                          value={currentProfile.name}
-                          onChange={(e) => renameProfile(e.target.value)}
-                        />
-                      </label>
-                      <div className="environment-form__actions">
-                        <button
-                          aria-label="Set as active environment"
-                          aria-pressed={draftActive === currentProfile.name}
-                          className={`environment-form__action ${draftActive === currentProfile.name ? "environment-form__action--active" : ""}`}
-                          onClick={() => setActive(currentProfile.name)}
-                          type="button"
-                        >
-                          {draftActive === currentProfile.name
-                            ? "Active"
-                            : "Set Active"}
-                        </button>
-                        <button
-                          aria-label="Delete environment profile"
-                          className="environment-form__action environment-form__action--danger"
-                          disabled={draftProfiles.length === 0}
-                          onClick={removeProfile}
-                          title="Delete profile"
-                          type="button"
-                        >
-                          <Trash2 aria-hidden="true" width={12} height={12} />
-                        </button>
-                      </div>
+                  <div className="environment-form__toolbar">
+                    <label className="environment-form__field">
+                      <span>Profile name</span>
+                      <input
+                        aria-label="Environment profile name"
+                        value={currentProfile.name}
+                        onChange={(e) => renameProfile(e.target.value)}
+                      />
+                    </label>
+                    <div className="environment-form__actions">
+                      <button
+                        aria-label="Set as active environment"
+                        aria-pressed={draftActive === currentProfile.name}
+                        className={`environment-form__action ${draftActive === currentProfile.name ? "environment-form__action--active" : ""}`}
+                        onClick={() => setActive(currentProfile.name)}
+                        type="button"
+                      >
+                        {draftActive === currentProfile.name
+                          ? "Active"
+                          : "Set active"}
+                      </button>
+                      <button
+                        aria-label="Delete environment profile"
+                        className="environment-form__action environment-form__action--danger"
+                        disabled={draftProfiles.length === 0}
+                        onClick={removeProfile}
+                        title="Delete profile"
+                        type="button"
+                      >
+                        <Trash2 aria-hidden="true" width={12} height={12} />
+                      </button>
                     </div>
                   </div>
+
+                  {saveError && (
+                    <div className="environment-form__error" role="alert">
+                      <div className="environment-form__error-header">
+                        <AlertTriangle aria-hidden="true" width={14} height={14} />
+                        <span>Save failed</span>
+                        <button
+                          aria-label="Dismiss error"
+                          className="environment-form__error-dismiss"
+                          onClick={dismissSaveError}
+                          type="button"
+                        >
+                          <X aria-hidden="true" width={12} height={12} />
+                        </button>
+                      </div>
+                      <p className="environment-form__error-message">{saveError}</p>
+                    </div>
+                  )}
 
                   <div className="environment-form__section">
                     <h4>Variables</h4>
                     <div className="environment-form__var-inputs">
-                      <input
-                        aria-label="Variable key"
-                        placeholder="Key"
-                        value={envVarKey}
-                        onChange={(e) => setEnvVarKey(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addVariable();
-                          }
-                        }}
-                      />
+                      <div className="environment-form__var-key-input">
+                        <input
+                          aria-label="Variable key"
+                          aria-invalid={keyError !== null}
+                          placeholder="Key"
+                          value={envVarKey}
+                          onChange={(e) => handleKeyChange(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addVariable();
+                            }
+                          }}
+                        />
+                        {keyError && (
+                          <span className="environment-form__var-error" role="alert">
+                            <AlertTriangle aria-hidden="true" width={10} height={10} />
+                            {keyError}
+                          </span>
+                        )}
+                      </div>
                       <InlineAutocomplete
                         envVars={Object.keys(currentProfile.variables)}
                       >
@@ -398,9 +454,9 @@ export function EnvironmentPage({
                       <button
                         aria-label="Add variable"
                         className="environment-form__mini-command"
-                        disabled={!pendingKey}
+                        disabled={!isPendingKeyValid}
                         onClick={addVariable}
-                        title="Add variable"
+                        title={keyError ?? "Add variable"}
                         type="button"
                       >
                         <Plus aria-hidden="true" width={12} height={12} />
@@ -417,25 +473,34 @@ export function EnvironmentPage({
                             <li key={key}>
                               {editingKey === key ? (
                                 <>
-                                  <input
-                                    aria-label="Edit variable key"
-                                    className="environment-form__var-edit-input"
-                                    value={editKeyDraft}
-                                    onChange={(e) =>
-                                      setEditKeyDraft(e.target.value)
-                                    }
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        saveEditVariable();
+                                  <div className="environment-form__var-key-input environment-form__var-key-input--edit">
+                                    <input
+                                      aria-label="Edit variable key"
+                                      aria-invalid={editKeyError !== null}
+                                      className="environment-form__var-edit-input"
+                                      value={editKeyDraft}
+                                      onChange={(e) =>
+                                        handleEditKeyChange(e.target.value)
                                       }
-                                      if (e.key === "Escape") {
-                                        e.preventDefault();
-                                        cancelEditVariable();
-                                      }
-                                    }}
-                                    autoFocus
-                                  />
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          saveEditVariable();
+                                        }
+                                        if (e.key === "Escape") {
+                                          e.preventDefault();
+                                          cancelEditVariable();
+                                        }
+                                      }}
+                                      autoFocus
+                                    />
+                                    {editKeyError && (
+                                      <span className="environment-form__var-error" role="alert">
+                                        <AlertTriangle aria-hidden="true" width={10} height={10} />
+                                        {editKeyError}
+                                      </span>
+                                    )}
+                                  </div>
                                   <InlineAutocomplete
                                     envVars={Object.keys(
                                       currentProfile.variables,
@@ -532,10 +597,25 @@ export function EnvironmentPage({
                       </ul>
                     ) : (
                       <div className="environment-form__empty">
-                        No variables defined
+                        <Braces aria-hidden="true" width={20} height={20} />
+                        <span>No variables defined</span>
                       </div>
                     )}
                   </div>
+                  {draftProfiles.length > 0 && (
+                    <div className="environment-form__footer">
+                      <button
+                        aria-label="Save environment changes"
+                        className={`environment-page__save-btn ${hasChanges ? "environment-page__save-btn--dirty" : ""}`}
+                        disabled={!hasChanges || isSaving}
+                        onClick={handleSave}
+                        type="button"
+                      >
+                        <Save aria-hidden="true" width={14} height={14} />
+                        {isSaving ? "Saving…" : hasChanges ? "Save changes" : "Saved"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="environment-page__empty-state">
@@ -549,17 +629,12 @@ export function EnvironmentPage({
 
       {toast && (
         <div
-          className={`environment-toast environment-toast--${toast.type}`}
+          className="environment-toast"
           role="status"
           aria-live="polite"
         >
-          {toast.type === "success" && (
-            <Check aria-hidden="true" width={14} height={14} />
-          )}
-          {toast.type === "error" && (
-            <X aria-hidden="true" width={14} height={14} />
-          )}
-          <span>{toast.message}</span>
+          <Check aria-hidden="true" width={14} height={14} />
+          <span>{toast}</span>
         </div>
       )}
     </section>

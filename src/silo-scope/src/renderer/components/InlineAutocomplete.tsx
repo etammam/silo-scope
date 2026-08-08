@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { FAKER_FIELDS, FAKER_LOCALES } from "../mockTokens";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FAKER_FIELDS, FAKER_LOCALES, findMockTokens } from "../mockTokens";
 
 interface InlineAutocompleteProps {
   children: React.ReactElement<HTMLInputElement | HTMLTextAreaElement>;
@@ -11,6 +11,7 @@ type Suggestion = {
   insert: string;
   detail?: string;
   icon: "faker" | "env";
+  cursorOffset?: number;
 };
 
 export function InlineAutocomplete({
@@ -24,6 +25,26 @@ export function InlineAutocomplete({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [replaceStart, setReplaceStart] = useState(0);
   const [replaceEnd, setReplaceEnd] = useState(0);
+  const [inputValue, setInputValue] = useState("");
+
+  const highlightHtml = useMemo(() => {
+    if (!inputValue) return null;
+    const tokens = findMockTokens(inputValue);
+    if (tokens.length === 0) return null;
+    const parts: Array<{ text: string; highlight: boolean }> = [];
+    let lastEnd = 0;
+    for (const t of tokens) {
+      if (t.start > lastEnd) {
+        parts.push({ text: inputValue.slice(lastEnd, t.start), highlight: false });
+      }
+      parts.push({ text: t.raw, highlight: true });
+      lastEnd = t.end;
+    }
+    if (lastEnd < inputValue.length) {
+      parts.push({ text: inputValue.slice(lastEnd), highlight: false });
+    }
+    return parts;
+  }, [inputValue]);
 
   const computeSuggestions = useCallback(
     (
@@ -105,9 +126,10 @@ export function InlineAutocomplete({
         if (prefix === "" || "faker".startsWith(prefix)) {
           suggs.push({
             label: "faker.",
-            insert: `{{faker.`,
+            insert: `{{faker.}}`,
             detail: "mock data",
             icon: "faker" as const,
+            cursorOffset: -2,
           });
         }
 
@@ -151,9 +173,16 @@ export function InlineAutocomplete({
     [envVars],
   );
 
+  useEffect(() => {
+    const input = inputRef.current;
+    if (input) setInputValue(input.value);
+  }, []);
+
   const handleInput = useCallback(() => {
     const input = inputRef.current;
     if (!input) return;
+
+    setInputValue(input.value);
 
     const cursorPos = input.selectionStart ?? input.value.length;
     const result = computeSuggestions(input.value, cursorPos);
@@ -210,7 +239,9 @@ export function InlineAutocomplete({
       });
       input.dispatchEvent(event);
 
-      const cursorPos = replaceStart + insert.length;
+      const cursorOffset = suggestions[index].cursorOffset ?? 0;
+      let cursorPos = replaceStart + insert.length + cursorOffset;
+      if (cursorPos < 0) cursorPos = 0;
       input.focus();
       input.setSelectionRange(cursorPos, cursorPos);
 
@@ -280,9 +311,13 @@ export function InlineAutocomplete({
     },
   });
 
+  const hasFaker = highlightHtml !== null;
+
   return (
     <div ref={containerRef} className="inline-autocomplete">
-      {clonedChild}
+      {React.cloneElement(clonedChild, {
+        "data-has-faker": hasFaker || undefined,
+      })}
       {open && suggestions.length > 0 && (
         <div className="inline-autocomplete__dropdown" role="listbox">
           {suggestions.map((s, i) => (
