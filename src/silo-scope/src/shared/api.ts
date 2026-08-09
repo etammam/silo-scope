@@ -57,6 +57,19 @@ export interface RendererApi {
       config: EnvironmentConfig,
     ) => Promise<boolean>;
   };
+  updates: {
+    check: () => Promise<void>;
+    download: () => Promise<void>;
+    apply: () => Promise<void>;
+    onStatus: (
+      callback: (entry: {
+        status: string;
+        message: string;
+        timestamp: number;
+        progress?: number;
+      }) => void,
+    ) => () => void;
+  };
   sidecar: {
     status: () => Promise<{ running: boolean }>;
     restart: () => Promise<{ running: boolean }>;

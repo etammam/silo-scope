@@ -23,6 +23,7 @@ import {
   SidecarJsonRpcClient,
 } from "./jsonRpcClient";
 import type { Workspace } from "../shared/types";
+import { initAutoUpdater, checkForUpdates, downloadUpdate, applyUpdate, setSidecarForUpdater } from "./updater";
 
 const isMac = process.platform === "darwin";
 
@@ -36,6 +37,7 @@ type FluentResult<T> = {
 
 const sidecar = new SidecarJsonRpcClient();
 sidecar.start();
+setSidecarForUpdater(sidecar);
 
 // Forward sidecar log notifications to renderer
 sidecar.onNotification((notification) => {
@@ -350,6 +352,22 @@ function createWindow(): void {
   } else {
     win.loadFile(join(__dirname, "../renderer/index.html"));
   }
+}
+
+// ─── Auto-updater IPC ───────────────────────────────────────────────────────
+
+function registerUpdateIpc(): void {
+  ipcMain.handle("siloscope:check-for-update", () => {
+    checkForUpdates();
+  });
+
+  ipcMain.handle("siloscope:download-update", () => {
+    downloadUpdate();
+  });
+
+  ipcMain.handle("siloscope:apply-update", async () => {
+    await applyUpdate();
+  });
 }
 
 // ─── Window control IPC ──────────────────────────────────────────────────────
@@ -1403,7 +1421,9 @@ function registerSidecarIpc(): void {
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
+  initAutoUpdater();
   registerWindowIpc();
+  registerUpdateIpc();
   registerStorageIpc();
   registerFeedsIpc();
   registerEnvironmentsIpc();
@@ -1413,6 +1433,35 @@ app.whenReady().then(() => {
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+// ─── Cleanup on quit ────────────────────────────────────────────────────────
+
+async function cleanupBeforeQuit(): Promise<void> {
+  console.info("[siloscope] Cleaning up before quit…");
+  try {
+    // Disconnect from cluster if connected
+    await sidecar
+      .request("DisconnectClusterAsync", undefined)
+      .catch(() => { /* cluster may not be connected */ });
+  } catch {
+    // best-effort
+  }
+  try {
+    await sidecar.dispose();
+    console.info("[siloscope] Sidecar disposed.");
+  } catch (err) {
+    console.warn("[siloscope] Sidecar dispose failed:", err);
+  }
+}
+
+app.on("before-quit", (event) => {
+  if ((globalThis as Record<string, unknown>)._cleanupDone) return;
+  (globalThis as Record<string, unknown>)._cleanupDone = true;
+  event.preventDefault();
+  cleanupBeforeQuit().finally(() => {
+    app.quit();
   });
 });
 

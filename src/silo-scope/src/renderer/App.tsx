@@ -246,7 +246,6 @@ function App() {
 
   useEffect(() => {
     void refreshPersistedWorkspaces().then(setWorkspaces);
-    void refreshAppUpdateState();
     void refreshBackendLogs();
     void refreshEnvironments(workspace?.id ?? null);
     void initializeStorage(); // calls refreshNugetFeeds() internally once storage is ready
@@ -945,16 +944,43 @@ function App() {
     }
   }, [closeApplication]);
 
-  const refreshAppUpdateState = useCallback(async () => {
-    const state = await rpc.request.getAppUpdateState();
-    setAppUpdateState(state);
+  // Listen for real auto-updater status events from main process
+  useEffect(() => {
+    if (!window.api?.updates?.onStatus) return;
+    return window.api.updates.onStatus((entry) => {
+      setAppUpdateState((prev) => ({
+        localInfo: prev?.localInfo ?? {
+          version: "0.1.0",
+          hash: "",
+          baseUrl: "",
+          channel: "latest",
+          name: "siloscope",
+          identifier: "siloscope.app",
+        },
+        updateInfo: entry.status === "update-available" || entry.status === "download-complete"
+          ? { version: entry.message, hash: "", updateAvailable: true, updateReady: entry.status === "download-complete", error: "" }
+          : null,
+        statusHistory: [
+          ...(prev?.statusHistory ?? []).slice(-49),
+          {
+            status: entry.status as AppUpdateState["statusHistory"][number]["status"],
+            message: entry.message,
+            timestamp: entry.timestamp,
+            progress: entry.progress,
+          },
+        ],
+      }));
+    });
   }, []);
 
   const handleCheckForUpdate = useCallback(async () => {
     setUpdateAction("checking");
     try {
-      const state = await rpc.request.checkForAppUpdate();
-      setAppUpdateState(state);
+      if (window.api?.updates) {
+        await window.api.updates.check();
+      } else {
+        await rpc.request.checkForAppUpdate();
+      }
     } finally {
       setUpdateAction(null);
     }
@@ -963,8 +989,11 @@ function App() {
   const handleDownloadUpdate = useCallback(async () => {
     setUpdateAction("downloading");
     try {
-      const state = await rpc.request.downloadAppUpdate();
-      setAppUpdateState(state);
+      if (window.api?.updates) {
+        await window.api.updates.download();
+      } else {
+        await rpc.request.downloadAppUpdate();
+      }
     } finally {
       setUpdateAction(null);
     }
@@ -972,7 +1001,11 @@ function App() {
 
   const handleApplyUpdate = useCallback(async () => {
     setUpdateAction("applying");
-    await rpc.request.applyAppUpdate();
+    if (window.api?.updates) {
+      await window.api.updates.apply();
+    } else {
+      await rpc.request.applyAppUpdate();
+    }
   }, []);
 
   const handleOpenBackendLogDirectory = useCallback(async () => {

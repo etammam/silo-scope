@@ -57,6 +57,33 @@ const api: RendererApi = {
         config,
       }),
   },
+  updates: {
+    check: () => ipcRenderer.invoke("siloscope:check-for-update"),
+    download: () => ipcRenderer.invoke("siloscope:download-update"),
+    apply: () => ipcRenderer.invoke("siloscope:apply-update"),
+    onStatus: (
+      callback: (entry: {
+        status: string;
+        message: string;
+        timestamp: number;
+        progress?: number;
+      }) => void,
+    ) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        entry: {
+          status: string;
+          message: string;
+          timestamp: number;
+          progress?: number;
+        },
+      ) => callback(entry);
+      ipcRenderer.on("siloscope:update-status", handler);
+      return () => {
+        ipcRenderer.removeListener("siloscope:update-status", handler);
+      };
+    },
+  },
   sidecar: {
     status: () => ipcRenderer.invoke("siloscope:sidecar-status"),
     restart: () => ipcRenderer.invoke("siloscope:sidecar-restart"),
