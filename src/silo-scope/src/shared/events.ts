@@ -86,6 +86,4 @@ export const CUSTOM_EVENTS = {
   applicationMenuAction: "siloscope:application-menu-action",
   /** The user requested the application to close (Cmd+Q / Ctrl+Q) */
   requestApplicationClose: "siloscope:request-application-close",
-  /** An auto-update status event was received from the main process */
-  applicationUpdateStatus: "siloscope:app-update-status",
 } as const;

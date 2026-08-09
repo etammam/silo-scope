@@ -19,6 +19,7 @@ import type {
   GrainInterfaceDescriptor,
   Workspace,
 } from "../features/workspaces/schema";
+import type { ApplicationUpdateLocalInfo } from "../features/settings/schema";
 
 export interface EnvironmentConfig {
   profiles: EnvironmentProfile[];
@@ -75,6 +76,8 @@ export interface RendererApi {
         message: string;
         timestamp: number;
         progress?: number;
+        version?: string;
+        localInfo?: ApplicationUpdateLocalInfo;
       }) => void,
     ) => () => void;
   };

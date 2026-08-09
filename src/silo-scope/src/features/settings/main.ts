@@ -33,6 +33,21 @@ export function initAutoUpdater(): void {
   autoUpdater.allowDowngrade = false;
   autoUpdater.logger = console;
 
+  // Send local build info so the renderer can show version / release URL
+  sendStatus({
+    status: "idle",
+    message: "Ready to check for updates.",
+    timestamp: Date.now(),
+    localInfo: {
+      version: app.getVersion(),
+      hash: "",
+      baseUrl: "https://github.com/etammam/silo-scope/releases/latest/download",
+      channel: "latest",
+      name: app.getName(),
+      identifier: "siloscope.app",
+    },
+  });
+
   autoUpdater.on("checking-for-update", () => {
     sendStatus({
       status: "checking",
@@ -46,6 +61,7 @@ export function initAutoUpdater(): void {
       status: "update-available",
       message: `Version ${info.version} available.`,
       timestamp: Date.now(),
+      version: info.version,
     });
   });
 
@@ -71,6 +87,7 @@ export function initAutoUpdater(): void {
       status: "download-complete",
       message: `Version ${info.version} downloaded. Restart to apply.`,
       timestamp: Date.now(),
+      version: info.version,
     });
   });
 

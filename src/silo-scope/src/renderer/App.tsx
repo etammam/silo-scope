@@ -71,7 +71,6 @@ const WORKBENCH_THEMES = [
   "github-light",
 ] as const;
 const CLOSE_APPLICATION_REQUEST_EVENT_NAME = "siloscope:request-application-close";
-const APP_UPDATE_STATUS_EVENT_NAME = "siloscope:app-update-status";
 const EMPTY_REQUEST_STATE: RequestState = {
   grainKey: "",
   keyType: "String",
@@ -295,16 +294,6 @@ function App() {
         useAppStore.setState({ connectionStep: "Cluster connected" });
       }
     });
-  }, []);
-
-  useEffect(() => {
-    const handleUpdateStatus = (event: Event) => {
-      setApplicationUpdateState((event as CustomEvent<ApplicationUpdateState>).detail);
-    };
-
-    window.addEventListener(APP_UPDATE_STATUS_EVENT_NAME, handleUpdateStatus);
-    return () =>
-      window.removeEventListener(APP_UPDATE_STATUS_EVENT_NAME, handleUpdateStatus);
   }, []);
 
   useEffect(() => {
@@ -936,7 +925,7 @@ function App() {
     if (!window.api?.updates?.onStatus) return;
     return window.api.updates.onStatus((entry) => {
       setApplicationUpdateState((prev) => ({
-        localInfo: prev?.localInfo ?? {
+        localInfo: entry.localInfo ?? prev?.localInfo ?? {
           version: "0.1.0",
           hash: "",
           baseUrl: "",
@@ -945,8 +934,8 @@ function App() {
           identifier: "siloscope.app",
         },
         updateInfo: entry.status === "update-available" || entry.status === "download-complete"
-          ? { version: entry.message, hash: "", updateAvailable: true, updateReady: entry.status === "download-complete", error: "" }
-          : null,
+          ? { version: entry.version ?? entry.message, hash: "", updateAvailable: true, updateReady: entry.status === "download-complete", error: "" }
+          : prev?.updateInfo ?? null,
         statusHistory: [
           ...(prev?.statusHistory ?? []).slice(-49),
           {

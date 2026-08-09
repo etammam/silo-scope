@@ -52,6 +52,8 @@ export const applicationUpdateStatusEntrySchema = z.object({
   message: z.string(),
   timestamp: z.number().positive(),
   progress: z.number().min(0).max(100).optional(),
+  version: z.string().optional(),
+  localInfo: applicationUpdateLocalInfoSchema.optional(),
 });
 export type ApplicationUpdateStatusEntry = z.infer<
   typeof applicationUpdateStatusEntrySchema

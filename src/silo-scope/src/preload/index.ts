@@ -12,6 +12,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import type { RendererApi } from "../shared/api";
+import type { ApplicationUpdateLocalInfo } from "../features/settings/schema";
 import { IPC_CHANNELS } from "../shared/events";
 
 const api: RendererApi = {
@@ -82,6 +83,8 @@ const api: RendererApi = {
         message: string;
         timestamp: number;
         progress?: number;
+        version?: string;
+        localInfo?: ApplicationUpdateLocalInfo;
       }) => void,
     ) => {
       const handler = (
@@ -91,6 +94,8 @@ const api: RendererApi = {
           message: string;
           timestamp: number;
           progress?: number;
+          version?: string;
+          localInfo?: ApplicationUpdateLocalInfo;
         },
       ) => callback(entry);
       ipcRenderer.on(IPC_CHANNELS.updateStatus, handler);
