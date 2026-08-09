@@ -20,60 +20,60 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { rpc } from "./mockApi";
+import { rpc } from "./shared/mock-api";
+import type { ApplicationUpdateState } from "../features/settings/schema";
+import type { EnvironmentProfile } from "../features/environments/schema";
 import type {
-  AppUpdateState,
-  EnvironmentProfile,
   GrainKeyType,
   SavedRequestContext,
-  SourceCatalogFunction,
   Workspace,
-} from "../shared/types";
+} from "../features/workspaces/schema";
+import type { SourceCatalogFunction } from "../features/grain-invocation/schema";
 import {
   buildSourceCatalogFromGrains,
   findCatalogFunction,
   findCatalogSource,
-} from "./catalog";
-import { ActivityBar, type ActivityView } from "./components/ActivityBar";
+} from "../features/grain-invocation/renderer/utils/catalog";
+import { ActivityBar, type ActivityView } from "./layout/ActivityBar";
 import {
   BackendLogsPanel,
   BackendLogStatusButton,
-} from "./components/BackendLogsPanel";
-import { NavigationSidebar } from "./components/NavigationSidebar";
-import { PackageFeedsPage } from "./components/PackageFeedsPage";
-import { SetupBanner } from "./components/SetupBanner";
+} from "./layout/BackendLogsPanel";
+import { NavigationSidebar } from "./layout/NavigationSidebar";
+import { PackageFeedsPage } from "../features/feeds/renderer/components/PackageFeedsPage";
+import { SetupBanner } from "./layout/SetupBanner";
 import {
   createPayloadTemplate,
   RequestWorkbench,
   type RequestState,
-} from "./components/RequestWorkbench";
-import { RequestEmptyState } from "./components/RequestEmptyState";
+} from "../features/grain-invocation/renderer/components/RequestWorkbench";
+import { RequestEmptyState } from "./shared/components/RequestEmptyState";
 import {
   ResponseTelemetryPane,
   type ResponsePaneTab,
-} from "./components/ResponseTelemetryPane";
-import { QuickAccessPanel, type QuickAccessActions } from "./components/QuickAccessPanel";
-import { EnvironmentPage } from "./components/EnvironmentPage";
-import { SettingsPage } from "./components/SettingsPage";
-import { WorkspacesPage } from "./components/WorkspacesPage";
-import { ConnectionStatusBar } from "./components/ConnectionStatusBar";
-import { SidecarStatus } from "./components/SidecarStatus";
-import { useAppStore } from "./store";
+} from "../features/grain-invocation/renderer/components/ResponseTelemetryPane";
+import { QuickAccessPanel, type QuickAccessActions } from "../features/quick-access/renderer/components/QuickAccessPanel";
+import { EnvironmentPage } from "../features/environments/renderer/components/EnvironmentPage";
+import { SettingsPage } from "../features/settings/renderer/components/SettingsPage";
+import { WorkspacesPage } from "../features/workspaces/renderer/components/WorkspacesPage";
+import { ConnectionStatusBar } from "./layout/ConnectionStatusBar";
+import { SidecarStatus } from "./layout/SidecarStatus";
+import { useAppStore } from "./global-state";
 
 type PaneLayout = "horizontal" | "vertical";
 type WorkbenchTheme = "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
 
-const themeStorageKey = "siloscope.theme";
-const workbenchThemes = [
+const THEME_STORAGE_KEY = "siloscope.theme";
+const WORKBENCH_THEMES = [
   "vscode-dark",
   "vscode-light",
   "github-dark",
   "github-light",
 ] as const;
-const applicationMenuEventName = "siloscope:application-menu-action";
-const closeApplicationRequestEventName = "siloscope:request-application-close";
-const appUpdateStatusEventName = "siloscope:app-update-status";
-const emptyRequestState: RequestState = {
+const APPLICATION_MENU_EVENT_NAME = "siloscope:application-menu-action";
+const CLOSE_APPLICATION_REQUEST_EVENT_NAME = "siloscope:request-application-close";
+const APP_UPDATE_STATUS_EVENT_NAME = "siloscope:app-update-status";
+const EMPTY_REQUEST_STATE: RequestState = {
   grainKey: "",
   keyType: "String",
   payload: "{\n}",
@@ -162,7 +162,7 @@ function App() {
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
   const [isSavingBeforeClose, setIsSavingBeforeClose] = useState(false);
-  const [appUpdateState, setAppUpdateState] = useState<AppUpdateState | null>(
+  const [appUpdateState, setApplicationUpdateState] = useState<ApplicationUpdateState | null>(
     null,
   );
   const [updateAction, setUpdateAction] = useState<
@@ -242,7 +242,7 @@ function App() {
     return selectedPath;
   }, [setStoragePath, setStorageReady, setWorkspaces]);
   useEffect(() => {
-    window.localStorage.setItem(themeStorageKey, theme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   useEffect(() => {
@@ -256,39 +256,56 @@ function App() {
   useEffect(() => {
     if (!window.api?.onSidecarLog) return;
     return window.api.onSidecarLog((entry) => {
-      const store = useAppStore.getState();
-      if (store.connectionStatus !== "connecting") return;
+      const { connectionStatus } = useAppStore.getState();
+      if (connectionStatus !== "connecting") return;
 
-      const msg = entry.message;
-      // Map known sidecar log messages to user-friendly steps
-      if (msg.includes("Restoring NuGet package") || msg.includes("restore")) {
-        const match = msg.match(/Restoring NuGet package (.+?) /);
-        store.setConnectionStatus("connecting", `Downloading ${match?.[1] ?? "packages"}…`);
-      } else if (msg.includes("Downloading ")) {
-        const match = msg.match(/Downloading (.+?) from/);
-        store.setConnectionStatus("connecting", `Downloading ${match?.[1] ?? "package"}…`);
-      } else if (msg.includes("Package extracted")) {
-        store.setConnectionStatus("connecting", "Extracting package…");
-      } else if (msg.includes("Connecting to cluster")) {
-        store.setConnectionStatus("connecting", "Connecting to Orleans cluster…");
-      } else if (msg.includes("Loading entry")) {
-        const match = msg.match(/Loading entry \d+: type=(.+?),/);
-        store.setConnectionStatus("connecting", `Loading ${match?.[1] ?? "source"}…`);
-      } else if (msg.includes("discovered") && msg.includes("grains")) {
-        const match = msg.match(/(\d+) grains/);
-        store.setConnectionStatus("connecting", `Discovered ${match?.[1] ?? ""} grains`);
+      const { message } = entry;
+      const lowerMessage = message.toLowerCase();
+
+      if (
+        lowerMessage.includes("restoring") ||
+        lowerMessage.includes("downloading")
+      ) {
+        const nugetMatch = message.match(
+          /(?:Restoring|Downloading|restoring|downloading)(?: NuGet package)? (.+?)(?: from|\.\.\.|before|$)/,
+        );
+        useAppStore.setState({
+          connectionStep: `Downloading ${nugetMatch?.[1]?.trim() ?? "packages"}…`,
+        });
+      } else if (lowerMessage.includes("extracted")) {
+        useAppStore.setState({ connectionStep: "Extracting package…" });
+      } else if (
+        lowerMessage.includes("connecting to gateway") ||
+        lowerMessage.includes("connecting to cluster")
+      ) {
+        useAppStore.setState({ connectionStep: "Connecting to Orleans cluster…" });
+      } else if (lowerMessage.includes("loading entry")) {
+        const match = message.match(/Loading entry \d+: type=(.+?),/i);
+        useAppStore.setState({
+          connectionStep: `Loading ${match?.[1] ?? "source"}…`,
+        });
+      } else if (
+        lowerMessage.includes("discovered") &&
+        (lowerMessage.includes("grain") || lowerMessage.includes("interface"))
+      ) {
+        const match = message.match(/(\d+) grain/i);
+        useAppStore.setState({
+          connectionStep: `Discovered ${match?.[1] ?? ""} grain interfaces`,
+        });
+      } else if (lowerMessage.includes("connected")) {
+        useAppStore.setState({ connectionStep: "Cluster connected" });
       }
     });
   }, []);
 
   useEffect(() => {
     const handleUpdateStatus = (event: Event) => {
-      setAppUpdateState((event as CustomEvent<AppUpdateState>).detail);
+      setApplicationUpdateState((event as CustomEvent<ApplicationUpdateState>).detail);
     };
 
-    window.addEventListener(appUpdateStatusEventName, handleUpdateStatus);
+    window.addEventListener(APP_UPDATE_STATUS_EVENT_NAME, handleUpdateStatus);
     return () =>
-      window.removeEventListener(appUpdateStatusEventName, handleUpdateStatus);
+      window.removeEventListener(APP_UPDATE_STATUS_EVENT_NAME, handleUpdateStatus);
   }, []);
 
   useEffect(() => {
@@ -334,12 +351,13 @@ function App() {
     // Keep connectionStatus in sync with isConnected when set from outside
     // connectCluster / disconnectCluster
     if (!previousIsConnected.current && isConnected) {
-      useAppStore
-        .getState()
-        .setConnectionStatus("connected", `Connected — ${workspace?.name ?? "cluster"}`);
+      useAppStore.setState({
+        connectionStatus: "connected",
+        connectionStep: `Connected — ${workspace?.name ?? "cluster"}`,
+      });
     }
     if (previousIsConnected.current && !isConnected) {
-      useAppStore.getState().setConnectionStatus("disconnected");
+      useAppStore.setState({ connectionStatus: "disconnected" });
     }
     previousIsConnected.current = isConnected;
   }, [
@@ -418,12 +436,12 @@ function App() {
     };
 
     window.addEventListener(
-      applicationMenuEventName,
+      APPLICATION_MENU_EVENT_NAME,
       handleApplicationMenuAction,
     );
     return () =>
       window.removeEventListener(
-        applicationMenuEventName,
+        APPLICATION_MENU_EVENT_NAME,
         handleApplicationMenuAction,
       );
   }, []);
@@ -441,7 +459,7 @@ function App() {
 
       if (modifier && event.key.toLowerCase() === "q") {
         event.preventDefault();
-        window.dispatchEvent(new Event(closeApplicationRequestEventName));
+        window.dispatchEvent(new Event(CLOSE_APPLICATION_REQUEST_EVENT_NAME));
         return;
       }
 
@@ -463,8 +481,8 @@ function App() {
       : buildSourceCatalogFromGrains(grains, workspace);
   }, [grains, sourceCatalog, workspace]);
   const activeRequestState = selectedFunctionId
-    ? (requestStates[selectedFunctionId] ?? emptyRequestState)
-    : emptyRequestState;
+    ? (requestStates[selectedFunctionId] ?? EMPTY_REQUEST_STATE)
+    : EMPTY_REQUEST_STATE;
   const activeFunction = useMemo(
     () => findCatalogFunction(effectiveSourceCatalog, selectedFunctionId),
     [effectiveSourceCatalog, selectedFunctionId],
@@ -949,7 +967,7 @@ function App() {
   useEffect(() => {
     if (!window.api?.updates?.onStatus) return;
     return window.api.updates.onStatus((entry) => {
-      setAppUpdateState((prev) => ({
+      setApplicationUpdateState((prev) => ({
         localInfo: prev?.localInfo ?? {
           version: "0.1.0",
           hash: "",
@@ -964,7 +982,7 @@ function App() {
         statusHistory: [
           ...(prev?.statusHistory ?? []).slice(-49),
           {
-            status: entry.status as AppUpdateState["statusHistory"][number]["status"],
+            status: entry.status as ApplicationUpdateState["statusHistory"][number]["status"],
             message: entry.message,
             timestamp: entry.timestamp,
             progress: entry.progress,
@@ -1039,12 +1057,12 @@ function App() {
     };
 
     window.addEventListener(
-      closeApplicationRequestEventName,
+      CLOSE_APPLICATION_REQUEST_EVENT_NAME,
       handleCloseRequest,
     );
     return () =>
       window.removeEventListener(
-        closeApplicationRequestEventName,
+        CLOSE_APPLICATION_REQUEST_EVENT_NAME,
         handleCloseRequest,
       );
   }, [handleClose]);
@@ -1835,8 +1853,8 @@ function readStoredTheme(): WorkbenchTheme {
     return "vscode-dark";
   }
 
-  const storedTheme = window.localStorage.getItem(themeStorageKey);
-  if (workbenchThemes.includes(storedTheme as WorkbenchTheme)) {
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (WORKBENCH_THEMES.includes(storedTheme as WorkbenchTheme)) {
     return storedTheme as WorkbenchTheme;
   }
 
@@ -1971,9 +1989,11 @@ async function loadSavedRequests(ws: Workspace) {
           isDefaultActive: false,
           targetGrainClass: req.targetGrainClass,
           targetMethod: req.targetMethod,
-          keyType: "String" as const,
+          keyType: (req.keyType as GrainKeyType) ?? "String",
           grainId: String(req.grainId),
           payload: payloadStr,
+          sourceId: req.sourceId ?? null,
+          functionId: req.functionId ?? null,
         });
       }
     }
@@ -2116,6 +2136,9 @@ async function saveAllUnsavedRequestContexts(path?: string) {
           payload: ctx.payload,
           targetGrainClass: ctx.targetGrainClass,
           targetMethod: ctx.targetMethod,
+          keyType: ctx.keyType,
+          sourceId: ctx.sourceId ?? null,
+          functionId: ctx.functionId ?? null,
         })),
       );
     }
@@ -2156,35 +2179,47 @@ async function connectCluster() {
     return;
   }
 
-  const store = useAppStore.getState();
-  store.setConnectionStatus("connecting", "Setting active workspace…");
+  useAppStore.setState({
+    connectionStatus: "connecting",
+    connectionStep: "Preparing workspace…",
+  });
 
   try {
     if (!(await setActiveWorkspace(workspace))) {
-      store.setConnectionStatus("error", "", "Failed to set active workspace.");
+      useAppStore.setState({
+        connectionStatus: "error",
+        connectionError: "Failed to set active workspace.",
+      });
       return;
     }
 
-    store.setConnectionStatus("connecting", "Connecting to cluster…");
+    useAppStore.setState({ connectionStep: "Initializing connection…" });
     const response = await rpc.request.connectCluster({
       workspace,
     });
-    store.setIsConnected(true);
-    store.addLog({
+    useAppStore.getState().setIsConnected(true);
+    useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "info",
       message: response.message,
     });
 
-    store.setConnectionStatus("connecting", "Discovering grain interfaces…");
+    useAppStore.setState({ connectionStep: "Discovering grain interfaces…" });
     await refreshWorkspaceCatalog(workspace.id);
-    store.setConnectionStatus("connected", `Connected — ${workspace.name}`);
+    useAppStore.setState({
+      connectionStatus: "connected",
+      connectionStep: `Connected — ${workspace.name}`,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to connect cluster.";
-    store.setIsConnected(false);
-    store.setConnectionStatus("error", "", message);
-    store.addLog({
+    const s = useAppStore.getState();
+    s.setIsConnected(false);
+    useAppStore.setState({
+      connectionStatus: "error",
+      connectionError: message,
+    });
+    s.addLog({
       timestamp: new Date().toISOString(),
       level: "error",
       message,
@@ -2193,16 +2228,19 @@ async function connectCluster() {
 }
 
 async function disconnectCluster() {
-  const store = useAppStore.getState();
-  store.setConnectionStatus("connecting", "Disconnecting…");
+  useAppStore.setState({
+    connectionStatus: "connecting",
+    connectionStep: "Disconnecting…",
+  });
   try {
     await rpc.request.disconnectCluster();
-    store.setGrains([]);
-    store.setSourceCatalog({ sources: [] });
-    store.setInvocationResult(null);
-    store.setIsConnected(false);
-    store.setConnectionStatus("disconnected");
-    store.addLog({
+    const s = useAppStore.getState();
+    s.setGrains([]);
+    s.setSourceCatalog({ sources: [] });
+    s.setInvocationResult(null);
+    s.setIsConnected(false);
+    useAppStore.setState({ connectionStatus: "disconnected" });
+    s.addLog({
       timestamp: new Date().toISOString(),
       level: "info",
       message: "Cluster disconnected.",
@@ -2212,9 +2250,12 @@ async function disconnectCluster() {
       error instanceof Error
         ? error.message
         : "Failed to disconnect cluster.";
-    store.setIsConnected(false);
-    store.setConnectionStatus("error", "", message);
-    store.addLog({
+    useAppStore.getState().setIsConnected(false);
+    useAppStore.setState({
+      connectionStatus: "error",
+      connectionError: message,
+    });
+    useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
       level: "error",
       message,

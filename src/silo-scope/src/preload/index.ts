@@ -1,5 +1,18 @@
+/**
+ * Electron preload script — exposes a typed {@link RendererApi} to the
+ * renderer process via `contextBridge.exposeInMainWorld`.
+ *
+ * Every method is a thin wrapper around `ipcRenderer.invoke` using channel
+ * name constants from {@link ../shared/events!IPC_CHANNELS} so that channel
+ * names stay consistent between the main process and the preload.
+ *
+ * Event subscriptions return an unsubscribe function that removes the
+ * listener via `ipcRenderer.removeListener`.
+ */
+
 import { contextBridge, ipcRenderer } from "electron";
 import type { RendererApi } from "../shared/api";
+import { IPC_CHANNELS } from "../shared/events";
 
 const api: RendererApi = {
   isDesktop: true,
@@ -8,59 +21,61 @@ const api: RendererApi = {
     electron: process.versions.electron,
     chrome: process.versions.chrome,
   },
+
+  /** Window control actions */
   window: {
-    minimize: () => ipcRenderer.invoke("siloscope:minimize-window"),
-    maximize: () => ipcRenderer.invoke("siloscope:maximize-window"),
-    close: () => ipcRenderer.invoke("siloscope:close-window"),
-    isMaximized: () => ipcRenderer.invoke("siloscope:is-maximized"),
-    onStateChange: (callback: (state: { isMaximized: boolean }) => void) => {
-      const handler = (
-        _event: Electron.IpcRendererEvent,
-        state: { isMaximized: boolean },
-      ) => callback(state);
-      ipcRenderer.on("siloscope:window-state", handler);
-      return () => {
-        ipcRenderer.removeListener("siloscope:window-state", handler);
-      };
-    },
+    minimize: () => ipcRenderer.invoke(IPC_CHANNELS.windowMinimize),
+    maximize: () => ipcRenderer.invoke(IPC_CHANNELS.windowMaximize),
+    close: () => ipcRenderer.invoke(IPC_CHANNELS.windowClose),
+    isMaximized: () => ipcRenderer.invoke(IPC_CHANNELS.windowIsMaximized),
   },
+
+  /** Storage path management */
   storage: {
-    getPath: () => ipcRenderer.invoke("siloscope:get-storage-path"),
-    selectFolder: () => ipcRenderer.invoke("siloscope:select-storage-folder"),
+    getPath: () => ipcRenderer.invoke(IPC_CHANNELS.storageGetPath),
+    selectFolder: () => ipcRenderer.invoke(IPC_CHANNELS.storageSelectFolder),
     verify: (path: string) =>
-      ipcRenderer.invoke("siloscope:verify-storage-path", path),
+      ipcRenderer.invoke(IPC_CHANNELS.storageVerify, path),
   },
+
+  /** NuGet feed management */
   feeds: {
-    list: () => ipcRenderer.invoke("siloscope:feeds-list"),
-    create: (request) => ipcRenderer.invoke("siloscope:feeds-create", request),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.feedsList),
+    create: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.feedsCreate, request),
     update: (name, request) =>
-      ipcRenderer.invoke("siloscope:feeds-update", { name, feed: request }),
-    test: (request) => ipcRenderer.invoke("siloscope:feeds-test", request),
+      ipcRenderer.invoke(IPC_CHANNELS.feedsUpdate, { name, feed: request }),
+    test: (request) =>
+      ipcRenderer.invoke(IPC_CHANNELS.feedsTest, request),
     search: (query, feedName, take) =>
-      ipcRenderer.invoke("siloscope:feeds-search", {
+      ipcRenderer.invoke(IPC_CHANNELS.feedsSearch, {
         query,
         feedName,
         take,
       }),
     getVersions: (packageId, feedName) =>
-      ipcRenderer.invoke("siloscope:feeds-get-versions", {
+      ipcRenderer.invoke(IPC_CHANNELS.feedsGetVersions, {
         packageId,
         feedName,
       }),
   },
+
+  /** Environment profiles */
   environments: {
     list: (workspaceId: string) =>
-      ipcRenderer.invoke("siloscope:environments-list", workspaceId),
+      ipcRenderer.invoke(IPC_CHANNELS.environmentsList, workspaceId),
     save: (workspaceId: string, config) =>
-      ipcRenderer.invoke("siloscope:environments-save", {
+      ipcRenderer.invoke(IPC_CHANNELS.environmentsSave, {
         workspaceId,
         config,
       }),
   },
+
+  /** Auto-update */
   updates: {
-    check: () => ipcRenderer.invoke("siloscope:check-for-update"),
-    download: () => ipcRenderer.invoke("siloscope:download-update"),
-    apply: () => ipcRenderer.invoke("siloscope:apply-update"),
+    check: () => ipcRenderer.invoke(IPC_CHANNELS.checkForUpdate),
+    download: () => ipcRenderer.invoke(IPC_CHANNELS.downloadUpdate),
+    apply: () => ipcRenderer.invoke(IPC_CHANNELS.applyUpdate),
     onStatus: (
       callback: (entry: {
         status: string;
@@ -78,16 +93,20 @@ const api: RendererApi = {
           progress?: number;
         },
       ) => callback(entry);
-      ipcRenderer.on("siloscope:update-status", handler);
+      ipcRenderer.on(IPC_CHANNELS.updateStatus, handler);
       return () => {
-        ipcRenderer.removeListener("siloscope:update-status", handler);
+        ipcRenderer.removeListener(IPC_CHANNELS.updateStatus, handler);
       };
     },
   },
+
+  /** Sidecar lifecycle */
   sidecar: {
-    status: () => ipcRenderer.invoke("siloscope:sidecar-status"),
-    restart: () => ipcRenderer.invoke("siloscope:sidecar-restart"),
+    status: () => ipcRenderer.invoke(IPC_CHANNELS.sidecarStatus),
+    restart: () => ipcRenderer.invoke(IPC_CHANNELS.sidecarRestart),
   },
+
+  /** Sidecar log forwarding (main → renderer push) */
   onSidecarLog: (
     callback: (entry: {
       timestamp: string;
@@ -105,38 +124,61 @@ const api: RendererApi = {
         message: string;
       },
     ) => callback(entry);
-    ipcRenderer.on("siloscope:sidecar-log", handler);
+    ipcRenderer.on(IPC_CHANNELS.sidecarLog, handler);
     return () => {
-      ipcRenderer.removeListener("siloscope:sidecar-log", handler);
+      ipcRenderer.removeListener(IPC_CHANNELS.sidecarLog, handler);
     };
   },
+
+  /** Connection progress updates (main → renderer push) */
+  onConnectionProgress: (
+    callback: (entry: { message: string }) => void,
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      entry: { message: string },
+    ) => callback(entry);
+    ipcRenderer.on(IPC_CHANNELS.connectionProgress, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.connectionProgress, handler);
+    };
+  },
+
+  /** Cluster / workspace management */
   clusters: {
-    list: () => ipcRenderer.invoke("siloscope:clusters-list"),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.clustersList),
     save: (cluster) =>
-      ipcRenderer.invoke("siloscope:clusters-save", { cluster }),
+      ipcRenderer.invoke(IPC_CHANNELS.clustersSave, { cluster }),
     remove: (id: string) =>
-      ipcRenderer.invoke("siloscope:clusters-delete", { id }),
+      ipcRenderer.invoke(IPC_CHANNELS.clustersDelete, { id }),
     pickSourceFile: () =>
-      ipcRenderer.invoke("siloscope:select-source-file"),
+      ipcRenderer.invoke(IPC_CHANNELS.selectSourceFile),
     connect: (cluster) =>
-      ipcRenderer.invoke("siloscope:connect-cluster", { workspace: cluster }),
+      ipcRenderer.invoke(IPC_CHANNELS.connectCluster, {
+        workspace: cluster,
+      }),
     disconnect: () =>
-      ipcRenderer.invoke("siloscope:disconnect-cluster"),
+      ipcRenderer.invoke(IPC_CHANNELS.disconnectCluster),
     setActive: (cluster) =>
-      ipcRenderer.invoke("siloscope:set-active-workspace", { workspace: cluster }),
+      ipcRenderer.invoke(IPC_CHANNELS.setActiveWorkspace, {
+        workspace: cluster,
+      }),
     discoverGrains: (workspaceId: string) =>
-      ipcRenderer.invoke("siloscope:discover-grains", { workspaceId }),
+      ipcRenderer.invoke(IPC_CHANNELS.discoverGrains, { workspaceId }),
     getGrains: () =>
-      ipcRenderer.invoke("siloscope:get-grains"),
+      ipcRenderer.invoke(IPC_CHANNELS.getGrains),
     getSourceCatalog: () =>
-      ipcRenderer.invoke("siloscope:get-source-catalog"),
+      ipcRenderer.invoke(IPC_CHANNELS.getSourceCatalog),
     invokeGrain: (params) =>
-      ipcRenderer.invoke("siloscope:invoke-grain", params),
+      ipcRenderer.invoke(IPC_CHANNELS.invokeGrain, params),
     requests: {
       list: (clusterId: string) =>
-        ipcRenderer.invoke("siloscope:clusters-requests-list", { clusterId }),
+        ipcRenderer.invoke(IPC_CHANNELS.clustersRequestsList, { clusterId }),
       save: (clusterId, requests) =>
-        ipcRenderer.invoke("siloscope:clusters-requests-save", { clusterId, requests }),
+        ipcRenderer.invoke(IPC_CHANNELS.clustersRequestsSave, {
+          clusterId,
+          requests,
+        }),
     },
   },
 };

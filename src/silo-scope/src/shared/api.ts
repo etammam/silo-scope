@@ -1,13 +1,24 @@
+/**
+ * Renderer API contract — the interface exposed to the renderer via
+ * `contextBridge.exposeInMainWorld("api", ...)` in the preload script.
+ *
+ * @module shared/api
+ */
+
 import type {
   CreateNugetFeedRequest,
-  EnvironmentProfile,
-  GrainInterfaceDescriptor,
-  InvocationResult,
   NugetFeed,
   NugetPackage,
+} from "../features/feeds/schema";
+import type { EnvironmentProfile } from "../features/environments/schema";
+import type {
+  InvocationResult,
   SourceOwnedCatalog,
+} from "../features/grain-invocation/schema";
+import type {
+  GrainInterfaceDescriptor,
   Workspace,
-} from "./types";
+} from "../features/workspaces/schema";
 
 export interface EnvironmentConfig {
   profiles: EnvironmentProfile[];
@@ -26,9 +37,6 @@ export interface RendererApi {
     maximize: () => Promise<void>;
     close: () => Promise<void>;
     isMaximized: () => Promise<boolean>;
-    onStateChange: (
-      callback: (state: { isMaximized: boolean }) => void,
-    ) => () => void;
   };
   storage: {
     getPath: () => Promise<string | null>;
@@ -82,6 +90,9 @@ export interface RendererApi {
       message: string;
     }) => void,
   ) => () => void;
+  onConnectionProgress: (
+    callback: (entry: { message: string }) => void,
+  ) => () => void;
   clusters: {
     list: () => Promise<Workspace[]>;
     save: (cluster: Workspace) => Promise<Workspace>;
@@ -117,6 +128,9 @@ export interface RendererApi {
           payload: string;
           targetGrainClass: string;
           targetMethod: string;
+          keyType: string;
+          sourceId?: string | null;
+          functionId?: string | null;
         }>
       >;
       save: (

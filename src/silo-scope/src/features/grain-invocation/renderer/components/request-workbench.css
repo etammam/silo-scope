@@ -1,0 +1,14 @@
+.workbench-tabs {
+	align-items: center;
+	background: var(--ui-1);
+	border-bottom: 1px solid var(--ui-3);
+	display: flex;
+	grid-column: 1;
+	grid-row: 1;
+	height: 35px;
+	min-width: 0;
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0;
+	scrollbar-width: none;
+}
