@@ -1,3 +1,6 @@
+## [1.2.0](https://github.com/etammam/silo-scope/compare/v1.1.1...v1.2.0) (2026-08-09)
+* **actions:** enhance CI/CD workflows with versioning and artifact management ([9222903](https://github.com/etammam/silo-scope/commit/922290378236950205fbc4036da7db71c3c153da)) by Islam Abouzeid
+
 ## [1.1.1](https://github.com/etammam/silo-scope/compare/v1.1.0...v1.1.1) (2026-08-09)
 * **release:** improve artifact upload process in CI workflow ([597b51c](https://github.com/etammam/silo-scope/commit/597b51c6dc296944f29cdb70dd7cf103f529391e)) by Islam Abouzeid
 
