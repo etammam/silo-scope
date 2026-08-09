@@ -261,15 +261,83 @@ public sealed class NugetConnectionManager : INugetConnectionManager
         string version,
         string? sourceUrl = null,
         NugetFeedSourceAuthentication? credentials = null,
+        string? feedName = null,
         CancellationToken cancellationToken = default
     )
     {
         try
         {
-            var packageSourceUrl = string.IsNullOrEmpty(sourceUrl)
-                ? "https://api.nuget.org/v3/index.json"
-                : sourceUrl;
+            // Resolve feed: explicit sourceUrl > feedName lookup > all feeds > nuget.org
+            var feedUrls = new List<(string url, NugetFeedSourceAuthentication? creds)>();
+            if (!string.IsNullOrEmpty(sourceUrl))
+            {
+                feedUrls.Add((sourceUrl, credentials));
+            }
+            else if (!string.IsNullOrEmpty(feedName))
+            {
+                var feed = _feeds.FirstOrDefault(f =>
+                    string.Equals(f.Name, feedName, StringComparison.OrdinalIgnoreCase)
+                );
+                if (feed != null)
+                    feedUrls.Add((feed.Url, GetCredentials(feed.Name)));
+                else
+                    feedUrls.Add(("https://api.nuget.org/v3/index.json", null));
+            }
+            else
+            {
+                foreach (var f in _feeds)
+                    feedUrls.Add((f.Url, GetCredentials(f.Name)));
+                feedUrls.Add(("https://api.nuget.org/v3/index.json", null));
+            }
 
+            var lastError = string.Empty;
+            foreach (var (packageSourceUrl, creds) in feedUrls)
+            {
+                try
+                {
+                    var result = await DownloadSingleAsync(
+                        packageId,
+                        version,
+                        packageSourceUrl,
+                        creds,
+                        cancellationToken
+                    );
+                    if (result.IsSuccess)
+                        return result;
+                    lastError = result.Errors.FirstOrDefault()?.Message ?? "Unknown error";
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex.Message;
+                }
+            }
+
+            return Result.Fail<string>(
+                $"Failed to download {packageId} {version} from any feed. Last error: {lastError}"
+            );
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(
+                e,
+                "Failed to download package {PackageId} {Version}",
+                packageId,
+                version
+            );
+            return Result.Fail<string>(e.Message);
+        }
+    }
+
+    private async Task<Result<string>> DownloadSingleAsync(
+        string packageId,
+        string version,
+        string packageSourceUrl,
+        NugetFeedSourceAuthentication? credentials,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
             _logger.LogInformation(
                 "Downloading {PackageId} {Version} from {Source}",
                 packageId,
@@ -300,8 +368,22 @@ public sealed class NugetConnectionManager : INugetConnectionManager
 
             if (Directory.Exists(targetPath) && HasInstalledPackageContent(targetPath, nupkgPath))
             {
-                _logger.LogInformation("Package already exists at {Path}", targetPath);
-                return Result.Ok(targetPath);
+                // If the .nupkg exists but is empty (failed download), clean it up
+                if (File.Exists(nupkgPath) && new FileInfo(nupkgPath).Length == 0)
+                {
+                    try
+                    {
+                        File.Delete(nupkgPath);
+                    }
+                    catch
+                    { /* best-effort */
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("Package already exists at {Path}", targetPath);
+                    return Result.Ok(targetPath);
+                }
             }
 
             Directory.CreateDirectory(targetPath);
@@ -321,6 +403,24 @@ public sealed class NugetConnectionManager : INugetConnectionManager
                     new SourceCacheContext(),
                     NullLogger.Instance,
                     cancellationToken
+                );
+            }
+
+            // Validate the download produced real content
+            var fileInfo = new FileInfo(nupkgPath);
+            if (!fileInfo.Exists || fileInfo.Length == 0)
+            {
+                // Clean up the empty file so it doesn't block future attempts
+                try
+                {
+                    File.Delete(nupkgPath);
+                }
+                catch
+                { /* best-effort */
+                }
+                return Result.Fail<string>(
+                    $"NuGet package {packageId} {version} was not found on the configured feeds. "
+                        + "Verify the package ID, version, and that the correct NuGet feed is configured."
                 );
             }
 
@@ -345,6 +445,7 @@ public sealed class NugetConnectionManager : INugetConnectionManager
         IEnumerable<(string Id, string Version)> packages,
         string? sourceUrl = null,
         string? feedName = null,
+        int maxDepth = int.MaxValue,
         CancellationToken cancellationToken = default
     )
     {
@@ -352,26 +453,65 @@ public sealed class NugetConnectionManager : INugetConnectionManager
         var errors = new List<string>();
         var restored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var credentials = !string.IsNullOrEmpty(feedName) ? GetCredentials(feedName) : null;
+        // Resolve feeds to try: specific feed > all configured feeds > nuget.org fallback
+        var feedUrls = new List<(string url, NugetFeedSourceAuthentication? credentials)>();
+        if (!string.IsNullOrEmpty(sourceUrl))
+        {
+            var creds = !string.IsNullOrEmpty(feedName) ? GetCredentials(feedName) : null;
+            feedUrls.Add((sourceUrl, creds));
+        }
+        else if (!string.IsNullOrEmpty(feedName))
+        {
+            var feed = _feeds.FirstOrDefault(f =>
+                string.Equals(f.Name, feedName, StringComparison.OrdinalIgnoreCase)
+            );
+            if (feed != null)
+                feedUrls.Add((feed.Url, GetCredentials(feed.Name)));
+            else
+                feedUrls.Add(("https://api.nuget.org/v3/index.json", null));
+        }
+        else
+        {
+            // Try all configured feeds, then fall back to nuget.org
+            foreach (var feed in _feeds)
+                feedUrls.Add((feed.Url, GetCredentials(feed.Name)));
+            feedUrls.Add(("https://api.nuget.org/v3/index.json", null));
+        }
 
         foreach (var (id, version) in packages)
         {
-            var result = await RestorePackageGraphAsync(
-                id,
-                version,
-                sourceUrl,
-                credentials,
-                restored,
-                results,
-                cancellationToken
-            );
-            if (result.IsSuccess)
+            var packageRestored = false;
+            var packageErrors = new List<string>();
+
+            foreach (var (url, credentials) in feedUrls)
             {
-                continue;
+                var result = await RestorePackageGraphAsync(
+                    id,
+                    version,
+                    url,
+                    credentials,
+                    restored,
+                    results,
+                    0,
+                    maxDepth,
+                    cancellationToken
+                );
+                if (result.IsSuccess)
+                {
+                    packageRestored = true;
+                    break;
+                }
+
+                packageErrors.Add(
+                    $"{id} {version} on {url}: {string.Join("; ", result.Errors.Select(e => e.Message))}"
+                );
             }
 
-            errors.Add($"{id} {version}: {result.Errors.FirstOrDefault()?.Message}");
-        }
+            if (!packageRestored)
+            {
+                errors.AddRange(packageErrors);
+            }
+        } // end foreach packages
 
         if (errors.Count > 0)
         {
@@ -482,6 +622,8 @@ public sealed class NugetConnectionManager : INugetConnectionManager
         NugetFeedSourceAuthentication? credentials,
         HashSet<string> restored,
         List<string> restoredPaths,
+        int depth,
+        int maxDepth,
         CancellationToken cancellationToken
     )
     {
@@ -496,7 +638,7 @@ public sealed class NugetConnectionManager : INugetConnectionManager
             version,
             sourceUrl,
             credentials,
-            cancellationToken
+            cancellationToken: cancellationToken
         );
         if (downloadResult.IsFailed)
         {
@@ -511,41 +653,86 @@ public sealed class NugetConnectionManager : INugetConnectionManager
             return Result.Fail(dependenciesResult.Errors.Select(e => e.Message));
         }
 
+        // Stop recursing when depth limit reached
+        if (depth >= maxDepth)
+        {
+            return Result.Ok();
+        }
+
         if (dependenciesResult.Value.Count == 0)
         {
             return Result.Ok();
         }
 
-        var source = CreatePackageSource(sourceUrl, credentials);
-        var repository = Repository.Factory.GetCoreV3(source);
-        var findPackageResource = await repository.GetResourceAsync<FindPackageByIdResource>(
-            cancellationToken
-        );
+        // Build a list of fallback feeds for dependency resolution.
+        // Dependencies may live on different feeds than the parent package.
+        var depFeedUrls = new List<(string url, NugetFeedSourceAuthentication? creds)>();
+        if (!string.IsNullOrEmpty(sourceUrl))
+            depFeedUrls.Add((sourceUrl, credentials));
+        // Add all configured feeds (deduplicated against sourceUrl)
+        foreach (var feed in _feeds)
+        {
+            if (
+                !string.IsNullOrEmpty(sourceUrl)
+                && string.Equals(feed.Url, sourceUrl, StringComparison.OrdinalIgnoreCase)
+            )
+                continue;
+            depFeedUrls.Add((feed.Url, GetCredentials(feed.Name)));
+        }
+        // Always include nuget.org as last resort
+        depFeedUrls.Add(("https://api.nuget.org/v3/index.json", null));
 
         foreach (var dependency in dependenciesResult.Value)
         {
-            var versionResult = await ResolveDependencyVersionAsync(
-                findPackageResource,
-                dependency,
-                cancellationToken
-            );
-            if (versionResult.IsFailed)
+            var depRestored = false;
+            var depErrors = new List<string>();
+
+            foreach (var (depUrl, depCreds) in depFeedUrls)
             {
-                return Result.Fail(versionResult.Errors.Select(e => e.Message));
+                var source = CreatePackageSource(depUrl, depCreds);
+                var repository = Repository.Factory.GetCoreV3(source);
+                var findPackageResource =
+                    await repository.GetResourceAsync<FindPackageByIdResource>(cancellationToken);
+
+                var versionResult = await ResolveDependencyVersionAsync(
+                    findPackageResource,
+                    dependency,
+                    cancellationToken
+                );
+                if (versionResult.IsFailed)
+                {
+                    depErrors.Add(
+                        $"{dependency.Id} on {depUrl}: {string.Join("; ", versionResult.Errors.Select(e => e.Message))}"
+                    );
+                    continue;
+                }
+
+                var restoreResult = await RestorePackageGraphAsync(
+                    dependency.Id,
+                    versionResult.Value.ToNormalizedString(),
+                    depUrl,
+                    depCreds,
+                    restored,
+                    restoredPaths,
+                    depth + 1,
+                    maxDepth,
+                    cancellationToken
+                );
+                if (restoreResult.IsSuccess)
+                {
+                    depRestored = true;
+                    break;
+                }
+                depErrors.Add(
+                    $"{dependency.Id} on {depUrl}: {string.Join("; ", restoreResult.Errors.Select(e => e.Message))}"
+                );
             }
 
-            var restoreResult = await RestorePackageGraphAsync(
-                dependency.Id,
-                versionResult.Value.ToNormalizedString(),
-                sourceUrl,
-                credentials,
-                restored,
-                restoredPaths,
-                cancellationToken
-            );
-            if (restoreResult.IsFailed)
+            if (!depRestored)
             {
-                return restoreResult;
+                return Result.Fail(
+                    $"Failed to restore dependency {dependency.Id}: {string.Join("; ", depErrors)}"
+                );
             }
         }
 

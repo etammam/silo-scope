@@ -879,6 +879,7 @@ public sealed class SiloScopeCommandsTests
                     ),
                     It.IsAny<string?>(),
                     It.IsAny<string?>(),
+                    It.IsAny<int>(),
                     It.IsAny<CancellationToken>()
                 )
             )
@@ -914,6 +915,7 @@ public sealed class SiloScopeCommandsTests
                     It.IsAny<IEnumerable<(string Id, string Version)>>(),
                     null,
                     null,
+                    It.IsAny<int>(),
                     It.IsAny<CancellationToken>()
                 )
             )
@@ -939,6 +941,7 @@ public sealed class SiloScopeCommandsTests
                     It.IsAny<IEnumerable<(string Id, string Version)>>(),
                     null,
                     null,
+                    It.IsAny<int>(),
                     It.IsAny<CancellationToken>()
                 )
             )

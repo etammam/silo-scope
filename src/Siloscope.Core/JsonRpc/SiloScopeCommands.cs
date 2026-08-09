@@ -532,7 +532,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
                 group.Select(package => (package.Id, package.Version)).ToList(),
                 sourceUrl,
                 group.Key,
-                cancellationToken
+                cancellationToken: cancellationToken
             );
 
             if (result.IsFailed)
@@ -748,7 +748,7 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
             [(packageId, version)],
             sourceUrl,
             feedName,
-            cancellationToken
+            cancellationToken: cancellationToken
         );
         if (restoreResult.IsFailed)
         {

@@ -151,98 +151,86 @@ jobs:
           retention-days: 30
 
   test-desktop:
-    name: Test Desktop (Ubuntu)
+    name: Test Desktop (Typecheck)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     needs: build-and-test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/silo-scope/package-lock.json
 
-      - name: Cache Bun dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            src/siloscope-desktop/node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('src/siloscope-desktop/bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        working-directory: src/silo-scope
+        run: npm ci
 
-      - name: Install desktop dependencies
-        working-directory: src/siloscope-desktop
-        run: bun install --frozen-lockfile
-
-      - name: Typecheck desktop
-        working-directory: src/siloscope-desktop
-        run: bun run typecheck
-
-      - name: Test desktop
-        working-directory: src/siloscope-desktop
-        run: bun run test:run
+      - name: Typecheck
+        working-directory: src/silo-scope
+        run: npm run typecheck
 
   build-desktop:
-    name: Build Desktop (${{ matrix.name }})
+    name: Package Desktop (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     needs:
       - build-and-test
-      - test-desktop
+      - publish-core
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             name: linux-x64
-            artifact: siloscope-desktop-linux-x64
+            runtime: linux-x64
+            dist-script: dist:linux
           - os: macos-latest
             name: macos-arm64
-            artifact: siloscope-desktop-macos-arm64
+            runtime: osx-arm64
+            dist-script: dist:mac
           - os: windows-latest
             name: win-x64
-            artifact: siloscope-desktop-win-x64
+            runtime: win-x64
+            dist-script: dist:win
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/silo-scope/package-lock.json
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Install Linux packaging deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libfuse2
+
+      - name: Download Core sidecar
+        uses: actions/download-artifact@v4
         with:
-          bun-version: latest
+          name: siloscope-core-${{ matrix.runtime }}
+          path: src/silo-scope/resources/core
 
-      - name: Cache Bun dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            src/siloscope-desktop/node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('src/siloscope-desktop/bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        working-directory: src/silo-scope
+        run: npm ci
 
-      - name: Install desktop dependencies
-        working-directory: src/siloscope-desktop
-        run: bun install --frozen-lockfile
+      - name: Package Electron app
+        working-directory: src/silo-scope
+        run: npm run ${{ matrix.dist-script }}
 
-      - name: Build stable desktop app
-        working-directory: src/siloscope-desktop
-        run: bun run build:stable
-
-      - name: Upload desktop artifacts
+      - name: Upload distributable packages
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: |
-            src/siloscope-desktop/build/
-            src/siloscope-desktop/artifacts/
+          name: siloscope-desktop-${{ matrix.name }}
+          path: src/silo-scope/dist/
           retention-days: 30
