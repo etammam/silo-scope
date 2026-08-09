@@ -203,6 +203,11 @@ function registerStorageIpc(): void {
  * Application startup — initializes the auto-updater, registers all
  * feature IPC handlers, and creates the main window.
  */
+// Required for Windows notifications and taskbar grouping (see electron-builder gotcha #8)
+if (process.platform === "win32") {
+  app.setAppUserModelId("app.siloscope.desktop");
+}
+
 app.whenReady().then(() => {
   if (IS_MAC_OS) {
     app.dock!.setIcon(iconPath);

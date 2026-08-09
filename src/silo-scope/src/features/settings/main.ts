@@ -1,4 +1,6 @@
-import { autoUpdater } from "electron-updater";
+import electronUpdater from "electron-updater";
+
+const { autoUpdater } = electronUpdater;
 import { app, BrowserWindow } from "electron";
 import type { ApplicationUpdateStatusEntry } from "../settings/schema";
 import { SidecarJsonRpcClient } from "../../main/sidecar/json-rpc-client";

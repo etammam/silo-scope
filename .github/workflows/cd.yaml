@@ -142,9 +142,23 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
 
       - name: Semantic Release
+        id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx -p semantic-release -p @semantic-release/changelog -p @semantic-release/git -p conventional-changelog-conventionalcommits semantic-release
+        run: |
+          npx -p semantic-release -p @semantic-release/changelog -p @semantic-release/git -p conventional-changelog-conventionalcommits semantic-release
+          echo "tag=$(git describe --tags --abbrev=0 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+
+      - name: Attach packages to release
+        if: steps.release.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # electron-builder outputs: dist/*.AppImage, dist/*.deb, dist/*.dmg, dist/*.exe, etc.
+          for artifact in siloscope-desktop-*; do
+            for f in "$artifact"/*.{AppImage,deb,dmg,zip,exe,blockmap,yml}; do
+              [ -f "$f" ] && gh release upload "${{ steps.release.outputs.tag }}" "$f"
+            done
+          done
