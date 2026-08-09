@@ -22,9 +22,14 @@ import {
 } from "../features/settings/main";
 import { registerWorkspaceIpc } from "../features/workspaces/main";
 import { IPC_CHANNELS } from "../shared/events";
+import { initMenu } from "./menu";
 import { SidecarAdapter } from "./sidecar/adapter";
 import { SidecarJsonRpcClient } from "./sidecar/json-rpc-client";
 import { getStoragePath, setStoragePath } from "./storage";
+
+// Must precede ready — macOS reads CFBundleName for the app menu title.
+// In packaged builds electron-builder sets it via Info.plist; this covers dev.
+if (process.platform === "darwin") app.name = "SiloScope";
 
 const IS_MAC_OS = process.platform === "darwin";
 
@@ -84,6 +89,10 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  window.on("page-title-updated", function (e) {
+    e.preventDefault();
   });
 
   window.on("ready-to-show", () => window.show());
@@ -195,7 +204,10 @@ function registerStorageIpc(): void {
  * feature IPC handlers, and creates the main window.
  */
 app.whenReady().then(() => {
-  if (IS_MAC_OS) app.dock.setIcon(iconPath);
+  if (IS_MAC_OS) {
+    app.dock!.setIcon(iconPath);
+  }
+  initMenu();
   initAutoUpdater();
   registerWindowIpc();
   registerUpdateIpc();

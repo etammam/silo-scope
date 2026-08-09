@@ -66,6 +66,7 @@ export const IPC_CHANNELS = {
   sidecarLog: "siloscope:sidecar-log",
   updateStatus: "siloscope:update-status",
   connectionProgress: "siloscope:connection-progress",
+  applicationMenuAction: "siloscope:application-menu-action",
 } as const;
 
 /**

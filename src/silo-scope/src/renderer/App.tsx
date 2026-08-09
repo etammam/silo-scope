@@ -70,7 +70,6 @@ const WORKBENCH_THEMES = [
   "github-dark",
   "github-light",
 ] as const;
-const APPLICATION_MENU_EVENT_NAME = "siloscope:application-menu-action";
 const CLOSE_APPLICATION_REQUEST_EVENT_NAME = "siloscope:request-application-close";
 const APP_UPDATE_STATUS_EVENT_NAME = "siloscope:app-update-status";
 const EMPTY_REQUEST_STATE: RequestState = {
@@ -414,37 +413,6 @@ function App() {
       ]);
     }
   }, [invocationResult]);
-
-  useEffect(() => {
-    const handleApplicationMenuAction = (event: Event) => {
-      const action = (event as CustomEvent<string>).detail;
-      if (action === "newWorkspace") {
-        setActiveView("workspaces");
-      }
-
-      if (action === "toggleActivityBar") {
-        setIsActivityBarVisible((visible) => !visible);
-      }
-
-      if (action === "toggleNavigationSidebar") {
-        setIsNavigationVisible((visible) => !visible);
-      }
-
-      if (action === "toggleTelemetryPane") {
-        setIsResponseVisible((visible) => !visible);
-      }
-    };
-
-    window.addEventListener(
-      APPLICATION_MENU_EVENT_NAME,
-      handleApplicationMenuAction,
-    );
-    return () =>
-      window.removeEventListener(
-        APPLICATION_MENU_EVENT_NAME,
-        handleApplicationMenuAction,
-      );
-  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1005,6 +973,61 @@ function App() {
     }
   }, []);
 
+  const adjustFontSize = useCallback((delta: number) => {
+    const cur = useAppStore.getState().fontSize;
+    setFontSize(Math.min(32, Math.max(8, cur + delta)));
+  }, []);
+
+  useEffect(() => {
+    if (!window.api?.onApplicationMenuAction) return;
+    return window.api.onApplicationMenuAction((action) => {
+      switch (action) {
+        case "check-for-updates":
+          handleCheckForUpdate();
+          break;
+        case "open-settings":
+          setActiveView("settings");
+          break;
+        case "go-workspace":
+          setActiveView("workspace");
+          break;
+        case "go-clusters":
+          setActiveView("workspaces");
+          break;
+        case "go-environments":
+          setActiveView("environments");
+          break;
+        case "go-feeds":
+          setActiveView("nuget");
+          break;
+        case "toggle-activity-bar":
+          setIsActivityBarVisible((v) => !v);
+          break;
+        case "toggle-navigation":
+          setIsNavigationVisible((v) => !v);
+          break;
+        case "toggle-response":
+          setIsResponseVisible((v) => !v);
+          break;
+        case "toggle-logs":
+          setIsLogPanelVisible((v) => !v);
+          break;
+        case "increase-font-size":
+          adjustFontSize(1);
+          break;
+        case "decrease-font-size":
+          adjustFontSize(-1);
+          break;
+        case "connect-cluster":
+          void connectCluster();
+          break;
+        case "disconnect-cluster":
+          void disconnectCluster();
+          break;
+      }
+    });
+  }, [handleCheckForUpdate, adjustFontSize]);
+
   const handleDownloadUpdate = useCallback(async () => {
     setUpdateAction("downloading");
     try {
@@ -1032,11 +1055,6 @@ function App() {
     if (panel === "navigation") setIsNavigationVisible((v) => !v);
     if (panel === "response") setIsResponseVisible((v) => !v);
     if (panel === "logs") setIsLogPanelVisible((v) => !v);
-  }, []);
-
-  const adjustFontSize = useCallback((delta: number) => {
-    const cur = useAppStore.getState().fontSize;
-    setFontSize(Math.min(32, Math.max(8, cur + delta)));
   }, []);
 
   const quickAccessActions: QuickAccessActions = useMemo(() => ({

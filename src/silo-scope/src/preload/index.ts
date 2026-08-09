@@ -130,6 +130,20 @@ const api: RendererApi = {
     };
   },
 
+  /** Application menu actions (main → renderer push) */
+  onApplicationMenuAction: (
+    callback: (action: string) => void,
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      action: string,
+    ) => callback(action);
+    ipcRenderer.on(IPC_CHANNELS.applicationMenuAction, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.applicationMenuAction, handler);
+    };
+  },
+
   /** Connection progress updates (main → renderer push) */
   onConnectionProgress: (
     callback: (entry: { message: string }) => void,

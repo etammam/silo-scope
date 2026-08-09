@@ -93,6 +93,9 @@ export interface RendererApi {
   onConnectionProgress: (
     callback: (entry: { message: string }) => void,
   ) => () => void;
+  onApplicationMenuAction: (
+    callback: (action: string) => void,
+  ) => () => void;
   clusters: {
     list: () => Promise<Workspace[]>;
     save: (cluster: Workspace) => Promise<Workspace>;
