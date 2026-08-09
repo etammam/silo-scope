@@ -22,22 +22,20 @@ export function BackendLogStatusButton({
   onToggle: () => void;
 }) {
   const errors = entries.filter((entry) => entry.level === "error").length;
-  const latest = entries.at(-1);
 
   return (
     <button
       aria-expanded={isOpen}
-      aria-label="Toggle backend logs panel"
+      aria-label={`Backend logs — ${entries.length} entries${errors > 0 ? `, ${errors} errors` : ""}`}
       className="global-status-bar__logs"
-      data-level={latest?.level ?? "idle"}
       onClick={() => onToggle()}
       type="button"
     >
-      <SquareTerminal aria-hidden="true" width={13} height={13} />
-      <span>Backend Logs</span>
-      <small>{entries.length}</small>
-      {errors > 0 && <strong>{errors} errors</strong>}
-      {latest && <em>{latest.message}</em>}
+      <SquareTerminal aria-hidden="true" width={12} height={12} />
+      <span className="global-status-bar__logs-count">{entries.length}</span>
+      {errors > 0 && (
+        <span className="global-status-bar__logs-errors">{errors}</span>
+      )}
     </button>
   );
 }

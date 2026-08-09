@@ -9464,28 +9464,31 @@ button:not(:disabled) {
 .global-status-bar {
 	align-items: center;
 	background: var(--ui-1);
-	border-top: 1px solid var(--ui-3);
-	color: var(--ui-6);
+	border-top: 1px solid color-mix(in srgb, var(--ui-4) 15%, transparent);
+	color: var(--ui-5);
 	display: flex;
 	font-size: 10px;
-	gap: 10px;
+	gap: 6px;
 	grid-column: 1 / -1;
 	grid-row: -2 / -1;
 	min-width: 0;
-	padding: 0 10px;
+	padding: 0 8px;
 	z-index: 6;
-	height: 24px;
+	height: 25px;
+	user-select: none;
 }
 
 .global-status-bar__label {
-	color: var(--ui-5);
-	font-size: 10px;
+	color: var(--ui-4);
+	font-size: 9px;
 	font-weight: 600;
-	opacity: 0.7;
+	letter-spacing: 0.04em;
+	opacity: 0.8;
+	text-transform: uppercase;
 }
 
 .global-status-bar__sep {
-	background: color-mix(in srgb, var(--ui-4) 25%, transparent);
+	background: color-mix(in srgb, var(--ui-4) 18%, transparent);
 	height: 14px;
 	width: 1px;
 	flex-shrink: 0;
@@ -9512,53 +9515,55 @@ button:not(:disabled) {
 	align-items: center;
 	appearance: none;
 	background: transparent;
-	border: 0;
-	border-radius: 0;
-	color: var(--ui-6);
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: var(--ui-5);
+	cursor: pointer;
 	display: flex;
 	font: inherit;
-	gap: 7px;
-	height: 100%;
-	max-width: min(600px, 55vw);
-	min-width: 0;
-	padding: 0 7px;
-	transition: background 100ms ease, color 100ms ease;
+	gap: 5px;
+	height: 20px;
+	margin-right: 2px;
+	padding: 0 6px;
+	transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
-.global-status-bar__logs:hover,
-.global-status-bar__logs:focus-visible,
+.global-status-bar__logs:hover {
+	background: color-mix(in srgb, var(--ui-4) 12%, transparent);
+	color: var(--ui-6);
+}
+
+.global-status-bar__logs:focus-visible {
+	outline: 1px solid var(--focus-ring);
+	outline-offset: -1px;
+}
+
 .global-status-bar__logs[aria-expanded="true"] {
-	background: rgb(241 241 241 / 0.12);
+	background: color-mix(in srgb, var(--ui-4) 20%, transparent);
 	color: var(--ui-7);
-	outline: none;
+	border-color: color-mix(in srgb, var(--ui-4) 25%, transparent);
 }
 
-.global-status-bar__logs small,
-.global-status-bar__logs strong {
-	background: var(--ui-3);
-	border-radius: 999px;
-	flex: 0 0 auto;
-	font: inherit;
+.global-status-bar__logs-count {
+	color: var(--ui-6);
+	font-family: var(--font-mono);
 	font-size: 10px;
-	padding: 1px 6px;
+	font-weight: 600;
+	min-width: 1ch;
+	text-align: right;
 }
 
-.global-status-bar__logs strong {
-	background: var(--red-dim);
-	color: var(--danger);
-}
-
-.global-status-bar__logs[data-level="error"] svg {
-	color: var(--danger);
-}
-
-.global-status-bar__logs em {
-	color: var(--ui-5);
-	font-style: normal;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+.global-status-bar__logs-errors {
+	background: var(--danger);
+	border-radius: 999px;
+	color: #fff;
+	font-family: var(--font-mono);
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 1;
+	min-width: 14px;
+	padding: 1px 4px;
+	text-align: center;
 }
 
 .backend-logs-panel-resizer {
@@ -9783,7 +9788,6 @@ button:not(:disabled) {
 		width: min(150px, 25vw);
 	}
 
-	.global-status-bar__logs em,
 	.backend-logs-panel__summary {
 		display: none;
 	}

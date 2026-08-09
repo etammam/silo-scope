@@ -1,0 +1,172 @@
+/* ─── Setup overlay ──────────────────────────────────────────── */
+
+.setup-overlay {
+  align-items: center;
+  background: var(--ui-0);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 100;
+}
+
+/* ─── Card ──────────────────────────────────────────────────── */
+
+.setup-card {
+  background: var(--ui-1);
+  border: 1px solid var(--ui-3);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  display: grid;
+  gap: 0;
+  justify-items: center;
+  max-width: 420px;
+  padding: 40px 36px 36px;
+  text-align: center;
+  width: 100%;
+  animation: setup-card-enter 320ms ease-out both;
+}
+
+@keyframes setup-card-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-card {
+    animation: none;
+  }
+}
+
+/* ─── Icon ring ─────────────────────────────────────────────── */
+
+.setup-card__icon {
+  margin-bottom: 20px;
+}
+
+.setup-card__icon-ring {
+  align-items: center;
+  background: color-mix(in srgb, var(--accent) 10%, var(--ui-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--ui-3));
+  border-radius: 50%;
+  box-shadow: 0 0 48px color-mix(in srgb, var(--accent) 10%, transparent);
+  display: flex;
+  height: 80px;
+  justify-content: center;
+  width: 80px;
+}
+
+.setup-card__icon-ring svg {
+  color: var(--accent);
+}
+
+/* spinner inside the icon ring (verifying state) */
+.setup-card__icon-ring .setup-card__spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+/* ─── Heading ───────────────────────────────────────────────── */
+
+.setup-card__heading {
+  color: var(--ui-7);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0 0 8px;
+}
+
+/* ─── Description ───────────────────────────────────────────── */
+
+.setup-card__description {
+  color: var(--ui-5);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 24px;
+  max-width: 320px;
+}
+
+/* ─── Button ────────────────────────────────────────────────── */
+
+.setup-card__button {
+  align-items: center;
+  appearance: none;
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--accent-contrast);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  gap: 8px;
+  height: 38px;
+  justify-content: center;
+  padding: 0 22px;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease;
+  min-width: 200px;
+}
+
+.setup-card__button:hover,
+.setup-card__button:focus-visible {
+  background: var(--accent-strong);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 24%, transparent);
+  outline: none;
+}
+
+.setup-card__button:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--ui-0),
+    0 0 0 4px var(--focus-ring);
+}
+
+.setup-card__button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+/* spinner inside the button */
+.setup-card__button .setup-card__spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+/* ─── Error ─────────────────────────────────────────────────── */
+
+.setup-card__error {
+  align-items: center;
+  background: var(--red-dim);
+  border: 1px solid color-mix(in srgb, var(--red) 24%, transparent);
+  border-radius: var(--radius-md);
+  color: var(--red);
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  line-height: 1.45;
+  margin-top: 20px;
+  padding: 10px 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.setup-card__error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ─── Shared ────────────────────────────────────────────────── */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
