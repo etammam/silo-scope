@@ -24,7 +24,7 @@ public sealed class OrleansClientConnector(
     ILogger<OrleansClientConnector>? logger = null
 ) : IDisposable
 {
-    private const int DefaultConnectTimeoutSeconds = 20;
+    private const int DefaultConnectTimeoutSeconds = 60;
     private const int MinConnectTimeoutSeconds = 3;
     private const int MaxConnectTimeoutSeconds = 300;
 
@@ -318,7 +318,7 @@ public sealed class OrleansClientConnector(
         {
             _logger.LogWarning("Connection timed out.");
             await CleanupHostAsync(CancellationToken.None);
-            return Result.Ok(
+            return Result.Fail(
                 $"Connection timed out after {ResolveConnectTimeoutSeconds()} seconds."
             );
         }

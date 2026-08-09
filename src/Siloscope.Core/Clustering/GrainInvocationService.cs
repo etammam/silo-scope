@@ -106,7 +106,18 @@ public sealed class GrainInvocationService : IGrainInvocationService
 
         if (!connector.TryGetClient(out var client))
         {
-            _logger.LogError("[Invoke] Rejected: Orleans client is not connected.");
+            if (connector.IsConnected)
+            {
+                _logger.LogError(
+                    "[Invoke] Rejected: connector.IsConnected=true but TryGetClient returned false — "
+                        + "this is a bug; the Orleans client reference was cleared unexpectedly"
+                );
+            }
+            else
+            {
+                _logger.LogError("[Invoke] Rejected: Orleans client is not connected.");
+            }
+
             return Result.Fail("Client is not connected. Click Connect first.");
         }
 
