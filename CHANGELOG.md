@@ -1,3 +1,7 @@
+## [1.1.0](https://github.com/etammam/silo-scope/compare/v1.0.0...v1.1.0) (2026-08-09)
+* replace electrobun with electron and add some improvements. ([#18](https://github.com/etammam/silo-scope/issues/18)) ([d8e23ad](https://github.com/etammam/silo-scope/commit/d8e23ad82b922f4c4394f071f2df2db0e060331e)) by Islam Abouzeid
+* **ci:** update desktop build process and reduce timeout ([#19](https://github.com/etammam/silo-scope/issues/19)) ([3838bf2](https://github.com/etammam/silo-scope/commit/3838bf2a716c41aae93f6459600ef6297ebb11a4)) by Islam Abouzeid
+
 ## 1.0.0 (2026-05-30)
 
 ### Features
