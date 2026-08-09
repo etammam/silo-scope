@@ -11,6 +11,7 @@ interface AppState {
   selectedMethod: string | null;
   selectedFunctionId: string | null;
   invocationResult: InvocationResult | null;
+  isInvoking: boolean;
   logs: LogEntry[];
   nugetFeeds: NugetFeed[];
   nugetPackages: NugetPackage[];
@@ -33,6 +34,7 @@ interface AppState {
   setSelectedMethod: (method: string | null) => void;
   setSelectedFunction: (functionId: string | null) => void;
   setInvocationResult: (result: InvocationResult | null) => void;
+  setIsInvoking: (isInvoking: boolean) => void;
   addLog: (entry: LogEntry) => void;
   hydrateLogs: (entries: LogEntry[]) => void;
   clearLogs: () => void;
@@ -61,6 +63,7 @@ export const useAppStore = create<AppState>((set) => ({
   selectedMethod: null,
   selectedFunctionId: null,
   invocationResult: null,
+  isInvoking: false,
   logs: [],
   nugetFeeds: [],
   nugetPackages: [],
@@ -83,6 +86,7 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedMethod: (selectedMethod) => set({ selectedMethod, selectedFunctionId: null }),
   setSelectedFunction: (selectedFunctionId) => set({ selectedFunctionId }),
   setInvocationResult: (invocationResult) => set({ invocationResult }),
+  setIsInvoking: (isInvoking) => set({ isInvoking }),
   addLog: (entry) => set((state) => ({ logs: [...state.logs, entry].slice(-50_000) })),
   hydrateLogs: (entries) => set((state) => {
     const incoming = new Set(state.logs.map(logIdentity));

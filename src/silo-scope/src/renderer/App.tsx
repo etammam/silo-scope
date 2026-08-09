@@ -96,6 +96,7 @@ function App() {
   const {
     grains,
     invocationResult,
+    isInvoking,
     isConnected,
     connectionStatus,
     connectionStep,
@@ -1486,6 +1487,7 @@ function App() {
                     theme={theme}
                     environments={environments}
                     activeEnvironment={activeEnvironment}
+                    isInvoking={isInvoking}
                   />
                   {isResponseVisible && (
                     <div
@@ -1504,6 +1506,7 @@ function App() {
                       activeTab={responseTab}
                       onTabChange={setResponseTab}
                       result={invocationResult}
+                      isInvoking={isInvoking}
                       theme={theme}
                       invocationHistory={invocationHistory}
                       fontFamily={fontFamily}
@@ -2436,6 +2439,9 @@ async function updateNugetFeed(
 }
 
 async function invokeGrain(request: GrainInvocationRequest) {
+  const store = useAppStore.getState();
+  store.setIsInvoking(true);
+  store.setInvocationResult(null);
   try {
     const result = await rpc.request.invokeGrain({
       grainType: request.grainType,
@@ -2446,12 +2452,14 @@ async function invokeGrain(request: GrainInvocationRequest) {
       functionId: request.functionId,
     });
 
-    useAppStore.getState().setInvocationResult(result);
+    store.setInvocationResult(result);
   } catch (error) {
-    useAppStore.getState().setInvocationResult({
+    store.setInvocationResult({
       isSuccess: false,
       error: error instanceof Error ? error.message : "Failed to invoke grain.",
     });
+  } finally {
+    store.setIsInvoking(false);
   }
 }
 

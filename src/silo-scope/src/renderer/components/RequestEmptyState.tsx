@@ -1,24 +1,47 @@
-import { Search, Send } from "lucide-react";
+import { ArrowRight, Command, Search, Zap } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 type RequestEmptyStateProps = {
   onOpenQuickAccess?: () => void;
   onOpenSources?: () => void;
 };
 
+const TIPS = [
+  "Start typing to search across all grain methods",
+  "Use Quick Access to jump to any function instantly",
+  "Select a grain from Sources to explore its methods",
+  "Save your request contexts for quick re-invocation",
+];
+
 export function RequestEmptyState({
   onOpenQuickAccess,
   onOpenSources,
 }: RequestEmptyStateProps) {
+  const [tipIndex, setTipIndex] = useState(0);
+  const isMac = useMemo(() => navigator.userAgent.includes("Mac"), []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTipIndex((i) => (i + 1) % TIPS.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="request-empty-state">
-      <div className="request-empty-state__icon">
-        <Send aria-hidden="true" width={48} height={48} />
+      <div className="request-empty-state__hero">
+        <div className="request-empty-state__icon-ring">
+          <div className="request-empty-state__icon">
+            <Zap aria-hidden="true" width={32} height={32} />
+          </div>
+        </div>
+
+        <h3 className="request-empty-state__title">Ready to invoke</h3>
+        <p className="request-empty-state__description">
+          Select a grain method to start building and invoking requests.
+        </p>
       </div>
-      <h3 className="request-empty-state__title">Select a function to get started</h3>
-      <p className="request-empty-state__description">
-        Choose a grain method to start building and invoking requests. You can browse the
-        Sources panel or use Quick Access to search across all available functions.
-      </p>
+
       <div className="request-empty-state__actions">
         {onOpenQuickAccess && (
           <button
@@ -26,8 +49,11 @@ export function RequestEmptyState({
             onClick={onOpenQuickAccess}
             type="button"
           >
-            <Search aria-hidden="true" width={14} height={14} />
-            Open Quick Access
+            <Search aria-hidden="true" width={15} height={15} />
+            <span>Quick Access</span>
+            <kbd className="request-empty-state__kbd">
+              {isMac ? "⌘K" : "Ctrl+K"}
+            </kbd>
           </button>
         )}
         {onOpenSources && (
@@ -36,9 +62,15 @@ export function RequestEmptyState({
             onClick={onOpenSources}
             type="button"
           >
-            Browse Sources
+            <span>Browse Sources</span>
+            <ArrowRight aria-hidden="true" width={14} height={14} />
           </button>
         )}
+      </div>
+
+      <div className="request-empty-state__tip" aria-live="polite">
+        <Command aria-hidden="true" width={12} height={12} />
+        <span key={tipIndex}>{TIPS[tipIndex]}</span>
       </div>
     </div>
   );
