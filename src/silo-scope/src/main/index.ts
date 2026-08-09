@@ -28,6 +28,8 @@ import { getStoragePath, setStoragePath } from "./storage";
 
 const IS_MAC_OS = process.platform === "darwin";
 
+const iconPath = join(__dirname, "../../resources/icon.png");
+
 /**
  * JSON-RPC client connected to the SiloScope Core sidecar process over stdio.
  */
@@ -75,6 +77,7 @@ function createWindow(): void {
     show: false,
     title: "SiloScope",
     titleBarStyle: IS_MAC_OS ? "hiddenInset" : "default",
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -192,6 +195,7 @@ function registerStorageIpc(): void {
  * feature IPC handlers, and creates the main window.
  */
 app.whenReady().then(() => {
+  if (IS_MAC_OS) app.dock.setIcon(iconPath);
   initAutoUpdater();
   registerWindowIpc();
   registerUpdateIpc();
