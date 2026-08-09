@@ -1,3 +1,7 @@
+## [1.2.1](https://github.com/etammam/silo-scope/compare/v1.2.0...v1.2.1) (2026-08-09)
+* **ci:** make sidecar executable for non-Windows environments ([eece74a](https://github.com/etammam/silo-scope/commit/eece74a3190cc9dcfc3993a22348f6b8a7da43ec)) by Islam Abouzeid
+* **ci:** update version extraction logic in CD workflow and adjust package.json for resource handling ([55d4cd1](https://github.com/etammam/silo-scope/commit/55d4cd1b4865d6cda6132ca138c989892952b1c1)) by Islam Abouzeid
+
 ## [1.2.0](https://github.com/etammam/silo-scope/compare/v1.1.1...v1.2.0) (2026-08-09)
 * **actions:** enhance CI/CD workflows with versioning and artifact management ([9222903](https://github.com/etammam/silo-scope/commit/922290378236950205fbc4036da7db71c3c153da)) by Islam Abouzeid
 
