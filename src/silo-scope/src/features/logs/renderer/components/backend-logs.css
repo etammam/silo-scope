@@ -1,0 +1,8 @@
+.backend-logs-panel-resizer {
+	background: color-mix(in srgb, var(--ui-3) 72%, transparent);
+	cursor: row-resize;
+	grid-column: 1 / -1;
+	grid-row: 3;
+	position: relative;
+	z-index: 4;
+}

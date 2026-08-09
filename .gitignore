@@ -433,5 +433,5 @@ FodyWeavers.xsd
 skills-lock.json
 .DS_Store
 .claude/
-!src/silo-scope/src/renderer/features/logs
+!src/silo-scope/src/features/logs
 dist/
