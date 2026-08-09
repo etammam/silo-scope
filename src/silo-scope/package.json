@@ -27,11 +27,17 @@
     "files": [
       "out/**/*",
       "resources/**/*",
+      "!resources/core/**",
       "package.json"
     ],
     "asarUnpack": [
-      "node_modules/electron-updater/**",
-      "resources/core/**"
+      "node_modules/electron-updater/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/core",
+        "to": "core"
+      }
     ],
     "electronUpdaterCompatibility": ">= 2.16",
     "mac": {

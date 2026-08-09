@@ -44,7 +44,7 @@ jobs:
         run: |
           npx -p semantic-release -p @semantic-release/changelog -p @semantic-release/git \
             -p conventional-changelog-conventionalcommits semantic-release --dry-run 2>&1 | tee dry-run.log
-          VERSION="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' dry-run.log | head -1)"
+          VERSION="$(sed -nE 's/.*The next release version is ([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?).*/\1/p' dry-run.log | head -1)"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
   build-core:
