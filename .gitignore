@@ -434,3 +434,4 @@ skills-lock.json
 .DS_Store
 .claude/
 !src/silo-scope/src/renderer/features/logs
+dist/
