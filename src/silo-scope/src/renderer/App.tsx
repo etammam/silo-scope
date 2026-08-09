@@ -52,7 +52,7 @@ import {
   ResponseTelemetryPane,
   type ResponsePaneTab,
 } from "./components/ResponseTelemetryPane";
-import { QuickAccessPanel } from "./components/QuickAccessPanel";
+import { QuickAccessPanel, type QuickAccessActions } from "./components/QuickAccessPanel";
 import { EnvironmentPage } from "./components/EnvironmentPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { WorkspacesPage } from "./components/WorkspacesPage";
@@ -1009,6 +1009,26 @@ function App() {
     }
   }, []);
 
+  const togglePanel = useCallback((panel: "activityBar" | "navigation" | "response" | "logs") => {
+    if (panel === "activityBar") setIsActivityBarVisible((v) => !v);
+    if (panel === "navigation") setIsNavigationVisible((v) => !v);
+    if (panel === "response") setIsResponseVisible((v) => !v);
+    if (panel === "logs") setIsLogPanelVisible((v) => !v);
+  }, []);
+
+  const adjustFontSize = useCallback((delta: number) => {
+    const cur = useAppStore.getState().fontSize;
+    setFontSize(Math.min(32, Math.max(8, cur + delta)));
+  }, []);
+
+  const quickAccessActions: QuickAccessActions = useMemo(() => ({
+    setActiveView,
+    togglePanel,
+    setPaneLayout,
+    setTheme,
+    adjustFontSize,
+  }), [setActiveView, togglePanel, setPaneLayout, setTheme, adjustFontSize]);
+
   const handleOpenBackendLogDirectory = useCallback(async () => {
     return await rpc.request.openBackendLogDirectory();
   }, []);
@@ -1585,12 +1605,13 @@ function App() {
         isConnected={isConnected}
         environments={environments}
         activeEnvironment={activeEnvironment}
+        actions={quickAccessActions}
+        currentTheme={theme}
+        currentFontSize={fontSize}
+        paneLayout={paneLayout}
         onSelectWorkspace={(workspaceId) => {
           setActiveView("workspace");
           handleSelectWorkspace(workspaceId);
-        }}
-        onSelectFeed={() => {
-          setActiveView("nuget");
         }}
         onSelectInterface={(interfaceId) => {
           setActiveView("workspace");
