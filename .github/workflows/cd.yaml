@@ -145,7 +145,7 @@ jobs:
 
       - name: Set package version
         working-directory: src/silo-scope
-        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
 
       - name: Package Electron app
         working-directory: src/silo-scope
@@ -188,7 +188,7 @@ jobs:
 
       - name: Set package version (for release commit)
         working-directory: src/silo-scope
-        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
 
       - name: Download installer artifacts
         uses: actions/download-artifact@v4
