@@ -2,6 +2,15 @@
 * **cspell:** add "Abouzeid" to custom words list ([bfe5ea3](https://github.com/etammam/silo-scope/commit/bfe5ea38f2b65b7bdb2a2592e9b9809d3b61145b)) by Islam Abouzeid
 * **cd:** allow same version when setting package version ([044dde0](https://github.com/etammam/silo-scope/commit/044dde0034807ffa4d6322884b7a60c089d79af4)) by Islam Abouzeid
 * **ci:** make sidecar executable for non-Windows environments ([eece74a](https://github.com/etammam/silo-scope/commit/eece74a3190cc9dcfc3993a22348f6b8a7da43ec)) by Islam Abouzeid
+* **ci:** prevent release-self-trigger, ensure sidecar unpacked correctly, and fix version extraction ([f0fec6c](https://github.com/etammam/silo-scope/commit/f0fec6c93a4f5def1e0358d86641b2691c9dd06f)) by Islam Abouzeid
+* **ci:** update version extraction logic in CD workflow and adjust package.json for resource handling ([55d4cd1](https://github.com/etammam/silo-scope/commit/55d4cd1b4865d6cda6132ca138c989892952b1c1)) by Islam Abouzeid
+* **release:** 1.2.1 [skip ci] ([c6baf3c](https://github.com/etammam/silo-scope/commit/c6baf3ca16c827a13efe03263f583be01a254148)) by [secure]
+* **release:** 1.2.1 [skip ci] ([10bf257](https://github.com/etammam/silo-scope/commit/10bf25749afd7734caece6206c81ae315aa9b428)) by [secure]
+
+## [1.2.1](https://github.com/etammam/silo-scope/compare/v1.2.0...v1.2.1) (2026-08-09)
+* **cspell:** add "Abouzeid" to custom words list ([bfe5ea3](https://github.com/etammam/silo-scope/commit/bfe5ea38f2b65b7bdb2a2592e9b9809d3b61145b)) by Islam Abouzeid
+* **cd:** allow same version when setting package version ([044dde0](https://github.com/etammam/silo-scope/commit/044dde0034807ffa4d6322884b7a60c089d79af4)) by Islam Abouzeid
+* **ci:** make sidecar executable for non-Windows environments ([eece74a](https://github.com/etammam/silo-scope/commit/eece74a3190cc9dcfc3993a22348f6b8a7da43ec)) by Islam Abouzeid
 * **ci:** update version extraction logic in CD workflow and adjust package.json for resource handling ([55d4cd1](https://github.com/etammam/silo-scope/commit/55d4cd1b4865d6cda6132ca138c989892952b1c1)) by Islam Abouzeid
 * **release:** 1.2.1 [skip ci] ([10bf257](https://github.com/etammam/silo-scope/commit/10bf25749afd7734caece6206c81ae315aa9b428)) by [secure]
 
