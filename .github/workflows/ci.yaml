@@ -175,9 +175,9 @@ jobs:
         run: npm run typecheck
 
   build-desktop:
-    name: Package Desktop (${{ matrix.name }})
+    name: Build Desktop (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     needs:
       - build-and-test
       - publish-core
@@ -188,15 +188,12 @@ jobs:
           - os: ubuntu-latest
             name: linux-x64
             runtime: linux-x64
-            dist-script: dist:linux
           - os: macos-latest
             name: macos-arm64
             runtime: osx-arm64
-            dist-script: dist:mac
           - os: windows-latest
             name: win-x64
             runtime: win-x64
-            dist-script: dist:win
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -208,12 +205,6 @@ jobs:
           cache: npm
           cache-dependency-path: src/silo-scope/package-lock.json
 
-      - name: Install Linux packaging deps
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libfuse2
-
       - name: Download Core sidecar
         uses: actions/download-artifact@v4
         with:
@@ -224,13 +215,6 @@ jobs:
         working-directory: src/silo-scope
         run: npm ci
 
-      - name: Package Electron app
+      - name: Verify desktop compiles
         working-directory: src/silo-scope
-        run: npm run ${{ matrix.dist-script }}
-
-      - name: Upload distributable packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: siloscope-desktop-${{ matrix.name }}
-          path: src/silo-scope/dist/
-          retention-days: 30
+        run: npm run build

@@ -114,6 +114,8 @@ jobs:
       - name: Package Electron app
         working-directory: src/silo-scope
         run: npm run ${{ matrix.dist-script }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload distributable packages
         uses: actions/upload-artifact@v4

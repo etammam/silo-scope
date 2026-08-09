@@ -12,10 +12,10 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "dist": "electron-vite build && electron-builder",
-    "dist:linux": "electron-vite build && electron-builder --linux",
-    "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:win": "electron-vite build && electron-builder --win",
+    "dist": "electron-vite build && electron-builder --publish never",
+    "dist:linux": "electron-vite build && electron-builder --linux --publish never",
+    "dist:mac": "electron-vite build && electron-builder --mac --publish never",
+    "dist:win": "electron-vite build && electron-builder --win --publish never",
     "postinstall": "node scripts/patch-electron-name.cjs"
   },
   "build": {
