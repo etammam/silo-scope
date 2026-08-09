@@ -1,6 +1,6 @@
 {
   "name": "silo-scope",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "description": "Siloscope desktop application (Electron) for exploring and invoking Microsoft Orleans grains.",
   "desktopName": "SiloScope",

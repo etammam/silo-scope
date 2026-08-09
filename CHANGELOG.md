@@ -1,3 +1,6 @@
+## [1.2.2](https://github.com/etammam/silo-scope/compare/v1.2.1...v1.2.2) (2026-08-09)
+* **OrleansClientConnector:** increase default connection timeout to 60 seconds and change timeout result to fail ([009f01d](https://github.com/etammam/silo-scope/commit/009f01d6a9d96214d4bd503bc654ff11cbf6c425)) by Islam Abouzeid
+
 ## [1.2.1](https://github.com/etammam/silo-scope/compare/v1.2.0...v1.2.1) (2026-08-09)
 * **cspell:** add "Abouzeid" to custom words list ([bfe5ea3](https://github.com/etammam/silo-scope/commit/bfe5ea38f2b65b7bdb2a2592e9b9809d3b61145b)) by Islam Abouzeid
 * **cd:** allow same version when setting package version ([044dde0](https://github.com/etammam/silo-scope/commit/044dde0034807ffa4d6322884b7a60c089d79af4)) by Islam Abouzeid
