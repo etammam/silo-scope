@@ -50,7 +50,7 @@
     [
       "@semantic-release/git",
       {
-        "assets": ["CHANGELOG.md"],
+        "assets": ["CHANGELOG.md", "src/silo-scope/package.json", "src/silo-scope/package-lock.json"],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
@@ -58,9 +58,13 @@
       "@semantic-release/github",
       {
         "assets": [
-          { "path": "artifacts/*.dmg", "label": "macOS Installer" },
-          { "path": "artifacts/*.zip", "label": "Windows Installer" },
-          { "path": "artifacts/*.tar.gz", "label": "Linux Installer" }
+          { "path": "release-assets/*.dmg", "label": "macOS Disk Image" },
+          { "path": "release-assets/*.zip", "label": "Portable Archive" },
+          { "path": "release-assets/*.AppImage", "label": "Linux AppImage" },
+          { "path": "release-assets/*.deb", "label": "Linux Debian Package" },
+          { "path": "release-assets/*.exe", "label": "Windows Installer" },
+          { "path": "release-assets/*.blockmap", "label": "Blockmap" },
+          { "path": "release-assets/latest*.yml", "label": "Auto-update Metadata" }
         ]
       }
     ]

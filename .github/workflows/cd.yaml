@@ -18,19 +18,46 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  prepare:
+    name: Determine next release version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.next-version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Compute next release version
+        id: next-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx -p semantic-release -p @semantic-release/changelog -p @semantic-release/git \
+            -p conventional-changelog-conventionalcommits semantic-release --dry-run 2>&1 | tee dry-run.log
+          VERSION="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' dry-run.log | head -1)"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
   build-core:
     name: Publish Core (${{ matrix.runtime }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: prepare
+    if: needs.prepare.outputs.version != ''
     strategy:
       fail-fast: false
       matrix:
         runtime:
           - linux-x64
-          - osx-x64
           - osx-arm64
           - win-x64
     steps:
@@ -63,11 +90,12 @@ jobs:
           path: artifacts/core/${{ matrix.runtime }}
           retention-days: 7
 
-  build-desktop:
+  package:
     name: Package Desktop (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    needs: build-core
+    needs: [prepare, build-core]
+    if: needs.prepare.outputs.version != ''
     strategy:
       fail-fast: false
       matrix:
@@ -111,6 +139,10 @@ jobs:
         working-directory: src/silo-scope
         run: npm ci
 
+      - name: Set package version
+        working-directory: src/silo-scope
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version
+
       - name: Package Electron app
         working-directory: src/silo-scope
         run: npm run ${{ matrix.dist-script }}
@@ -120,45 +152,51 @@ jobs:
       - name: Upload distributable packages
         uses: actions/upload-artifact@v4
         with:
-          name: siloscope-desktop-${{ matrix.name }}
-          path: src/silo-scope/dist/
+          name: silo-scope-dist-${{ matrix.name }}
+          path: |
+            src/silo-scope/dist/*.dmg
+            src/silo-scope/dist/*.zip
+            src/silo-scope/dist/*.AppImage
+            src/silo-scope/dist/*.deb
+            src/silo-scope/dist/*.exe
+            src/silo-scope/dist/*.blockmap
+            src/silo-scope/dist/latest*.yml
+          if-no-files-found: error
           retention-days: 7
 
   release:
-    name: Semantic Release
+    name: Semantic Release and Publish
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: build-desktop
+    needs: [prepare, package]
+    if: needs.prepare.outputs.version != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
 
-      - name: Download all artifacts
+      - name: Set package version (for release commit)
+        working-directory: src/silo-scope
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version
+
+      - name: Download installer artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          pattern: silo-scope-dist-*
+          merge-multiple: true
+          path: release-assets
 
       - name: Semantic Release
         id: release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
         run: |
-          npx -p semantic-release -p @semantic-release/changelog -p @semantic-release/git -p conventional-changelog-conventionalcommits semantic-release
-          echo "tag=$(git describe --tags --abbrev=0 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
-
-      - name: Attach packages to release
-        if: steps.release.outputs.tag != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd artifacts
-          for artifact_dir in siloscope-desktop-*/; do
-            find "$artifact_dir" -type f -exec gh release upload "${{ steps.release.outputs.tag }}" {} +
-          done
+          npx -p semantic-release -p @semantic-release/changelog -p @semantic-release/git \
+            -p conventional-changelog-conventionalcommits semantic-release
