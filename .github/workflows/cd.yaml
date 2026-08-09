@@ -135,6 +135,10 @@ jobs:
           name: siloscope-core-${{ matrix.runtime }}
           path: src/silo-scope/resources/core
 
+      - name: Make sidecar executable
+        if: runner.os != 'Windows'
+        run: chmod +x src/silo-scope/resources/core/Siloscope.Core
+
       - name: Install dependencies
         working-directory: src/silo-scope
         run: npm ci
