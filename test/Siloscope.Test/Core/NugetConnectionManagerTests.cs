@@ -72,9 +72,7 @@ public sealed class NugetConnectionManagerTests
 
         var result = await _manager.RestorePackagesAsync(
             packages,
-            null,
-            null,
-            CancellationToken.None
+            cancellationToken: CancellationToken.None
         );
 
         result.IsSuccess.Should().BeTrue();
@@ -86,9 +84,7 @@ public sealed class NugetConnectionManagerTests
         var result = await _manager.DownloadPackageAsync(
             "Newtonsoft.Json",
             "13.0.3",
-            null,
-            null,
-            CancellationToken.None
+            cancellationToken: CancellationToken.None
         );
 
         result.IsSuccess.Should().BeTrue();
@@ -102,9 +98,7 @@ public sealed class NugetConnectionManagerTests
 
         var result = await _manager.RestorePackagesAsync(
             packages,
-            null,
-            null,
-            CancellationToken.None
+            cancellationToken: CancellationToken.None
         );
 
         result.IsSuccess.Should().BeTrue();
@@ -133,8 +127,7 @@ public sealed class NugetConnectionManagerTests
             var result = await _manager.RestorePackagesAsync(
                 [("SiloScope.Root", "1.0.0")],
                 sourcePath,
-                null,
-                CancellationToken.None
+                cancellationToken: CancellationToken.None
             );
 
             result.IsSuccess.Should().BeTrue(result.Errors.FirstOrDefault()?.Message ?? "");

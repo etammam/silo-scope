@@ -55,6 +55,7 @@ public sealed class InterfaceCatalogTests
                         ),
                         null,
                         "private",
+                        It.IsAny<int>(),
                         default
                     )
                 )
