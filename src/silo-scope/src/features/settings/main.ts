@@ -6,6 +6,7 @@ import type { ApplicationUpdateStatusEntry } from "../settings/schema";
 import { SidecarJsonRpcClient } from "../../main/sidecar/json-rpc-client";
 
 let sidecarRef: SidecarJsonRpcClient | null = null;
+let cachedLocalInfo: ApplicationUpdateStatusEntry["localInfo"] | undefined;
 
 /** Register the sidecar reference so applyUpdate can dispose it before restart. */
 export function setSidecarForUpdater(sidecar: SidecarJsonRpcClient): void {
@@ -13,9 +14,20 @@ export function setSidecarForUpdater(sidecar: SidecarJsonRpcClient): void {
 }
 
 function sendStatus(entry: ApplicationUpdateStatusEntry): void {
+  // Cache the first localInfo we see and attach it to every status entry
+  // so the renderer never loses version / release-url details.
+  if (entry.localInfo) {
+    cachedLocalInfo = entry.localInfo;
+  }
+
+  const enriched: ApplicationUpdateStatusEntry = {
+    ...entry,
+    localInfo: entry.localInfo ?? cachedLocalInfo,
+  };
+
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
-      win.webContents.send("siloscope:update-status", entry);
+      win.webContents.send("siloscope:update-status", enriched);
     }
   }
 }
@@ -24,9 +36,37 @@ function isDev(): boolean {
   return !app.isPackaged || process.env["ELECTRON_IS_DEV"] === "1";
 }
 
+function buildLocalInfo(): NonNullable<ApplicationUpdateStatusEntry["localInfo"]> {
+  const dev = isDev();
+  return {
+    version: app.getVersion(),
+    hash: "",
+    baseUrl: "https://github.com/etammam/silo-scope/releases/latest/download",
+    channel: dev ? "dev" : "latest",
+    name: app.getName(),
+    identifier: "siloscope.app",
+  };
+}
+
+export function broadcastUpdateState(): void {
+  sendStatus({
+    status: "idle",
+    message: isDev()
+      ? "Auto-update disabled in development."
+      : "Ready to check for updates.",
+    timestamp: Date.now(),
+    localInfo: buildLocalInfo(),
+  });
+}
+
 export function initAutoUpdater(): void {
-  // Skip auto-update checks in development — there are no published releases
-  if (isDev()) {
+  const dev = isDev();
+
+  // Always broadcast local build info so the renderer can show version / release URL
+  broadcastUpdateState();
+
+  // Skip auto-update event listeners and checks in development
+  if (dev) {
     console.info("[updater] Skipping auto-update in development mode.");
     return;
   }
@@ -34,21 +74,6 @@ export function initAutoUpdater(): void {
   autoUpdater.autoDownload = false;
   autoUpdater.allowDowngrade = false;
   autoUpdater.logger = console;
-
-  // Send local build info so the renderer can show version / release URL
-  sendStatus({
-    status: "idle",
-    message: "Ready to check for updates.",
-    timestamp: Date.now(),
-    localInfo: {
-      version: app.getVersion(),
-      hash: "",
-      baseUrl: "https://github.com/etammam/silo-scope/releases/latest/download",
-      channel: "latest",
-      name: app.getName(),
-      identifier: "siloscope.app",
-    },
-  });
 
   autoUpdater.on("checking-for-update", () => {
     sendStatus({

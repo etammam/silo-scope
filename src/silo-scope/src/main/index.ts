@@ -15,6 +15,7 @@ import { verifyStoragePath } from "../features/feeds/persistence";
 import { registerGrainInvocationIpc } from "../features/grain-invocation/main";
 import {
   applyUpdate,
+  broadcastUpdateState,
   checkForUpdates,
   downloadUpdate,
   initAutoUpdater,
@@ -96,6 +97,13 @@ function createWindow(): void {
   });
 
   window.on("ready-to-show", () => window.show());
+
+  // Re-broadcast update state once the page finishes loading so the renderer
+  // receives version / release info even if the initial sendStatus in
+  // initAutoUpdater fired before the preload listener was registered.
+  window.webContents.on("did-finish-load", () => {
+    broadcastUpdateState();
+  });
 
   window.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url);
@@ -213,7 +221,6 @@ app.whenReady().then(() => {
     app.dock!.setIcon(iconPath);
   }
   initMenu();
-  initAutoUpdater();
   registerWindowIpc();
   registerUpdateIpc();
   registerStorageIpc();
@@ -222,6 +229,7 @@ app.whenReady().then(() => {
   registerWorkspaceIpc(getStoragePath);
   registerGrainInvocationIpc(adapter, sidecar, getStoragePath);
   createWindow();
+  initAutoUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
