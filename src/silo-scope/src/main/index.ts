@@ -14,12 +14,13 @@ import { registerFeedsIpc } from "../features/feeds/main";
 import { verifyStoragePath } from "../features/feeds/persistence";
 import { registerGrainInvocationIpc } from "../features/grain-invocation/main";
 import {
-    applyUpdate,
-    broadcastUpdateState,
-    checkForUpdates,
-    downloadUpdate,
-    initAutoUpdater,
-    setSidecarForUpdater,
+  applyUpdate,
+  broadcastUpdateState,
+  checkForUpdates,
+  downloadUpdate,
+  getIsUpdatePending,
+  initAutoUpdater,
+  setSidecarForUpdater,
 } from "../features/settings/main";
 import { registerWorkspaceIpc } from "../features/workspaces/main";
 import { IPC_CHANNELS } from "../shared/events";
@@ -254,6 +255,11 @@ async function cleanupBeforeQuit(): Promise<void> {
 }
 
 app.on("before-quit", (event) => {
+  // When an update is pending, let quitAndInstall() proceed without our
+  // cleanup logic interfering — electron-updater needs the quit to
+  // complete naturally to replace the app bundle.
+  if (getIsUpdatePending()) return;
+
   if ((globalThis as Record<string, unknown>).cleanupDone) return;
   (globalThis as Record<string, unknown>).cleanupDone = true;
   event.preventDefault();

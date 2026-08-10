@@ -1,12 +1,23 @@
+import { app, BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
+import { SidecarJsonRpcClient } from "../../main/sidecar/json-rpc-client";
+import type { ApplicationUpdateStatusEntry } from "../settings/schema";
 
 const { autoUpdater } = electronUpdater;
-import { app, BrowserWindow } from "electron";
-import type { ApplicationUpdateStatusEntry } from "../settings/schema";
-import { SidecarJsonRpcClient } from "../../main/sidecar/json-rpc-client";
 
 let sidecarRef: SidecarJsonRpcClient | null = null;
 let cachedLocalInfo: ApplicationUpdateStatusEntry["localInfo"] | undefined;
+
+/**
+ * Set to true when quitAndInstall() is about to be called so the before-quit
+ * handler can let the update installer proceed without cleanup interference.
+ */
+let isUpdatePending = false;
+
+/** Returns true when an update is about to be applied via quitAndInstall. */
+export function getIsUpdatePending(): boolean {
+  return isUpdatePending;
+}
 
 /** Register the sidecar reference so applyUpdate can dispose it before restart. */
 export function setSidecarForUpdater(sidecar: SidecarJsonRpcClient): void {
@@ -36,7 +47,9 @@ function isDev(): boolean {
   return !app.isPackaged || process.env["ELECTRON_IS_DEV"] === "1";
 }
 
-function buildLocalInfo(): NonNullable<ApplicationUpdateStatusEntry["localInfo"]> {
+function buildLocalInfo(): NonNullable<
+  ApplicationUpdateStatusEntry["localInfo"]
+> {
   const dev = isDev();
   return {
     version: app.getVersion(),
@@ -155,16 +168,22 @@ export function downloadUpdate(): void {
 }
 
 export async function applyUpdate(): Promise<void> {
+  isUpdatePending = true;
+
   // Clean up sidecar before restarting to install the update
   if (sidecarRef) {
     try {
       await sidecarRef
         .request("DisconnectClusterAsync", undefined)
         .catch(() => {});
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
     try {
       await sidecarRef.dispose();
-    } catch { /* best-effort */ }
+    } catch {
+      /* best-effort */
+    }
   }
   autoUpdater.quitAndInstall();
 }
