@@ -1,3 +1,6 @@
+## [1.4.0](https://github.com/etammam/silo-scope/compare/v1.3.0...v1.4.0) (2026-08-10)
+* **updater:** enhance update state broadcasting and local info caching ([b6db8b8](https://github.com/etammam/silo-scope/commit/b6db8b839f8608721e6a18bacf2afb1fc8318408)) by Islam Abouzeid
+
 ## [1.3.0](https://github.com/etammam/silo-scope/compare/v1.2.2...v1.3.0) (2026-08-10)
 * **connection:** enhance logging during cluster connection and catalog discovery ([4abeac6](https://github.com/etammam/silo-scope/commit/4abeac6a0b91304f9ee33ea29a9200637ed0a43a)) by Islam Abouzeid
 
