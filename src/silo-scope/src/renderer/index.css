@@ -2321,7 +2321,7 @@ textarea,
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: var(--success, #3fb950);
+  color: #1a7f37;
   cursor: pointer;
   display: inline-flex;
   flex-shrink: 0;
