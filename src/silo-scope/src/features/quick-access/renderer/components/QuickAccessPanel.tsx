@@ -1,31 +1,34 @@
 import {
-  Box,
-  Briefcase,
-  Folder,
-  Globe,
-  Layers,
-  Moon,
-  Package,
-  PanelLeft,
-  PanelLeftOpen,
-  PanelRight,
-  Play,
-  Plus,
-  Rows3,
-  Search,
-  Settings,
-  Square,
-  Sun,
-  Terminal,
-  X,
-  type LucideIcon,
+    Box,
+    Briefcase,
+    Folder,
+    Globe,
+    Layers,
+    Moon,
+    Package,
+    PanelLeft,
+    PanelLeftOpen,
+    PanelRight,
+    Play,
+    Plus,
+    Rows3,
+    Search,
+    Settings,
+    Square,
+    Sun,
+    Terminal,
+    X,
+    type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Workspace } from "../../../workspaces/schema";
-import type { NugetFeed } from "../../../feeds/schema";
-import type { EnvironmentProfile } from "../../../environments/schema";
-import type { SourceCatalogFunction, SourceOwnedCatalog } from "../../../grain-invocation/schema";
 import type { ActivityView } from "../../../../renderer/layout/ActivityBar";
+import type { EnvironmentProfile } from "../../../environments/schema";
+import type { NugetFeed } from "../../../feeds/schema";
+import type {
+    SourceCatalogFunction,
+    SourceOwnedCatalog,
+} from "../../../grain-invocation/schema";
+import type { Workspace } from "../../../workspaces/schema";
 import "./quick-access-panel.css";
 
 type SearchResultType =
@@ -49,7 +52,11 @@ type ResultGroup =
 
 type PanelId = "activityBar" | "navigation" | "response" | "logs";
 type PaneLayout = "horizontal" | "vertical";
-type WorkbenchTheme = "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
+type WorkbenchTheme =
+  | "vscode-dark"
+  | "vscode-light"
+  | "github-dark"
+  | "github-light";
 
 interface CommandItem {
   run: () => void;
@@ -93,6 +100,8 @@ interface QuickAccessPanelProps {
   onSelectFunction?: (functionId: string) => void;
   onConnectCluster?: () => void;
   onDisconnectCluster?: () => void;
+  onCancelConnect?: () => void;
+  connectionStatus?: string;
   onSwitchEnvironment?: (envName: string) => void;
 }
 
@@ -115,6 +124,8 @@ export function QuickAccessPanel({
   onSelectFunction,
   onConnectCluster,
   onDisconnectCluster,
+  onCancelConnect,
+  connectionStatus,
   onSwitchEnvironment,
 }: QuickAccessPanelProps) {
   const [query, setQuery] = useState("");
@@ -126,8 +137,21 @@ export function QuickAccessPanel({
     const normalizedQuery = query.trim().toLowerCase();
     const allResults: SearchResult[] = [];
 
-    // ── Commands (connect/disconnect) ──
-    if (workspace && !isConnected) {
+    // ── Commands (connect/disconnect/cancel) ──
+    if (workspace && connectionStatus === "connecting") {
+      if (!normalizedQuery || "cancel connection".includes(normalizedQuery)) {
+        allResults.push({
+          id: "command:cancel-connect",
+          type: "command",
+          group: "commands",
+          title: "Cancel connection",
+          subtitle: `Cancel connecting to ${workspace.name}`,
+          icon: X,
+          data: { run: () => onCancelConnect?.() },
+        });
+      }
+    }
+    if (workspace && !isConnected && connectionStatus !== "connecting") {
       const text = `connect cluster ${workspace.name}`.toLowerCase();
       if (!normalizedQuery || text.includes(normalizedQuery)) {
         allResults.push({
@@ -156,12 +180,42 @@ export function QuickAccessPanel({
     }
 
     // ── Views (Module 1) ──
-    const VIEWS: Array<{ id: string; title: string; view: ActivityView; icon: LucideIcon }> = [
-      { id: "view:workspace", title: "Go to Workspace", view: "workspace", icon: Folder },
-      { id: "view:clusters", title: "Go to Clusters", view: "workspaces", icon: Briefcase },
-      { id: "view:environments", title: "Go to Environments", view: "environments", icon: Globe },
-      { id: "view:feeds", title: "Go to NuGet Feeds", view: "nuget", icon: Package },
-      { id: "view:settings", title: "Go to Settings", view: "settings", icon: Settings },
+    const VIEWS: Array<{
+      id: string;
+      title: string;
+      view: ActivityView;
+      icon: LucideIcon;
+    }> = [
+      {
+        id: "view:workspace",
+        title: "Go to Workspace",
+        view: "workspace",
+        icon: Folder,
+      },
+      {
+        id: "view:clusters",
+        title: "Go to Clusters",
+        view: "workspaces",
+        icon: Briefcase,
+      },
+      {
+        id: "view:environments",
+        title: "Go to Environments",
+        view: "environments",
+        icon: Globe,
+      },
+      {
+        id: "view:feeds",
+        title: "Go to NuGet Feeds",
+        view: "nuget",
+        icon: Package,
+      },
+      {
+        id: "view:settings",
+        title: "Go to Settings",
+        view: "settings",
+        icon: Settings,
+      },
     ];
     for (const v of VIEWS) {
       if (!normalizedQuery || v.title.toLowerCase().includes(normalizedQuery)) {
@@ -179,11 +233,41 @@ export function QuickAccessPanel({
     }
 
     // ── Panels (Module 2) ──
-    const PANELS: Array<{ id: string; title: string; subtitle: string; panel: PanelId; icon: LucideIcon }> = [
-      { id: "panel:activity", title: "Toggle Activity Bar", subtitle: "Show or hide the activity bar", panel: "activityBar", icon: PanelLeft },
-      { id: "panel:navigation", title: "Toggle Navigation Sidebar", subtitle: "Show or hide the navigation sidebar", panel: "navigation", icon: PanelLeftOpen },
-      { id: "panel:response", title: "Toggle Response Pane", subtitle: "Show or hide the response telemetry pane", panel: "response", icon: PanelRight },
-      { id: "panel:logs", title: "Toggle Backend Logs", subtitle: "Show or hide the backend log panel", panel: "logs", icon: Terminal },
+    const PANELS: Array<{
+      id: string;
+      title: string;
+      subtitle: string;
+      panel: PanelId;
+      icon: LucideIcon;
+    }> = [
+      {
+        id: "panel:activity",
+        title: "Toggle Activity Bar",
+        subtitle: "Show or hide the activity bar",
+        panel: "activityBar",
+        icon: PanelLeft,
+      },
+      {
+        id: "panel:navigation",
+        title: "Toggle Navigation Sidebar",
+        subtitle: "Show or hide the navigation sidebar",
+        panel: "navigation",
+        icon: PanelLeftOpen,
+      },
+      {
+        id: "panel:response",
+        title: "Toggle Response Pane",
+        subtitle: "Show or hide the response telemetry pane",
+        panel: "response",
+        icon: PanelRight,
+      },
+      {
+        id: "panel:logs",
+        title: "Toggle Backend Logs",
+        subtitle: "Show or hide the backend log panel",
+        panel: "logs",
+        icon: Terminal,
+      },
     ];
     for (const p of PANELS) {
       if (!normalizedQuery || p.title.toLowerCase().includes(normalizedQuery)) {
@@ -201,7 +285,12 @@ export function QuickAccessPanel({
     }
 
     // Layout toggle
-    if (!normalizedQuery || "layout".includes(normalizedQuery) || "stack".includes(normalizedQuery) || "side by side".includes(normalizedQuery)) {
+    if (
+      !normalizedQuery ||
+      "layout".includes(normalizedQuery) ||
+      "stack".includes(normalizedQuery) ||
+      "side by side".includes(normalizedQuery)
+    ) {
       const isVertical = paneLayout === "vertical";
       allResults.push({
         id: "panel:layout",
@@ -209,34 +298,51 @@ export function QuickAccessPanel({
         group: "panels",
         badge: "Layout",
         title: isVertical ? "Layout: Side by Side" : "Layout: Stack Vertically",
-        subtitle: isVertical ? "Place request and response panels side by side" : "Stack request and response panels",
+        subtitle: isVertical
+          ? "Place request and response panels side by side"
+          : "Stack request and response panels",
         icon: isVertical ? PanelRight : Rows3,
-        data: { run: () => actions.setPaneLayout(isVertical ? "horizontal" : "vertical") },
+        data: {
+          run: () =>
+            actions.setPaneLayout(isVertical ? "horizontal" : "vertical"),
+        },
       });
     }
 
     // ── Appearance (Module 3) ──
-    const THEMES: Array<{ theme: WorkbenchTheme; label: string; icon: LucideIcon }> = [
+    const THEMES: Array<{
+      theme: WorkbenchTheme;
+      label: string;
+      icon: LucideIcon;
+    }> = [
       { theme: "vscode-dark", label: "VS Code Dark", icon: Moon },
       { theme: "vscode-light", label: "VS Code Light", icon: Sun },
       { theme: "github-dark", label: "GitHub Dark", icon: Moon },
       { theme: "github-light", label: "GitHub Light", icon: Sun },
     ];
     for (const t of THEMES) {
-      if (!normalizedQuery || `theme ${t.label}`.toLowerCase().includes(normalizedQuery)) {
+      if (
+        !normalizedQuery ||
+        `theme ${t.label}`.toLowerCase().includes(normalizedQuery)
+      ) {
         allResults.push({
           id: `appearance:theme:${t.theme}`,
           type: "command",
           group: "appearance",
           badge: "Theme",
           title: `Theme: ${t.label}`,
-          subtitle: currentTheme === t.theme ? "Current theme" : "Switch to this theme",
+          subtitle:
+            currentTheme === t.theme ? "Current theme" : "Switch to this theme",
           icon: t.icon,
           data: { run: () => actions.setTheme(t.theme) },
         });
       }
     }
-    if (!normalizedQuery || "font".includes(normalizedQuery) || "increase".includes(normalizedQuery)) {
+    if (
+      !normalizedQuery ||
+      "font".includes(normalizedQuery) ||
+      "increase".includes(normalizedQuery)
+    ) {
       allResults.push({
         id: "appearance:font_up",
         type: "command",
@@ -248,7 +354,11 @@ export function QuickAccessPanel({
         data: { run: () => actions.adjustFontSize(1) },
       });
     }
-    if (!normalizedQuery || "font".includes(normalizedQuery) || "decrease".includes(normalizedQuery)) {
+    if (
+      !normalizedQuery ||
+      "font".includes(normalizedQuery) ||
+      "decrease".includes(normalizedQuery)
+    ) {
       allResults.push({
         id: "appearance:font_down",
         type: "command",
@@ -263,14 +373,18 @@ export function QuickAccessPanel({
 
     // ── Environments ──
     for (const env of environments) {
-      const text = `${env.name} environment ${activeEnvironment === env.name ? "active" : ""}`.toLowerCase();
+      const text =
+        `${env.name} environment ${activeEnvironment === env.name ? "active" : ""}`.toLowerCase();
       if (!normalizedQuery || text.includes(normalizedQuery)) {
         allResults.push({
           id: `environment:${env.name}`,
           type: "environment",
           group: "environments",
           title: env.name,
-          subtitle: activeEnvironment === env.name ? "Active environment" : "Environment profile",
+          subtitle:
+            activeEnvironment === env.name
+              ? "Active environment"
+              : "Environment profile",
           icon: Layers,
           data: env,
         });
@@ -279,7 +393,8 @@ export function QuickAccessPanel({
 
     // ── Workspaces / clusters ──
     for (const ws of workspaces) {
-      const text = `${ws.name} ${ws.siloAddress} ${ws.clusterId ?? ""}`.toLowerCase();
+      const text =
+        `${ws.name} ${ws.siloAddress} ${ws.clusterId ?? ""}`.toLowerCase();
       if (!normalizedQuery || text.includes(normalizedQuery)) {
         allResults.push({
           id: `workspace:${ws.id}`,
@@ -312,7 +427,8 @@ export function QuickAccessPanel({
     // ── Interfaces & functions ──
     for (const source of sourceCatalog.sources) {
       for (const iface of source.interfaces) {
-        const ifaceText = `${iface.interfaceName} ${iface.namespace}`.toLowerCase();
+        const ifaceText =
+          `${iface.interfaceName} ${iface.namespace}`.toLowerCase();
         if (!normalizedQuery || ifaceText.includes(normalizedQuery)) {
           allResults.push({
             id: `interface:${iface.interfaceId}`,
@@ -325,9 +441,17 @@ export function QuickAccessPanel({
           });
         }
         for (const method of iface.methods) {
-          const methodText = `${method.methodName} ${method.signature} ${method.returnType}`.toLowerCase();
-          const paramText = method.parameters.map((p) => `${p.name} ${p.typeName}`).join(" ").toLowerCase();
-          if (!normalizedQuery || methodText.includes(normalizedQuery) || paramText.includes(normalizedQuery)) {
+          const methodText =
+            `${method.methodName} ${method.signature} ${method.returnType}`.toLowerCase();
+          const paramText = method.parameters
+            .map((p) => `${p.name} ${p.typeName}`)
+            .join(" ")
+            .toLowerCase();
+          if (
+            !normalizedQuery ||
+            methodText.includes(normalizedQuery) ||
+            paramText.includes(normalizedQuery)
+          ) {
             allResults.push({
               id: `function:${method.functionId}`,
               type: "function",
@@ -343,10 +467,24 @@ export function QuickAccessPanel({
     }
 
     return allResults;
-  }, [query, workspaces, feeds, sourceCatalog, workspace, isConnected, environments, activeEnvironment, actions, currentTheme, currentFontSize]);
+  }, [
+    query,
+    workspaces,
+    feeds,
+    sourceCatalog,
+    workspace,
+    isConnected,
+    environments,
+    activeEnvironment,
+    actions,
+    currentTheme,
+    currentFontSize,
+  ]);
 
   // Reset selection when results change
-  useEffect(() => { setSelectedIndex(0); }, [results.length]);
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [results.length]);
 
   // Focus input when opened
   useEffect(() => {
@@ -361,10 +499,27 @@ export function QuickAccessPanel({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
-      if (event.key === "ArrowDown") { event.preventDefault(); setSelectedIndex((p) => (p < results.length - 1 ? p + 1 : 0)); return; }
-      if (event.key === "ArrowUp") { event.preventDefault(); setSelectedIndex((p) => (p > 0 ? p - 1 : results.length - 1)); return; }
-      if (event.key === "Enter") { event.preventDefault(); const r = results[selectedIndex]; if (r) handleSelect(r); return; }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setSelectedIndex((p) => (p < results.length - 1 ? p + 1 : 0));
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setSelectedIndex((p) => (p > 0 ? p - 1 : results.length - 1));
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const r = results[selectedIndex];
+        if (r) handleSelect(r);
+        return;
+      }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -373,8 +528,11 @@ export function QuickAccessPanel({
   // Scroll selected item into view
   useEffect(() => {
     if (!listRef.current) return;
-    const selectedItem = listRef.current.children[selectedIndex] as HTMLElement | undefined;
-    if (selectedItem) selectedItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const selectedItem = listRef.current.children[selectedIndex] as
+      | HTMLElement
+      | undefined;
+    if (selectedItem)
+      selectedItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedIndex]);
 
   const handleSelect = useCallback(
@@ -395,7 +553,10 @@ export function QuickAccessPanel({
           break;
         }
         case "interface": {
-          const { interfaceId } = result.data as { interfaceId: string; sourceId: string };
+          const { interfaceId } = result.data as {
+            interfaceId: string;
+            sourceId: string;
+          };
           actions.setActiveView("workspace");
           onSelectInterface?.(interfaceId);
           break;
@@ -414,7 +575,14 @@ export function QuickAccessPanel({
       }
       onClose();
     },
-    [actions, onClose, onSelectWorkspace, onSelectInterface, onSelectFunction, onSwitchEnvironment],
+    [
+      actions,
+      onClose,
+      onSelectWorkspace,
+      onSelectInterface,
+      onSelectFunction,
+      onSwitchEnvironment,
+    ],
   );
 
   if (!isOpen) return null;
@@ -424,14 +592,21 @@ export function QuickAccessPanel({
   return (
     <div
       className="quick-access-overlay"
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       role="dialog"
       aria-modal="true"
       aria-label="Quick access"
     >
       <div className="quick-access-panel">
         <div className="quick-access-input-row">
-          <Search aria-hidden="true" className="quick-access-search-icon" width={16} height={16} />
+          <Search
+            aria-hidden="true"
+            className="quick-access-search-icon"
+            width={16}
+            height={16}
+          />
           <input
             ref={inputRef}
             aria-label="Search commands, views, panels, environments, clusters, feeds, interfaces and grains"
@@ -445,7 +620,10 @@ export function QuickAccessPanel({
             <button
               aria-label="Clear search"
               className="quick-access-clear"
-              onClick={() => { setQuery(""); inputRef.current?.focus(); }}
+              onClick={() => {
+                setQuery("");
+                inputRef.current?.focus();
+              }}
               type="button"
             >
               <X aria-hidden="true" width={14} height={14} />
@@ -457,7 +635,9 @@ export function QuickAccessPanel({
           <ul className="quick-access-results" ref={listRef} role="listbox">
             {groupedResults.map((group) => (
               <li key={group.group} className="quick-access-group">
-                <div className="quick-access-group-label">{formatGroupLabel(group.group)}</div>
+                <div className="quick-access-group-label">
+                  {formatGroupLabel(group.group)}
+                </div>
                 <ul className="quick-access-group-items" role="group">
                   {group.items.map((result) => {
                     const globalIndex = results.indexOf(result);
@@ -473,12 +653,19 @@ export function QuickAccessPanel({
                           role="option"
                           type="button"
                         >
-                          <Icon aria-hidden="true" className="quick-access-item-icon" width={16} height={16} />
+                          <Icon
+                            aria-hidden="true"
+                            className="quick-access-item-icon"
+                            width={16}
+                            height={16}
+                          />
                           <span className="quick-access-item-text">
                             <span className="quick-access-item-title">
                               {highlightMatch(result.title, query)}
                             </span>
-                            <span className="quick-access-item-subtitle">{result.subtitle}</span>
+                            <span className="quick-access-item-subtitle">
+                              {result.subtitle}
+                            </span>
                           </span>
                           <span className="quick-access-item-badge">
                             {result.badge ?? formatTypeLabel(result.type)}
@@ -493,15 +680,23 @@ export function QuickAccessPanel({
           </ul>
         ) : (
           <div className="quick-access-empty">
-            <Search aria-hidden="true" className="quick-access-empty-icon" width={32} height={32} />
+            <Search
+              aria-hidden="true"
+              className="quick-access-empty-icon"
+              width={32}
+              height={32}
+            />
             <span>No results found</span>
           </div>
         )}
 
         <div className="quick-access-footer">
-          <span>{results.length > 0 ? `${results.length} results` : "No results"}</span>
+          <span>
+            {results.length > 0 ? `${results.length} results` : "No results"}
+          </span>
           <span className="quick-access-footer-shortcuts">
-            <kbd>↑</kbd><kbd>↓</kbd> to navigate
+            <kbd>↑</kbd>
+            <kbd>↓</kbd> to navigate
             <kbd>↵</kbd> to select
             <kbd>esc</kbd> to close
           </span>
@@ -520,8 +715,15 @@ interface GroupedResults {
 
 function groupResults(results: SearchResult[]): GroupedResults[] {
   const ORDER: ResultGroup[] = [
-    "commands", "views", "panels", "appearance",
-    "environments", "clusters", "feeds", "interfaces", "grains",
+    "commands",
+    "views",
+    "panels",
+    "appearance",
+    "environments",
+    "clusters",
+    "feeds",
+    "interfaces",
+    "grains",
   ];
   const groups = new Map<ResultGroup, SearchResult[]>();
   for (const r of results) {
@@ -556,12 +758,18 @@ function formatGroupLabel(group: ResultGroup): string {
 
 function formatTypeLabel(type: SearchResultType): string {
   switch (type) {
-    case "command": return "Command";
-    case "environment": return "Env";
-    case "workspace": return "Cluster";
-    case "feed": return "Feed";
-    case "interface": return "Interface";
-    case "function": return "Grain";
+    case "command":
+      return "Command";
+    case "environment":
+      return "Env";
+    case "workspace":
+      return "Cluster";
+    case "feed":
+      return "Feed";
+    case "interface":
+      return "Interface";
+    case "function":
+      return "Grain";
   }
 }
 
@@ -573,5 +781,11 @@ function highlightMatch(text: string, query: string) {
   const before = text.slice(0, idx);
   const match = text.slice(idx, idx + query.trim().length);
   const after = text.slice(idx + query.trim().length);
-  return <>{before}<mark className="quick-access-highlight">{match}</mark>{after}</>;
+  return (
+    <>
+      {before}
+      <mark className="quick-access-highlight">{match}</mark>
+      {after}
+    </>
+  );
 }

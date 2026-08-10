@@ -53,6 +53,7 @@ export const IPC_CHANNELS = {
   sidecarRestart: "siloscope:sidecar-restart",
   setActiveWorkspace: "siloscope:set-active-workspace",
   connectCluster: "siloscope:connect-cluster",
+  cancelConnectCluster: "siloscope:cancel-connect-cluster",
   disconnectCluster: "siloscope:disconnect-cluster",
   discoverGrains: "siloscope:discover-grains",
   getGrains: "siloscope:get-grains",

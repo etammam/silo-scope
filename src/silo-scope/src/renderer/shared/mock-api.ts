@@ -1,11 +1,24 @@
 // ponytail: UI-only mock / browser-dev fallback for the SiloScope RPC surface.
 // Delegates to window.api.* when available (desktop), falls back to in-memory stubs otherwise.
-import type { CreateNugetFeedRequest, NugetFeed, NugetPackage } from "../../features/feeds/schema";
-import type { EnvironmentProfile, EnvironmentConfig } from "../../features/environments/schema";
-import type { InvocationResult, SourceOwnedCatalog } from "../../features/grain-invocation/schema";
-import type { ApplicationUpdateState } from "../../features/settings/schema";
-import type { GrainInterfaceDescriptor, Workspace } from "../../features/workspaces/schema";
+import type {
+    EnvironmentConfig,
+    EnvironmentProfile,
+} from "../../features/environments/schema";
+import type {
+    CreateNugetFeedRequest,
+    NugetFeed,
+    NugetPackage,
+} from "../../features/feeds/schema";
+import type {
+    InvocationResult,
+    SourceOwnedCatalog,
+} from "../../features/grain-invocation/schema";
 import type { LogEntry } from "../../features/logs/schema";
+import type { ApplicationUpdateState } from "../../features/settings/schema";
+import type {
+    GrainInterfaceDescriptor,
+    Workspace,
+} from "../../features/workspaces/schema";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -411,6 +424,12 @@ export const rpc = {
       await delay(500);
       return { message: "Connected to cluster via gateway localhost:30000." };
     },
+    cancelConnectCluster: async (): Promise<void> => {
+      if (typeof window !== "undefined" && window.api?.clusters) {
+        return window.api.clusters.cancelConnect();
+      }
+      await delay(100);
+    },
     disconnectCluster: async (): Promise<{ success: boolean }> => {
       if (typeof window !== "undefined" && window.api?.clusters) {
         return window.api.clusters.disconnect();
@@ -575,7 +594,8 @@ export const rpc = {
       success: true,
       path: "~/Library/Logs/SiloScope",
     }),
-    getApplicationUpdateState: async (): Promise<ApplicationUpdateState> => updateState,
+    getApplicationUpdateState: async (): Promise<ApplicationUpdateState> =>
+      updateState,
     checkForAppUpdate: async (): Promise<ApplicationUpdateState> => updateState,
     downloadAppUpdate: async (): Promise<ApplicationUpdateState> => updateState,
     applyAppUpdate: async (): Promise<{ success: boolean }> => ({

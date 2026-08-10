@@ -178,6 +178,7 @@ const api: RendererApi = {
       ipcRenderer.invoke(IPC_CHANNELS.connectCluster, {
         workspace: cluster,
       }),
+    cancelConnect: () => ipcRenderer.invoke(IPC_CHANNELS.cancelConnectCluster),
     disconnect: () => ipcRenderer.invoke(IPC_CHANNELS.disconnectCluster),
     setActive: (cluster) =>
       ipcRenderer.invoke(IPC_CHANNELS.setActiveWorkspace, {

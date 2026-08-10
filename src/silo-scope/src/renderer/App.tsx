@@ -3,13 +3,12 @@ import {
     ChevronDown,
     Layers,
     LayoutTemplate,
-    Loader2,
     PanelLeftClose,
     PanelRightClose,
     Play,
     Save,
     Square,
-    X,
+    X
 } from "lucide-react";
 import {
     useCallback,
@@ -83,6 +82,9 @@ const EMPTY_REQUEST_STATE: RequestState = {
 let activeRequestContextProvider: (() => SavedRequestContext | null) | null =
   null;
 let unsavedRequestContextsProvider: (() => SavedRequestContext[]) | null = null;
+
+/** AbortController for in-progress cluster connection, so the user can cancel. */
+let connectAbortController: AbortController | null = null;
 
 type GrainInvocationRequest = {
   grainType: string;
@@ -1183,8 +1185,12 @@ function App() {
           )}
           <button
             className={`app-titlebar__connect app-region-no-drag ${isConnected ? "app-titlebar__connect--connected" : ""} ${connectionStatus === "connecting" ? "app-titlebar__connect--connecting" : ""}`}
-            disabled={!workspace || connectionStatus === "connecting"}
+            disabled={!workspace}
             onClick={() => {
+              if (connectionStatus === "connecting") {
+                void cancelConnectCluster();
+                return;
+              }
               if (isConnected) {
                 void disconnectCluster();
                 return;
@@ -1192,10 +1198,10 @@ function App() {
               void connectCluster();
             }}
             title={
-              isConnected
-                ? "Disconnect"
-                : connectionStatus === "connecting"
-                  ? connectionStep
+              connectionStatus === "connecting"
+                ? "Cancel connection"
+                : isConnected
+                  ? "Disconnect"
                   : "Connect"
             }
             type="button"
@@ -1208,12 +1214,7 @@ function App() {
                 height={12}
               />
             ) : connectionStatus === "connecting" ? (
-              <Loader2
-                aria-hidden="true"
-                className="app-titlebar__connect-spinner"
-                width={13}
-                height={13}
-              />
+              <X aria-hidden="true" width={14} height={14} />
             ) : (
               <Play
                 aria-hidden="true"
@@ -1697,6 +1698,8 @@ function App() {
         }}
         onConnectCluster={connectCluster}
         onDisconnectCluster={disconnectCluster}
+        onCancelConnect={cancelConnectCluster}
+        connectionStatus={connectionStatus}
         onSwitchEnvironment={(envName) => {
           setActiveEnvironment(envName);
           void saveEnvironments(workspace?.id ?? null, environments, envName);
@@ -2233,12 +2236,18 @@ async function connectCluster() {
     return;
   }
 
+  // Create a fresh AbortController so the user can cancel mid-flight.
+  const controller = new AbortController();
+  connectAbortController = controller;
+
   useAppStore.setState({
     connectionStatus: "connecting",
     connectionStep: "Preparing workspace…",
   });
 
   try {
+    if (controller.signal.aborted) return;
+
     if (!(await setActiveWorkspace(workspace))) {
       useAppStore.setState({
         connectionStatus: "error",
@@ -2247,10 +2256,23 @@ async function connectCluster() {
       return;
     }
 
+    if (controller.signal.aborted) return;
+
     useAppStore.setState({ connectionStep: "Initializing connection…" });
     const response = await rpc.request.connectCluster({
       workspace,
     });
+
+    // The user cancelled while the connect IPC was in flight — clean up.
+    if (controller.signal.aborted) {
+      try {
+        await rpc.request.disconnectCluster();
+      } catch {
+        // Best-effort cleanup.
+      }
+      return;
+    }
+
     useAppStore.getState().setIsConnected(true);
     useAppStore.getState().addLog({
       timestamp: new Date().toISOString(),
@@ -2258,13 +2280,22 @@ async function connectCluster() {
       message: response.message,
     });
 
+    if (controller.signal.aborted) return;
+
     useAppStore.setState({ connectionStep: "Discovering grain interfaces…" });
     await refreshWorkspaceCatalog(workspace.id);
+
+    if (controller.signal.aborted) return;
+
     useAppStore.setState({
       connectionStatus: "connected",
       connectionStep: `Connected — ${workspace.name}`,
     });
   } catch (error) {
+    // If the user cancelled, ignore the error — cancelConnectCluster already
+    // handled cleanup and state reset.
+    if (controller.signal.aborted) return;
+
     const message =
       error instanceof Error ? error.message : "Failed to connect cluster.";
     const s = useAppStore.getState();
@@ -2278,7 +2309,30 @@ async function connectCluster() {
       level: "error",
       message,
     });
+  } finally {
+    connectAbortController = null;
   }
+}
+
+async function cancelConnectCluster() {
+  // Signal the in-flight connectCluster to bail out.
+  connectAbortController?.abort();
+
+  // Best-effort: tell the sidecar to abort its connection attempt.
+  try {
+    await rpc.request.cancelConnectCluster();
+  } catch {
+    // Ignore — the sidecar may still be spinning up.
+  }
+
+  const s = useAppStore.getState();
+  s.setIsConnected(false);
+  useAppStore.setState({ connectionStatus: "disconnected" });
+  s.addLog({
+    timestamp: new Date().toISOString(),
+    level: "info",
+    message: "Connection cancelled.",
+  });
 }
 
 async function disconnectCluster() {

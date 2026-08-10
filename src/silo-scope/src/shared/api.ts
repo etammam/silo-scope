@@ -106,6 +106,7 @@ export interface RendererApi {
     remove: (id: string) => Promise<{ success: boolean }>;
     pickSourceFile: () => Promise<string | null>;
     connect: (cluster: Workspace) => Promise<{ message: string }>;
+    cancelConnect: () => Promise<void>;
     disconnect: () => Promise<{ success: boolean }>;
     setActive: (cluster: Workspace) => Promise<{ workspace: Workspace }>;
     discoverGrains: (workspaceId: string) => Promise<{

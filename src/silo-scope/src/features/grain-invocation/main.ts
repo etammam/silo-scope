@@ -4,13 +4,13 @@
  * @module features/grain-invocation/main
  */
 
+import { BrowserWindow, ipcMain } from "electron";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { BrowserWindow, ipcMain } from "electron";
-import { IPC_CHANNELS } from "../../shared/events";
 import type { ISidecarAdapter } from "../../main/sidecar/adapter";
-import type { SidecarJsonRpcClient } from "../../main/sidecar/json-rpc-client";
 import { flattenSourceCatalog } from "../../main/sidecar/adapter";
+import type { SidecarJsonRpcClient } from "../../main/sidecar/json-rpc-client";
+import { IPC_CHANNELS } from "../../shared/events";
 
 /** Cached source catalog from the last successful discover. */
 let cachedSourceCatalog: Record<string, unknown> | null = null;
@@ -115,6 +115,17 @@ export function registerGrainInvocationIpc(
     await adapter.disconnectCluster();
     cachedSourceCatalog = null;
     return { success: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.cancelConnectCluster, async () => {
+    broadcastConnectionProgress("Connection cancelled.");
+    try {
+      await adapter.disconnectCluster();
+    } catch {
+      // Ignore disconnect errors during cancellation — the sidecar may
+      // still be in the middle of connecting.
+    }
+    cachedSourceCatalog = null;
   });
 
   ipcMain.handle(
