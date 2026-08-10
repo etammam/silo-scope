@@ -10,13 +10,13 @@
 
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/events";
-import {
-  createNugetFeedRequestSchema,
-  type NugetFeed,
-  type NugetPackage,
-  type PersistedFeed,
-} from "../feeds/schema";
 import { readFeeds, writeFeeds } from "../feeds/persistence";
+import {
+    createNugetFeedRequestSchema,
+    type NugetFeed,
+    type NugetPackage,
+    type PersistedFeed,
+} from "../feeds/schema";
 
 /**
  * Module-level reference to the storage path getter, set during
@@ -59,9 +59,7 @@ function persistedToFeed(persisted: PersistedFeed): NugetFeed {
  *
  * @param storagePathGetter - Function that returns the current storage path.
  */
-export function registerFeedsIpc(
-  storagePathGetter: () => string | null,
-): void {
+export function registerFeedsIpc(storagePathGetter: () => string | null): void {
   getStoragePath = storagePathGetter;
 
   ipcMain.handle(IPC_CHANNELS.feedsList, () => {
@@ -156,8 +154,7 @@ export function registerFeedsIpc(
       const updated: PersistedFeed = {
         name: updatedName,
         url: updatedUrl,
-        username:
-          params.feed.username?.trim() || target.username || undefined,
+        username: params.feed.username?.trim() || target.username || undefined,
         password: params.feed.password || target.password || undefined,
         hasCredentials,
         isDefault: target.isDefault,
@@ -315,18 +312,15 @@ export function registerFeedsIpc(
               pkg: {
                 packageId: String(item.id ?? item.Id ?? ""),
                 version: String(item.version ?? item.Version ?? ""),
-                description:
-                  (item.description ?? item.Description ?? null) as
-                    | string
-                    | null,
-                authors:
-                  ((item.authors ?? item.Authors) as string) || null,
-                downloadCount:
-                  (item.totalDownloads ??
-                    item.TotalDownloads ??
-                    item.downloadCount ??
-                    item.DownloadCount ??
-                    null) as number | null,
+                description: (item.description ?? item.Description ?? null) as
+                  | string
+                  | null,
+                authors: ((item.authors ?? item.Authors) as string) || null,
+                downloadCount: (item.totalDownloads ??
+                  item.TotalDownloads ??
+                  item.downloadCount ??
+                  item.DownloadCount ??
+                  null) as number | null,
               },
               isDefault: feed.isDefault,
             }),
@@ -399,14 +393,14 @@ export function registerFeedsIpc(
               const body = await response.json();
               const versions: string[] = [];
               const pageItems = body.items ?? body.Items ?? [];
-              for (const page of (
-                pageItems as Array<Record<string, unknown>>
-              )) {
-                const leafItems = (page.items ?? page.Items ?? []) as Array<Record<string, unknown>>;
+              for (const page of pageItems as Array<Record<string, unknown>>) {
+                const leafItems = (page.items ?? page.Items ?? []) as Array<
+                  Record<string, unknown>
+                >;
                 for (const leaf of leafItems) {
-                  const entry = (
-                    leaf.catalogEntry ?? leaf.CatalogEntry ?? leaf
-                  ) as Record<string, unknown>;
+                  const entry = (leaf.catalogEntry ??
+                    leaf.CatalogEntry ??
+                    leaf) as Record<string, unknown>;
                   const ver = entry.version ?? entry.Version;
                   if (ver && typeof ver === "string") versions.push(ver);
                 }
@@ -688,11 +682,60 @@ function deduplicateAndSortPackages(
 }
 
 /**
+ * Compares two NuGet-style semantic version strings.
+ *
+ * Correctly handles numeric components, pre-release tags (e.g. "1.0.0-beta"),
+ * and four-part versions (e.g. "1.2.3.4"). Pre-release versions sort
+ * before their corresponding release version.
+ *
+ * Returns negative if a < b, positive if a > b, zero if equal.
+ */
+function compareSemVer(a: string, b: string): number {
+  const parseVersion = (v: string) => {
+    // Strip leading 'v' or 'V' if present
+    const stripped = v.replace(/^[vV]/, "");
+    // Split into version core and pre-release/build metadata
+    const dashIdx = stripped.indexOf("-");
+    const plusIdx = stripped.indexOf("+");
+    const preReleaseEnd =
+      dashIdx >= 0 ? (plusIdx > dashIdx ? plusIdx : stripped.length) : -1;
+    const core = dashIdx >= 0 ? stripped.slice(0, dashIdx) : stripped;
+    const preRelease =
+      dashIdx >= 0 ? stripped.slice(dashIdx + 1, preReleaseEnd) : null;
+    const parts = core.split(".").map((p) => {
+      const n = parseInt(p, 10);
+      return Number.isNaN(n) ? 0 : n;
+    });
+    return { parts, preRelease };
+  };
+
+  const va = parseVersion(a);
+  const vb = parseVersion(b);
+
+  // Compare numeric components
+  const maxLen = Math.max(va.parts.length, vb.parts.length);
+  for (let i = 0; i < maxLen; i++) {
+    const na = va.parts[i] ?? 0;
+    const nb = vb.parts[i] ?? 0;
+    if (na !== nb) return na - nb;
+  }
+
+  // Compare pre-release tags: no pre-release > any pre-release
+  if (!va.preRelease && !vb.preRelease) return 0;
+  if (!va.preRelease) return 1;
+  if (!vb.preRelease) return -1;
+
+  // Both have pre-release — compare lexicographically (standard semver convention)
+  return va.preRelease.localeCompare(vb.preRelease);
+}
+
+/**
  * Deduplicates and sorts version lists across multiple feeds.
- * Versions from the default feed are prioritized.
+ * Versions from the default feed are prioritized, and within the
+ * same priority group versions are sorted from newest to oldest.
  *
  * @param results - Settled promises from per-feed version calls.
- * @returns Deduplicated, sorted version strings.
+ * @returns Deduplicated, sorted version strings (latest first).
  */
 function deduplicateAndSortVersions(
   results: PromiseSettledResult<
@@ -709,7 +752,7 @@ function deduplicateAndSortVersions(
       seen.add(version);
       versions.push({
         version,
-        _feedPriority: isDefault ? 1 : 0,
+        _feedPriority: isDefault ? 0 : 1,
       });
     }
   }
@@ -717,7 +760,7 @@ function deduplicateAndSortVersions(
   versions.sort((a, b) => {
     if (a._feedPriority !== b._feedPriority)
       return a._feedPriority - b._feedPriority;
-    return a.version.localeCompare(b.version);
+    return compareSemVer(b.version, a.version);
   });
 
   return versions.map(({ _feedPriority, ...rest }) => rest.version);

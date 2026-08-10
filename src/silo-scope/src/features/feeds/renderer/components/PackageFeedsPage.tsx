@@ -1,25 +1,25 @@
 import {
-    AlertCircle,
-    Check,
-    ChevronRight,
-    Download,
-    Globe,
-    Key,
-    Loader2,
-    Package,
-    Pencil,
-    Plus,
-    Search,
-    Shield,
-    X,
+  AlertCircle,
+  Check,
+  ChevronRight,
+  Download,
+  Globe,
+  Key,
+  Loader2,
+  Package,
+  Pencil,
+  Plus,
+  Search,
+  Shield,
+  X,
 } from "lucide-react";
 import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import type { NugetFeed, NugetPackage } from "../../schema";
 import "./package-feeds-page.css";
@@ -85,6 +85,57 @@ function formatDownloadCount(n: number | null | undefined): string | null {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
   return `${n}`;
+}
+
+/**
+ * Compares two NuGet-style semantic version strings.
+ * Returns negative if a < b, positive if a > b, zero if equal.
+ *
+ * Handles numeric components correctly (so "10.0" > "9.0"),
+ * pre-release tags ("1.0.0-beta" < "1.0.0"), and four-part versions.
+ */
+function compareSemVer(a: string, b: string): number {
+  const parseVersion = (v: string) => {
+    const stripped = v.replace(/^[vV]/, "");
+    const dashIdx = stripped.indexOf("-");
+    const plusIdx = stripped.indexOf("+");
+    const preReleaseEnd =
+      dashIdx >= 0 ? (plusIdx > dashIdx ? plusIdx : stripped.length) : -1;
+    const core = dashIdx >= 0 ? stripped.slice(0, dashIdx) : stripped;
+    const preRelease =
+      dashIdx >= 0 ? stripped.slice(dashIdx + 1, preReleaseEnd) : null;
+    const parts = core.split(".").map((p) => {
+      const n = parseInt(p, 10);
+      return Number.isNaN(n) ? 0 : n;
+    });
+    return { parts, preRelease };
+  };
+
+  const va = parseVersion(a);
+  const vb = parseVersion(b);
+
+  const maxLen = Math.max(va.parts.length, vb.parts.length);
+  for (let i = 0; i < maxLen; i++) {
+    const na = va.parts[i] ?? 0;
+    const nb = vb.parts[i] ?? 0;
+    if (na !== nb) return na - nb;
+  }
+
+  if (!va.preRelease && !vb.preRelease) return 0;
+  if (!va.preRelease) return 1;
+  if (!vb.preRelease) return -1;
+  return va.preRelease.localeCompare(vb.preRelease);
+}
+
+/**
+ * Finds the latest (highest) version from a list of version strings
+ * using semantic version comparison.
+ */
+function findLatestVersion(versions: string[]): string | null {
+  if (versions.length === 0) return null;
+  return versions.reduce((latest, current) =>
+    compareSemVer(current, latest) > 0 ? current : latest,
+  );
 }
 
 /** Main PackageFeedsPage component. */
@@ -311,7 +362,7 @@ export function PackageFeedsPage({
             selectedFeedName ?? undefined,
           );
           setPackageVersions(versions);
-          setSelectedVersion(versions[0] ?? null);
+          setSelectedVersion(findLatestVersion(versions));
         }
       } catch {
         setPackageVersions([]);
