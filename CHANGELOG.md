@@ -1,3 +1,6 @@
+## [1.6.0](https://github.com/etammam/silo-scope/compare/v1.5.0...v1.6.0) (2026-08-10)
+* **updater:** implement update pending state management and cleanup logic ([60071a4](https://github.com/etammam/silo-scope/commit/60071a44928f9c579cf6e1233edd27d77829a042)) by Islam Abouzeid
+
 ## [1.5.0](https://github.com/etammam/silo-scope/compare/v1.4.0...v1.5.0) (2026-08-10)
 * **environments:** sync environment profiles to sidecar for token substitution ([0483a8d](https://github.com/etammam/silo-scope/commit/0483a8db3fbe417ec191058f5a10cd30e83ca090)) by Islam Abouzeid
 * **persistence:** enhance copySourceFile to include sibling DLLs and .deps.json files ([cd7f7b3](https://github.com/etammam/silo-scope/commit/cd7f7b33f98144120b5d89baca80b376188716ba)) by Islam Abouzeid
