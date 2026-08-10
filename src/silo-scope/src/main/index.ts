@@ -14,12 +14,12 @@ import { registerFeedsIpc } from "../features/feeds/main";
 import { verifyStoragePath } from "../features/feeds/persistence";
 import { registerGrainInvocationIpc } from "../features/grain-invocation/main";
 import {
-  applyUpdate,
-  broadcastUpdateState,
-  checkForUpdates,
-  downloadUpdate,
-  initAutoUpdater,
-  setSidecarForUpdater,
+    applyUpdate,
+    broadcastUpdateState,
+    checkForUpdates,
+    downloadUpdate,
+    initAutoUpdater,
+    setSidecarForUpdater,
 } from "../features/settings/main";
 import { registerWorkspaceIpc } from "../features/workspaces/main";
 import { IPC_CHANNELS } from "../shared/events";
@@ -225,7 +225,7 @@ app.whenReady().then(() => {
   registerUpdateIpc();
   registerStorageIpc();
   registerFeedsIpc(getStoragePath);
-  registerEnvironmentsIpc(getStoragePath);
+  registerEnvironmentsIpc(getStoragePath, adapter);
   registerWorkspaceIpc(getStoragePath);
   registerGrainInvocationIpc(adapter, sidecar, getStoragePath);
   createWindow();

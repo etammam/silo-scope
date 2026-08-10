@@ -12,8 +12,8 @@
  * @module main/sidecar/adapter
  */
 
-import { SidecarJsonRpcClient } from "./json-rpc-client";
 import type { Workspace } from "../../features/workspaces/schema";
+import { SidecarJsonRpcClient } from "./json-rpc-client";
 
 /**
  * Generic `FluentResult<T>` envelope returned by every SiloScope Core
@@ -95,17 +95,13 @@ type BackendInvocationResult = {
  * @returns `true` when the error message indicates a missing method.
  */
 function isMissingJsonRpcMethod(error: unknown): boolean {
-  return (
-    error instanceof Error && /no method by the name/i.test(error.message)
-  );
+  return error instanceof Error && /no method by the name/i.test(error.message);
 }
 
 /**
  * Type guard for grain key types returned by the backend.
  */
-function isGrainKeyType(
-  value: string,
-): value is "Guid" | "String" | "Integer" {
+function isGrainKeyType(value: string): value is "Guid" | "String" | "Integer" {
   return value === "Guid" || value === "String" || value === "Integer";
 }
 
@@ -299,15 +295,15 @@ export function flattenSourceCatalog(
       (iface) => ({
         interfaceId: iface.interfaceId,
         interfaceName: iface.interfaceName,
-        methods: (
-          (iface.methods as Array<Record<string, unknown>>) ?? []
-        ).map((method) => ({
-          name: method.methodName,
-          signature: method.signature,
-          returnType: method.returnType,
-          keyType: method.keyType,
-          parameters: method.parameters,
-        })),
+        methods: ((iface.methods as Array<Record<string, unknown>>) ?? []).map(
+          (method) => ({
+            name: method.methodName,
+            signature: method.signature,
+            returnType: method.returnType,
+            keyType: method.keyType,
+            parameters: method.parameters,
+          }),
+        ),
       }),
     ),
   );
@@ -352,6 +348,11 @@ export interface ISidecarAdapter {
       totalMs: number;
     };
   }>;
+
+  saveEnvironments(config: {
+    profiles: Array<{ name: string; variables: Record<string, string> }>;
+    activeEnvironment: string | null;
+  }): Promise<void>;
 }
 
 /**
@@ -478,11 +479,9 @@ export class SidecarAdapter implements ISidecarAdapter {
     sourceCatalog: Record<string, unknown>;
     grains: Array<Record<string, unknown>>;
   }> {
-    const result =
-      await this.requestSidecar<FluentResult<BackendSourceCatalog>>(
-        "DiscoverSourceCatalogAsync",
-        undefined,
-      );
+    const result = await this.requestSidecar<
+      FluentResult<BackendSourceCatalog>
+    >("DiscoverSourceCatalogAsync", undefined);
 
     if (!result.IsSuccess) {
       throw new Error(
@@ -490,9 +489,7 @@ export class SidecarAdapter implements ISidecarAdapter {
       );
     }
 
-    const sourceCatalog = mapSourceCatalog(
-      result.Value ?? { Sources: [] },
-    );
+    const sourceCatalog = mapSourceCatalog(result.Value ?? { Sources: [] });
     const grains = flattenSourceCatalog(sourceCatalog);
 
     return { sourceCatalog, grains };
@@ -522,18 +519,16 @@ export class SidecarAdapter implements ISidecarAdapter {
       totalMs: number;
     };
   }> {
-    const result =
-      await this.requestSidecar<FluentResult<BackendInvocationResult>>(
-        "InvokeGrainAsync",
-        [
-          parameters.grainType,
-          parameters.method,
-          parameters.grainKey,
-          parameters.payload || null,
-          parameters.sourceId ?? null,
-          parameters.functionId ?? null,
-        ],
-      );
+    const result = await this.requestSidecar<
+      FluentResult<BackendInvocationResult>
+    >("InvokeGrainAsync", [
+      parameters.grainType,
+      parameters.method,
+      parameters.grainKey,
+      parameters.payload || null,
+      parameters.sourceId ?? null,
+      parameters.functionId ?? null,
+    ]);
 
     if (!result.IsSuccess) {
       throw new Error(
@@ -554,5 +549,28 @@ export class SidecarAdapter implements ISidecarAdapter {
           }
         : undefined,
     };
+  }
+
+  /**
+   * Syncs environment profiles to the sidecar so that token substitution
+   * (e.g. <c>{{TENANT_ID}}</c>) works during grain invocation.
+   *
+   * @param config - The environment config from the renderer's zustand state.
+   * @throws {Error} When the sidecar call fails.
+   */
+  async saveEnvironments(config: {
+    profiles: Array<{ name: string; variables: Record<string, string> }>;
+    activeEnvironment: string | null;
+  }): Promise<void> {
+    const result = await this.requestSidecar<FluentResult<unknown>>(
+      "SaveEnvironmentsAsync",
+      [config],
+    );
+
+    if (!result.IsSuccess) {
+      throw new Error(
+        result.Errors?.[0]?.Message ?? "Failed to save environments.",
+      );
+    }
   }
 }
