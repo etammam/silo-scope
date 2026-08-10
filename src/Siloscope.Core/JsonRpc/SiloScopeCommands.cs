@@ -256,7 +256,17 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         CancellationToken cancellationToken = default
     )
     {
-        _logger.LogInformation("Connecting to cluster {ClusterId}", options.ClusterId);
+        _logger.LogInformation(
+            "Connecting to cluster: ClusterId='{ClusterId}', ServiceId='{ServiceId}', "
+                + "GatewayEndpoints=[{GatewayEndpoints}], HasClustering={HasClustering}, "
+                + "HasWorkspace={HasWorkspace}, EnabledSilos={EnabledSiloCount}",
+            options.ClusterId,
+            options.ServiceId,
+            string.Join(", ", options.GatewayEndpoints),
+            options.Clustering is not null,
+            _currentWorkspace is not null,
+            _currentWorkspace?.Silos.Count(s => s.Enabled) ?? 0
+        );
 
         InterfaceCatalog catalog = new([], []);
         IReadOnlyList<InterfaceEntry>? entries = null;
@@ -270,6 +280,21 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
 
             catalog = _catalog ?? catalog;
             entries = BuildInterfaceEntries(_currentWorkspace.Silos.Where(s => s.Enabled).ToList());
+            _logger.LogInformation(
+                "Catalog after discovery: {GrainCount} grains, {GatewayCount} gateways=[{Gateways}], "
+                    + "{AssemblyPathCount} assembly paths",
+                catalog.Grains.Count,
+                catalog.Gateways.Count,
+                string.Join(", ", catalog.Gateways),
+                catalog.AssemblyPaths.Count
+            );
+        }
+        else
+        {
+            _logger.LogWarning(
+                "No current workspace set — catalog discovery skipped. "
+                    + "The fallback 'localhost' connector will be used."
+            );
         }
 
         var toolOptions = new ToolClusterOptions(
