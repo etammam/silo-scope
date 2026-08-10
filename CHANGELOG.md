@@ -1,3 +1,6 @@
+## [1.3.0](https://github.com/etammam/silo-scope/compare/v1.2.2...v1.3.0) (2026-08-10)
+* **connection:** enhance logging during cluster connection and catalog discovery ([4abeac6](https://github.com/etammam/silo-scope/commit/4abeac6a0b91304f9ee33ea29a9200637ed0a43a)) by Islam Abouzeid
+
 ## [1.2.2](https://github.com/etammam/silo-scope/compare/v1.2.1...v1.2.2) (2026-08-09)
 * **OrleansClientConnector:** increase default connection timeout to 60 seconds and change timeout result to fail ([009f01d](https://github.com/etammam/silo-scope/commit/009f01d6a9d96214d4bd503bc654ff11cbf6c425)) by Islam Abouzeid
 
