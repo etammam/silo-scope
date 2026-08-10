@@ -1,17 +1,17 @@
 import {
-  AlertTriangle,
-  Braces,
-  Check,
-  Globe,
-  Pencil,
-  Plus,
-  Save,
-  Trash2,
-  X,
+    AlertTriangle,
+    Braces,
+    Check,
+    Globe,
+    Pencil,
+    Plus,
+    Save,
+    Trash2,
+    X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { EnvironmentProfile } from "../../schema";
 import { InlineAutocomplete } from "../../../../renderer/shared/components/InlineAutocomplete";
+import type { EnvironmentProfile } from "../../schema";
 import "./environment-page.css";
 
 type EnvironmentPageProps = {
@@ -65,6 +65,8 @@ export function EnvironmentPage({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [profileNameDraft, setProfileNameDraft] = useState("");
+  const [profileNameError, setProfileNameError] = useState<string | null>(null);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editKeyDraft, setEditKeyDraft] = useState("");
@@ -106,6 +108,14 @@ export function EnvironmentPage({
     const timer = setTimeout(() => setToast(null), 2800);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Sync profile name draft when the selected profile changes
+  useEffect(() => {
+    if (currentProfile) {
+      setProfileNameDraft(currentProfile.name);
+      setProfileNameError(null);
+    }
+  }, [selectedProfile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentProfile =
     draftProfiles.find((e) => e.name === selectedProfile) ?? draftProfiles[0];
@@ -207,6 +217,32 @@ export function EnvironmentPage({
     setSelectedProfile(trimmed);
   };
 
+  const validateProfileName = (name: string): string | null => {
+    const trimmed = name.trim();
+    if (!trimmed) return "Profile name is required.";
+    if (
+      draftProfiles.some(
+        (e) => e.name === trimmed && e.name !== selectedProfile,
+      )
+    )
+      return "A profile with this name already exists.";
+    return null;
+  };
+
+  const commitProfileName = (): boolean => {
+    const trimmed = profileNameDraft.trim();
+    const error = validateProfileName(profileNameDraft);
+    setProfileNameError(error);
+    if (error) {
+      // Revert draft to current profile name on validation failure
+      if (currentProfile) setProfileNameDraft(currentProfile.name);
+      return false;
+    }
+    if (trimmed === currentProfile?.name) return true;
+    renameProfile(trimmed);
+    return true;
+  };
+
   const addVariable = () => {
     if (!pendingKey || !currentProfile || !isPendingKeyValid) return;
     const next = draftProfiles.map((e) =>
@@ -270,6 +306,8 @@ export function EnvironmentPage({
   };
 
   const handleSave = async () => {
+    // Commit any pending profile name rename before saving
+    if (!commitProfileName()) return;
     const profilesToSave = hasPendingInput
       ? flushPendingVariable()
       : draftProfiles;
@@ -380,9 +418,28 @@ export function EnvironmentPage({
                       <span>Profile name</span>
                       <input
                         aria-label="Environment profile name"
-                        value={currentProfile.name}
-                        onChange={(e) => renameProfile(e.target.value)}
+                        aria-invalid={profileNameError !== null}
+                        value={profileNameDraft}
+                        onChange={(e) => {
+                          setProfileNameDraft(e.target.value);
+                          setProfileNameError(null);
+                        }}
+                        onBlur={() => commitProfileName()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            commitProfileName();
+                          }
+                        }}
                       />
+                      {profileNameError && (
+                        <span
+                          className="environment-form__field-error"
+                          role="alert"
+                        >
+                          {profileNameError}
+                        </span>
+                      )}
                     </label>
                     <div className="environment-form__actions">
                       <button
