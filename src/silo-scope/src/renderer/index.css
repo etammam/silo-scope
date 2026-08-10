@@ -500,7 +500,7 @@ textarea,
 }
 
 .workspace-menu__trigger[aria-expanded="true"] svg:first-child {
-  color: var(--invoke-accent);
+  color: var(--accent);
 }
 
 /* ============================================================
@@ -699,8 +699,8 @@ textarea,
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in srgb, var(--invoke-accent) 22%, transparent) 40%,
-    color-mix(in srgb, var(--invoke-accent) 22%, transparent) 60%,
+    color-mix(in srgb, var(--accent) 22%, transparent) 40%,
+    color-mix(in srgb, var(--accent) 22%, transparent) 60%,
     transparent 100%
   );
   z-index: 1;
@@ -799,7 +799,7 @@ textarea,
 .workspace-menu__cluster--active,
 .workspace-menu__cluster--active:hover,
 .workspace-menu__cluster--active:focus-visible {
-  background: color-mix(in srgb, var(--invoke-accent) 8%, var(--ui-2));
+  background: color-mix(in srgb, var(--accent) 8%, var(--ui-2));
   color: var(--ui-7);
 }
 
@@ -811,16 +811,16 @@ textarea,
   top: 6px;
   bottom: 6px;
   width: 2.5px;
-  background: var(--invoke-accent);
+  background: var(--accent);
   border-radius: 0 2px 2px 0;
 }
 
 .workspace-menu__cluster--active svg {
-  color: var(--invoke-accent);
+  color: var(--accent);
 }
 
 .workspace-menu__cluster--active .workspace-menu__cluster-status {
-  color: var(--invoke-accent);
+  color: var(--accent);
   font-weight: 650;
 }
 
@@ -9772,8 +9772,8 @@ button:not(:disabled) {
 .environment-menu__trigger {
   align-items: center;
   appearance: none;
-  background: color-mix(in srgb, var(--invoke-accent) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--invoke-accent) 16%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
   border-radius: 5px;
   color: var(--ui-6);
   cursor: pointer;
@@ -9793,7 +9793,7 @@ button:not(:disabled) {
 }
 
 .environment-menu__trigger svg:first-child {
-  color: var(--invoke-accent);
+  color: var(--accent);
   flex-shrink: 0;
   opacity: 0.75;
 }
@@ -9812,8 +9812,8 @@ button:not(:disabled) {
 
 .environment-menu__trigger:hover,
 .environment-menu__trigger:focus-visible {
-  background: color-mix(in srgb, var(--invoke-accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--invoke-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   color: var(--ui-7);
   outline: none;
 }
@@ -9824,8 +9824,8 @@ button:not(:disabled) {
 }
 
 .environment-menu__trigger[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--invoke-accent) 14%, var(--ui-2));
-  border-color: color-mix(in srgb, var(--invoke-accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--ui-2));
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
   color: var(--ui-7);
 }
 
@@ -9834,7 +9834,7 @@ button:not(:disabled) {
 }
 
 .environment-menu__trigger[aria-expanded="true"] svg:last-child {
-  color: var(--invoke-accent);
+  color: var(--accent);
   transform: rotate(180deg);
 }
 
@@ -9865,8 +9865,8 @@ button:not(:disabled) {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in srgb, var(--invoke-accent) 26%, transparent) 30%,
-    color-mix(in srgb, var(--invoke-accent) 26%, transparent) 70%,
+    color-mix(in srgb, var(--accent) 26%, transparent) 30%,
+    color-mix(in srgb, var(--accent) 26%, transparent) 70%,
     transparent 100%
   );
   z-index: 1;
@@ -9940,7 +9940,7 @@ button:not(:disabled) {
 .environment-menu__item--active,
 .environment-menu__item--active:hover,
 .environment-menu__item--active:focus-visible {
-  background: color-mix(in srgb, var(--invoke-accent) 10%, var(--ui-2));
+  background: color-mix(in srgb, var(--accent) 10%, var(--ui-2));
   color: var(--ui-7);
 }
 
@@ -9951,16 +9951,16 @@ button:not(:disabled) {
   top: 7px;
   bottom: 7px;
   width: 3px;
-  background: var(--invoke-accent);
+  background: var(--accent);
   border-radius: 0 2px 2px 0;
 }
 
 .environment-menu__item--active svg {
-  color: var(--invoke-accent);
+  color: var(--accent);
 }
 
 .environment-menu__item--active .environment-menu__item-status {
-  color: var(--invoke-accent);
+  color: var(--accent);
   font-weight: 650;
 }
 
