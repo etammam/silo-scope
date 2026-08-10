@@ -1,44 +1,9 @@
-import {
-  Copy,
-  ExternalLink,
-  Search,
-  SquareTerminal,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Copy, ExternalLink, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LogEntry } from "../../features/logs/schema";
 import "./backend-logs.css";
 
 type LogLevelFilter = LogEntry["level"] | "all";
-
-export function BackendLogStatusButton({
-  entries,
-  isOpen,
-  onToggle,
-}: {
-  entries: LogEntry[];
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  const errors = entries.filter((entry) => entry.level === "error").length;
-
-  return (
-    <button
-      aria-expanded={isOpen}
-      aria-label={`Backend logs — ${entries.length} entries${errors > 0 ? `, ${errors} errors` : ""}`}
-      className="global-status-bar__logs"
-      onClick={() => onToggle()}
-      type="button"
-    >
-      <SquareTerminal aria-hidden="true" width={12} height={12} />
-      <span className="global-status-bar__logs-count">{entries.length}</span>
-      {errors > 0 && (
-        <span className="global-status-bar__logs-errors">{errors}</span>
-      )}
-    </button>
-  );
-}
 
 export function BackendLogsPanel({
   entries,
@@ -88,8 +53,12 @@ export function BackendLogsPanel({
 
   const copyVisibleLogs = async () => {
     try {
-      await navigator.clipboard.writeText(visibleEntries.map(formatLogText).join("\n"));
-      setNotice(`${visibleEntries.length} line${visibleEntries.length === 1 ? "" : "s"} copied`);
+      await navigator.clipboard.writeText(
+        visibleEntries.map(formatLogText).join("\n"),
+      );
+      setNotice(
+        `${visibleEntries.length} line${visibleEntries.length === 1 ? "" : "s"} copied`,
+      );
     } catch {
       setNotice("Copy failed");
     }
@@ -98,7 +67,9 @@ export function BackendLogsPanel({
   const openLogs = async () => {
     try {
       const result = await onOpenLogDirectory();
-      setNotice(result.success ? `Opened ${result.path}` : "Could not open logs folder");
+      setNotice(
+        result.success ? `Opened ${result.path}` : "Could not open logs folder",
+      );
     } catch {
       setNotice("Could not open logs folder");
     }
@@ -107,7 +78,11 @@ export function BackendLogsPanel({
   return (
     <section className="backend-logs-panel" aria-label="Backend logs panel">
       <header className="backend-logs-panel__toolbar">
-        <div className="backend-logs-panel__tabs" role="tablist" aria-label="Bottom panel views">
+        <div
+          className="backend-logs-panel__tabs"
+          role="tablist"
+          aria-label="Bottom panel views"
+        >
           <button aria-selected="true" role="tab" type="button">
             LOGS
           </button>
@@ -145,33 +120,74 @@ export function BackendLogsPanel({
         >
           Follow
         </button>
-        <button aria-label="Copy visible logs" className="backend-logs-panel__icon" onClick={() => void copyVisibleLogs()} type="button">
+        <button
+          aria-label="Copy visible logs"
+          className="backend-logs-panel__icon"
+          onClick={() => void copyVisibleLogs()}
+          type="button"
+        >
           <Copy aria-hidden="true" width={14} height={14} />
         </button>
-        <button aria-label="Open logs folder" className="backend-logs-panel__icon" onClick={() => void openLogs()} type="button">
+        <button
+          aria-label="Open logs folder"
+          className="backend-logs-panel__icon"
+          onClick={() => void openLogs()}
+          type="button"
+        >
           <ExternalLink aria-hidden="true" width={14} height={14} />
         </button>
-        <button aria-label="Clear logs" className="backend-logs-panel__icon" onClick={() => onClear()} type="button">
+        <button
+          aria-label="Clear logs"
+          className="backend-logs-panel__icon"
+          onClick={() => onClear()}
+          type="button"
+        >
           <Trash2 aria-hidden="true" width={14} height={14} />
         </button>
-        <button aria-label="Close logs panel" className="backend-logs-panel__icon" onClick={() => onClose()} type="button">
+        <button
+          aria-label="Close logs panel"
+          className="backend-logs-panel__icon"
+          onClick={() => onClose()}
+          type="button"
+        >
           <X aria-hidden="true" width={14} height={14} />
         </button>
       </header>
-      <div className="backend-logs-panel__viewport" ref={viewportRef} role="log" aria-live="polite">
+      <div
+        className="backend-logs-panel__viewport"
+        ref={viewportRef}
+        role="log"
+        aria-live="polite"
+      >
         {visibleEntries.length === 0 ? (
           <div className="backend-logs-panel__empty">
-            {entries.length === 0 ? "Waiting for backend output..." : "No log entries match the filter."}
+            {entries.length === 0
+              ? "Waiting for backend output..."
+              : "No log entries match the filter."}
           </div>
         ) : (
           visibleEntries.map((entry, index) => (
-            <div className="panel-log-line" data-level={entry.level} key={`${entry.timestamp}-${index}-${entry.message}`}>
-              <time dateTime={entry.timestamp}>{formatTimestamp(entry.timestamp)}</time>
+            <div
+              className="panel-log-line"
+              data-level={entry.level}
+              key={`${entry.timestamp}-${index}-${entry.message}`}
+            >
+              <time dateTime={entry.timestamp}>
+                {formatTimestamp(entry.timestamp)}
+              </time>
               <strong>{entry.level.toUpperCase().padEnd(5, "\u00a0")}</strong>
               <span className="panel-log-line__process">(core)</span>
-              {entry.category && <span className="panel-log-line__category">{entry.category}</span>}
+              {entry.category && (
+                <span className="panel-log-line__category">
+                  {entry.category}
+                </span>
+              )}
               <span className="panel-log-line__message">{entry.message}</span>
-              {entry.exception && <pre className="panel-log-line__exception">{entry.exception}</pre>}
+              {entry.exception && (
+                <pre className="panel-log-line__exception">
+                  {entry.exception}
+                </pre>
+              )}
             </div>
           ))
         )}

@@ -1,6 +1,5 @@
 import { Loader2 } from "lucide-react";
 import type { ConnectionStatus } from "../../features/workspaces/renderer/state";
-import "./connection-status.css";
 
 type ConnectionStatusBarProps = {
   status: ConnectionStatus;
@@ -21,44 +20,58 @@ export function ConnectionStatusBar({
 
   if (status === "disconnected") {
     return (
-      <span className="conn-status" title="Disconnected">
-        <span className="conn-status__pulse conn-status__pulse--idle" aria-hidden="true" />
+      <>
+        <span
+          className="conn-status__dot conn-status__dot--idle"
+          aria-hidden="true"
+        />
         <span className="conn-status__text">Disconnected</span>
-      </span>
+      </>
     );
   }
 
   if (status === "connecting") {
     return (
-      <span className="conn-status conn-status--acquiring" title={step}>
-        <Loader2 aria-hidden="true" className="conn-status__spinner" width={11} height={11} />
+      <>
+        <Loader2
+          aria-hidden="true"
+          className="conn-status__spinner"
+          width={11}
+          height={11}
+        />
         <span className="conn-status__text">{step}</span>
-      </span>
+      </>
     );
   }
 
   if (status === "connected") {
     return (
-      <span className="conn-status conn-status--locked" title={step || `Connected to ${name}`}>
-        <span className="conn-status__pulse conn-status__pulse--live" aria-hidden="true" />
+      <>
+        <span
+          className="conn-status__dot conn-status__dot--live"
+          aria-hidden="true"
+        />
         <span className="conn-status__text">{name}</span>
-      </span>
+      </>
     );
   }
 
   // error
   return (
-    <span className="conn-status conn-status--fault" title={error ?? ""}>
-      <span className="conn-status__pulse conn-status__pulse--fault" aria-hidden="true" />
+    <>
+      <span
+        className="conn-status__dot conn-status__dot--fault"
+        aria-hidden="true"
+      />
       <span className="conn-status__text">{error ?? "Connection failed"}</span>
       <button
         className="conn-status__dismiss"
         onClick={onDismissError}
         type="button"
-        aria-label="Dismiss"
+        aria-label="Dismiss error"
       >
         ×
       </button>
-    </span>
+    </>
   );
 }

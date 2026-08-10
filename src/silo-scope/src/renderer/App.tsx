@@ -1,67 +1,70 @@
 import {
-  Briefcase,
-  ChevronDown,
-  Layers,
-  LayoutTemplate,
-  Loader2,
-  PanelLeftClose,
-  PanelRightClose,
-  Play,
-  Save,
-  Square,
-  X,
+    Briefcase,
+    ChevronDown,
+    Layers,
+    LayoutTemplate,
+    Loader2,
+    PanelLeftClose,
+    PanelRightClose,
+    Play,
+    Save,
+    Square,
+    X,
 } from "lucide-react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+    type MouseEvent as ReactMouseEvent,
 } from "react";
-import { rpc } from "./shared/mock-api";
-import type { ApplicationUpdateState } from "../features/settings/schema";
+import { EnvironmentPage } from "../features/environments/renderer/components/EnvironmentPage";
 import type { EnvironmentProfile } from "../features/environments/schema";
-import type {
-  GrainKeyType,
-  SavedRequestContext,
-  Workspace,
-} from "../features/workspaces/schema";
+import { PackageFeedsPage } from "../features/feeds/renderer/components/PackageFeedsPage";
+import {
+    createPayloadTemplate,
+    RequestWorkbench,
+    type RequestState,
+} from "../features/grain-invocation/renderer/components/RequestWorkbench";
+import {
+    ResponseTelemetryPane,
+    type ResponsePaneTab,
+} from "../features/grain-invocation/renderer/components/ResponseTelemetryPane";
+import {
+    buildSourceCatalogFromGrains,
+    findCatalogFunction,
+    findCatalogSource,
+} from "../features/grain-invocation/renderer/utils/catalog";
 import type { SourceCatalogFunction } from "../features/grain-invocation/schema";
 import {
-  buildSourceCatalogFromGrains,
-  findCatalogFunction,
-  findCatalogSource,
-} from "../features/grain-invocation/renderer/utils/catalog";
-import { ActivityBar, type ActivityView } from "./layout/ActivityBar";
-import {
-  BackendLogsPanel,
-  BackendLogStatusButton,
-} from "./layout/BackendLogsPanel";
-import { NavigationSidebar } from "./layout/NavigationSidebar";
-import { PackageFeedsPage } from "../features/feeds/renderer/components/PackageFeedsPage";
-import { SetupBanner } from "./layout/SetupBanner";
-import {
-  createPayloadTemplate,
-  RequestWorkbench,
-  type RequestState,
-} from "../features/grain-invocation/renderer/components/RequestWorkbench";
-import { RequestEmptyState } from "./shared/components/RequestEmptyState";
-import {
-  ResponseTelemetryPane,
-  type ResponsePaneTab,
-} from "../features/grain-invocation/renderer/components/ResponseTelemetryPane";
-import { QuickAccessPanel, type QuickAccessActions } from "../features/quick-access/renderer/components/QuickAccessPanel";
-import { EnvironmentPage } from "../features/environments/renderer/components/EnvironmentPage";
+    QuickAccessPanel,
+    type QuickAccessActions,
+} from "../features/quick-access/renderer/components/QuickAccessPanel";
 import { SettingsPage } from "../features/settings/renderer/components/SettingsPage";
+import type { ApplicationUpdateState } from "../features/settings/schema";
 import { WorkspacesPage } from "../features/workspaces/renderer/components/WorkspacesPage";
-import { ConnectionStatusBar } from "./layout/ConnectionStatusBar";
-import { SidecarStatus } from "./layout/SidecarStatus";
+import type {
+    GrainKeyType,
+    SavedRequestContext,
+    Workspace,
+} from "../features/workspaces/schema";
 import { useAppStore } from "./global-state";
+import { ActivityBar, type ActivityView } from "./layout/ActivityBar";
+import { BackendLogsPanel } from "./layout/BackendLogsPanel";
+import { NavigationSidebar } from "./layout/NavigationSidebar";
+import { SetupBanner } from "./layout/SetupBanner";
+import { StatusBar } from "./layout/StatusBar";
+import { RequestEmptyState } from "./shared/components/RequestEmptyState";
+import { rpc } from "./shared/mock-api";
 
 type PaneLayout = "horizontal" | "vertical";
-type WorkbenchTheme = "vscode-dark" | "vscode-light" | "github-dark" | "github-light";
+type WorkbenchTheme =
+  | "vscode-dark"
+  | "vscode-light"
+  | "github-dark"
+  | "github-light";
 
 const THEME_STORAGE_KEY = "siloscope.theme";
 const WORKBENCH_THEMES = [
@@ -70,7 +73,8 @@ const WORKBENCH_THEMES = [
   "github-dark",
   "github-light",
 ] as const;
-const CLOSE_APPLICATION_REQUEST_EVENT_NAME = "siloscope:request-application-close";
+const CLOSE_APPLICATION_REQUEST_EVENT_NAME =
+  "siloscope:request-application-close";
 const EMPTY_REQUEST_STATE: RequestState = {
   grainKey: "",
   keyType: "String",
@@ -160,9 +164,8 @@ function App() {
   const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
   const [isSavingBeforeClose, setIsSavingBeforeClose] = useState(false);
-  const [appUpdateState, setApplicationUpdateState] = useState<ApplicationUpdateState | null>(
-    null,
-  );
+  const [appUpdateState, setApplicationUpdateState] =
+    useState<ApplicationUpdateState | null>(null);
   const [updateAction, setUpdateAction] = useState<
     "checking" | "downloading" | "applying" | null
   >(null);
@@ -220,7 +223,9 @@ function App() {
 
   const handleChangeStorage = useCallback(async (): Promise<string | null> => {
     if (typeof window.api?.storage?.selectFolder !== "function") {
-      throw new Error("Storage API not available. Are you running in the desktop app?");
+      throw new Error(
+        "Storage API not available. Are you running in the desktop app?",
+      );
     }
 
     const selectedPath = await window.api.storage.selectFolder();
@@ -276,7 +281,9 @@ function App() {
         lowerMessage.includes("connecting to gateway") ||
         lowerMessage.includes("connecting to cluster")
       ) {
-        useAppStore.setState({ connectionStep: "Connecting to Orleans cluster…" });
+        useAppStore.setState({
+          connectionStep: "Connecting to Orleans cluster…",
+        });
       } else if (lowerMessage.includes("loading entry")) {
         const match = message.match(/Loading entry \d+: type=(.+?),/i);
         useAppStore.setState({
@@ -773,7 +780,7 @@ function App() {
 
       event.preventDefault();
       const bounds = shell.getBoundingClientRect();
-      const statusBarSize = 24;
+      const statusBarSize = 22;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         setLogPanelSize(
@@ -822,7 +829,6 @@ function App() {
     },
     [setWorkspace, workspaces],
   );
-
 
   const handleCreateWorkspace = useCallback(
     (nextWorkspace: Workspace) => {
@@ -925,21 +931,31 @@ function App() {
     if (!window.api?.updates?.onStatus) return;
     return window.api.updates.onStatus((entry) => {
       setApplicationUpdateState((prev) => ({
-        localInfo: entry.localInfo ?? prev?.localInfo ?? {
-          version: "0.1.0",
-          hash: "",
-          baseUrl: "",
-          channel: "latest",
-          name: "siloscope",
-          identifier: "siloscope.app",
-        },
-        updateInfo: entry.status === "update-available" || entry.status === "download-complete"
-          ? { version: entry.version ?? entry.message, hash: "", updateAvailable: true, updateReady: entry.status === "download-complete", error: "" }
-          : prev?.updateInfo ?? null,
+        localInfo: entry.localInfo ??
+          prev?.localInfo ?? {
+            version: "0.1.0",
+            hash: "",
+            baseUrl: "",
+            channel: "latest",
+            name: "siloscope",
+            identifier: "siloscope.app",
+          },
+        updateInfo:
+          entry.status === "update-available" ||
+          entry.status === "download-complete"
+            ? {
+                version: entry.version ?? entry.message,
+                hash: "",
+                updateAvailable: true,
+                updateReady: entry.status === "download-complete",
+                error: "",
+              }
+            : (prev?.updateInfo ?? null),
         statusHistory: [
           ...(prev?.statusHistory ?? []).slice(-49),
           {
-            status: entry.status as ApplicationUpdateState["statusHistory"][number]["status"],
+            status:
+              entry.status as ApplicationUpdateState["statusHistory"][number]["status"],
             message: entry.message,
             timestamp: entry.timestamp,
             progress: entry.progress,
@@ -1039,20 +1055,26 @@ function App() {
     }
   }, []);
 
-  const togglePanel = useCallback((panel: "activityBar" | "navigation" | "response" | "logs") => {
-    if (panel === "activityBar") setIsActivityBarVisible((v) => !v);
-    if (panel === "navigation") setIsNavigationVisible((v) => !v);
-    if (panel === "response") setIsResponseVisible((v) => !v);
-    if (panel === "logs") setIsLogPanelVisible((v) => !v);
-  }, []);
+  const togglePanel = useCallback(
+    (panel: "activityBar" | "navigation" | "response" | "logs") => {
+      if (panel === "activityBar") setIsActivityBarVisible((v) => !v);
+      if (panel === "navigation") setIsNavigationVisible((v) => !v);
+      if (panel === "response") setIsResponseVisible((v) => !v);
+      if (panel === "logs") setIsLogPanelVisible((v) => !v);
+    },
+    [],
+  );
 
-  const quickAccessActions: QuickAccessActions = useMemo(() => ({
-    setActiveView,
-    togglePanel,
-    setPaneLayout,
-    setTheme,
-    adjustFontSize,
-  }), [setActiveView, togglePanel, setPaneLayout, setTheme, adjustFontSize]);
+  const quickAccessActions: QuickAccessActions = useMemo(
+    () => ({
+      setActiveView,
+      togglePanel,
+      setPaneLayout,
+      setTheme,
+      adjustFontSize,
+    }),
+    [setActiveView, togglePanel, setPaneLayout, setTheme, adjustFontSize],
+  );
 
   const handleOpenBackendLogDirectory = useCallback(async () => {
     return await rpc.request.openBackendLogDirectory();
@@ -1169,15 +1191,36 @@ function App() {
               }
               void connectCluster();
             }}
-            title={isConnected ? "Disconnect" : connectionStatus === "connecting" ? connectionStep : "Connect"}
+            title={
+              isConnected
+                ? "Disconnect"
+                : connectionStatus === "connecting"
+                  ? connectionStep
+                  : "Connect"
+            }
             type="button"
           >
             {isConnected ? (
-              <Square aria-hidden="true" fill="currentColor" width={12} height={12} />
+              <Square
+                aria-hidden="true"
+                fill="currentColor"
+                width={12}
+                height={12}
+              />
             ) : connectionStatus === "connecting" ? (
-              <Loader2 aria-hidden="true" className="app-titlebar__connect-spinner" width={13} height={13} />
+              <Loader2
+                aria-hidden="true"
+                className="app-titlebar__connect-spinner"
+                width={13}
+                height={13}
+              />
             ) : (
-              <Play aria-hidden="true" fill="currentColor" width={12} height={12} />
+              <Play
+                aria-hidden="true"
+                fill="currentColor"
+                width={12}
+                height={12}
+              />
             )}
           </button>
         </div>
@@ -1215,13 +1258,19 @@ function App() {
                     onClick={() => {
                       setIsEnvironmentMenuOpen(false);
                       setActiveEnvironment(null);
-                      void saveEnvironments(workspace?.id ?? null, environments, null);
+                      void saveEnvironments(
+                        workspace?.id ?? null,
+                        environments,
+                        null,
+                      );
                     }}
                   >
                     <Layers aria-hidden="true" width={13} height={13} />
                     <span className="environment-menu__item-name">(none)</span>
                     {activeEnvironment === null && (
-                      <span className="environment-menu__item-status">Active</span>
+                      <span className="environment-menu__item-status">
+                        Active
+                      </span>
                     )}
                   </button>
                   {environments.map((env) => (
@@ -1235,7 +1284,11 @@ function App() {
                         setIsEnvironmentMenuOpen(false);
                         const envName = env.name || null;
                         setActiveEnvironment(envName);
-                        void saveEnvironments(workspace?.id ?? null, environments, envName);
+                        void saveEnvironments(
+                          workspace?.id ?? null,
+                          environments,
+                          envName,
+                        );
                       }}
                     >
                       <Layers aria-hidden="true" width={13} height={13} />
@@ -1411,7 +1464,11 @@ function App() {
             onEnvironmentsChange={async (nextEnvironments, nextActive) => {
               useAppStore.getState().setEnvironments(nextEnvironments);
               useAppStore.getState().setActiveEnvironment(nextActive);
-              await saveEnvironments(workspace?.id ?? null, nextEnvironments, nextActive);
+              await saveEnvironments(
+                workspace?.id ?? null,
+                nextEnvironments,
+                nextActive,
+              );
             }}
           />
         ) : (
@@ -1591,34 +1648,24 @@ function App() {
           onOpenLogDirectory={handleOpenBackendLogDirectory}
         />
       )}
-      <footer className="global-status-bar">
-        <span className="global-status-bar__label">Cluster</span>
-        <ConnectionStatusBar
-          status={connectionStatus}
-          step={connectionStep}
-          error={connectionError}
-          clusterName={workspace?.name}
-          onDismissError={() => setConnectionStatus("disconnected")}
-        />
-        <span className="global-status-bar__sep" aria-hidden="true" />
-        <span className="global-status-bar__label">Core</span>
-        <SidecarStatus
-          checkStatus={async () => {
-            if (window.api?.sidecar) return window.api.sidecar.status();
-            return { running: true };
-          }}
-          restart={async () => {
-            if (window.api?.sidecar) return window.api.sidecar.restart();
-            return { running: true };
-          }}
-        />
-        <span className="global-status-bar__spacer" />
-        <BackendLogStatusButton
-          entries={logs}
-          isOpen={isLogPanelVisible}
-          onToggle={() => setIsLogPanelVisible((visible) => !visible)}
-        />
-      </footer>
+      <StatusBar
+        connectionStatus={connectionStatus}
+        connectionStep={connectionStep}
+        connectionError={connectionError}
+        clusterName={workspace?.name}
+        onDismissError={() => setConnectionStatus("disconnected")}
+        sidecarCheckStatus={async () => {
+          if (window.api?.sidecar) return window.api.sidecar.status();
+          return { running: true };
+        }}
+        sidecarRestart={async () => {
+          if (window.api?.sidecar) return window.api.sidecar.restart();
+          return { running: true };
+        }}
+        logs={logs}
+        isLogPanelVisible={isLogPanelVisible}
+        onToggleLogPanel={() => setIsLogPanelVisible((visible) => !visible)}
+      />
 
       <QuickAccessPanel
         isOpen={isQuickAccessOpen}
@@ -2254,9 +2301,7 @@ async function disconnectCluster() {
     });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to disconnect cluster.";
+      error instanceof Error ? error.message : "Failed to disconnect cluster.";
     useAppStore.getState().setIsConnected(false);
     useAppStore.setState({
       connectionStatus: "error",

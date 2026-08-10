@@ -1,0 +1,256 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Status Bar — VS Code–style status bar with full theme support
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Container ─────────────────────────────────────────────────────────── */
+
+.status-bar {
+  align-items: center;
+  background: var(--status-bar-bg);
+  color: var(--status-bar-fg);
+  display: flex;
+  font-size: 12px;
+  grid-column: 1 / -1;
+  grid-row: -2 / -1;
+  height: 22px;
+  min-width: 0;
+  padding: 0 4px;
+  user-select: none;
+  z-index: 6;
+}
+
+/* ── Left items group ──────────────────────────────────────────────────── */
+
+.status-bar__left {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Right items group ─────────────────────────────────────────────────── */
+
+.status-bar__right {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── Generic status bar item ───────────────────────────────────────────── */
+
+.status-bar__item {
+  align-items: center;
+  color: inherit;
+  cursor: default;
+  display: flex;
+  font: inherit;
+  gap: 4px;
+  height: 100%;
+  line-height: 22px;
+  padding: 0 5px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.status-bar__item:hover {
+  background: var(--status-bar-item-hover-bg);
+}
+
+/* clickable / button variant */
+button.status-bar__item {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+button.status-bar__item:focus-visible {
+  outline: 1px solid var(--status-bar-fg);
+  outline-offset: -2px;
+}
+
+.status-bar__item[aria-pressed="true"],
+.status-bar__item[aria-expanded="true"] {
+  background: var(--status-bar-item-hover-bg);
+}
+
+/* ── Item label (bold prefix) ──────────────────────────────────────────── */
+
+.status-bar__item-label {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+/* ── Item icon ─────────────────────────────────────────────────────────── */
+
+.status-bar__item-icon {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+/* ── Divider ───────────────────────────────────────────────────────────── */
+
+.status-bar__divider {
+  background: var(--status-bar-border);
+  flex-shrink: 0;
+  height: 18px;
+  margin: 0 2px;
+  width: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Connection Status
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.conn-status {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+  max-width: 240px;
+}
+
+.conn-status__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* dots */
+.conn-status__dot {
+  border-radius: 50%;
+  flex-shrink: 0;
+  height: 7px;
+  width: 7px;
+}
+
+.conn-status__dot--idle {
+  background: color-mix(in srgb, var(--status-bar-fg) 40%, transparent);
+}
+.conn-status__dot--live {
+  background: #6f6;
+}
+.conn-status__dot--fault {
+  background: #f66;
+}
+
+/* Connecting spinner */
+.conn-status__spinner {
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+/* Dismiss button */
+.conn-status__dismiss {
+  appearance: none;
+  background: var(--status-bar-item-hover-bg);
+  border: none;
+  border-radius: 3px;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 12px;
+  height: 15px;
+  line-height: 1;
+  margin-left: 2px;
+  opacity: 0.7;
+  padding: 0;
+  width: 15px;
+}
+
+.conn-status__dismiss:hover {
+  background: color-mix(in srgb, var(--status-bar-fg) 25%, transparent);
+  opacity: 1;
+}
+
+.conn-status__dismiss:focus-visible {
+  outline: 1px solid var(--status-bar-fg);
+  outline-offset: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sidecar Status
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.sidecar-status__dot {
+  border-radius: 50%;
+  flex-shrink: 0;
+  height: 7px;
+  width: 7px;
+}
+
+.sidecar-status__dot--live {
+  background: #6f6;
+}
+.sidecar-status__dot--dead {
+  background: color-mix(in srgb, var(--status-bar-fg) 40%, transparent);
+}
+.sidecar-status__dot--restarting {
+  background: #fc6;
+  animation: status-blink 0.9s ease-in-out infinite;
+}
+
+.sidecar-status__icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.sidecar-status__icon--spin {
+  animation: spin 1.2s linear infinite;
+  opacity: 0.6;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Log Button
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.status-bar__log-count {
+  font-weight: 600;
+}
+
+.status-bar__log-errors {
+  background: var(--danger, #f14c4c);
+  border-radius: 9px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 1px;
+  min-width: 16px;
+  padding: 1px 5px;
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Keyframes
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes status-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidecar-status__dot--restarting,
+  .conn-status__spinner,
+  .sidecar-status__icon--spin {
+    animation: none;
+  }
+}

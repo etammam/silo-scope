@@ -1,10 +1,2 @@
-.sidecar-status--live       { color: #10b981; }
-.sidecar-status--dead       { color: #64748b; }
-.sidecar-status--restarting { color: #f59e0b; }
-
-.sidecar-status__dot {
-	border-radius: 50%;
-	flex-shrink: 0;
-	height: 5px;
-	width: 5px;
-}
+/* Sidecar status styles are now in status-bar.css */
+/* This file exists for component-level import; actual styles live alongside the full status bar */
