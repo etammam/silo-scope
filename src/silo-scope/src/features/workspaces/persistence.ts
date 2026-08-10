@@ -16,17 +16,17 @@
  */
 
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
-  copyFileSync,
 } from "node:fs";
-import { basename, join, resolve } from "node:path";
-import { clusterConfigSchema } from "./schema";
+import { basename, dirname, join, resolve } from "node:path";
 import type { Workspace } from "./schema";
+import { clusterConfigSchema } from "./schema";
 
 const CLUSTER_FILE_NAME = "cluster.json";
 
@@ -64,10 +64,7 @@ function clusterFilePath(storagePath: string, workspaceId: string): string {
  * @returns The sources directory path.
  */
 function sourcesDirectory(storagePath: string, workspaceId: string): string {
-  const directory = join(
-    clusterDirectory(storagePath, workspaceId),
-    "sources",
-  );
+  const directory = join(clusterDirectory(storagePath, workspaceId), "sources");
   if (!existsSync(directory)) {
     mkdirSync(directory, { recursive: true });
   }
@@ -147,10 +144,7 @@ export function writeCluster(
  * @param storagePath - The user-selected storage root directory.
  * @param workspaceId - The stable workspace identifier to delete.
  */
-export function deleteCluster(
-  storagePath: string,
-  workspaceId: string,
-): void {
+export function deleteCluster(storagePath: string, workspaceId: string): void {
   const directory = join(storagePath, workspaceId);
   if (existsSync(directory)) {
     rmSync(directory, { recursive: true, force: true });
@@ -265,13 +259,18 @@ export function writeRequests(
 }
 
 /**
- * Copies a DLL (or any source file) into the workspace's `sources/`
- * subdirectory.
+ * Copies a DLL into the workspace's `sources/` subdirectory, along with all
+ * sibling `.dll` and `.deps.json` files from the same source directory.
+ *
+ * Copying sibling DLLs ensures that project references and other locally
+ * resolved dependencies are available when the .NET runtime loads the
+ * assembly from its new location.  `.deps.json` files are also copied so
+ * that {@link AssemblyDependencyResolver} can resolve NuGet dependencies.
  *
  * @param storagePath - The user-selected storage root directory.
  * @param workspaceId - The workspace identifier.
- * @param sourcePath - The absolute path to the source file.
- * @returns The absolute destination path of the copied file.
+ * @param sourcePath - The absolute path to the source DLL.
+ * @returns The absolute destination path of the copied source file.
  */
 export function copySourceFile(
   storagePath: string,
@@ -279,9 +278,34 @@ export function copySourceFile(
   sourcePath: string,
 ): string {
   const destinationDirectory = sourcesDirectory(storagePath, workspaceId);
-  const destinationPath = join(destinationDirectory, basename(sourcePath));
-  copyFileSync(sourcePath, destinationPath);
-  return destinationPath;
+  const sourceDirectory = dirname(sourcePath);
+  const sourceFileName = basename(sourcePath);
+
+  // Copy all sibling .dll and .deps.json files so that local dependencies
+  // (project references, shared libraries) are available alongside the
+  // selected assembly.
+  try {
+    const siblingFiles = readdirSync(sourceDirectory, { withFileTypes: true })
+      .filter(
+        (entry) =>
+          entry.isFile() &&
+          (entry.name.endsWith(".dll") || entry.name.endsWith(".deps.json")),
+      )
+      .map((entry) => entry.name);
+
+    for (const fileName of siblingFiles) {
+      const src = join(sourceDirectory, fileName);
+      const dest = join(destinationDirectory, fileName);
+      copyFileSync(src, dest);
+    }
+  } catch (error) {
+    console.warn(
+      `[copySourceFile] Could not copy sibling dependencies from "${sourceDirectory}":`,
+      error,
+    );
+  }
+
+  return join(destinationDirectory, sourceFileName);
 }
 
 /**
