@@ -5,21 +5,21 @@
  * @module shared/api
  */
 
+import type { EnvironmentProfile } from "../features/environments/schema";
 import type {
   CreateNugetFeedRequest,
   NugetFeed,
   NugetPackage,
 } from "../features/feeds/schema";
-import type { EnvironmentProfile } from "../features/environments/schema";
 import type {
   InvocationResult,
   SourceOwnedCatalog,
 } from "../features/grain-invocation/schema";
+import type { ApplicationUpdateLocalInfo } from "../features/settings/schema";
 import type {
   GrainInterfaceDescriptor,
   Workspace,
 } from "../features/workspaces/schema";
-import type { ApplicationUpdateLocalInfo } from "../features/settings/schema";
 
 export interface EnvironmentConfig {
   profiles: EnvironmentProfile[];
@@ -61,10 +61,13 @@ export interface RendererApi {
   };
   environments: {
     list: (workspaceId: string) => Promise<EnvironmentConfig>;
-    save: (
+    save: (workspaceId: string, config: EnvironmentConfig) => Promise<boolean>;
+    update: (
       workspaceId: string,
-      config: EnvironmentConfig,
+      profileName: string,
+      profile: EnvironmentProfile,
     ) => Promise<boolean>;
+    delete: (workspaceId: string, profileName: string) => Promise<boolean>;
   };
   updates: {
     check: () => Promise<void>;
@@ -96,9 +99,7 @@ export interface RendererApi {
   onConnectionProgress: (
     callback: (entry: { message: string }) => void,
   ) => () => void;
-  onApplicationMenuAction: (
-    callback: (action: string) => void,
-  ) => () => void;
+  onApplicationMenuAction: (callback: (action: string) => void) => () => void;
   clusters: {
     list: () => Promise<Workspace[]>;
     save: (cluster: Workspace) => Promise<Workspace>;

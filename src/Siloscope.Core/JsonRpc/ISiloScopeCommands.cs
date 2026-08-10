@@ -101,6 +101,32 @@ public interface ISiloScopeCommands
         CancellationToken cancellationToken = default
     );
 
+    /// <summary>
+    /// Updates a single environment profile by name.
+    /// </summary>
+    /// <param name="profileName">The name of the profile to update.</param>
+    /// <param name="profile">The replacement profile data.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> indicating success or failure.</returns>
+    [JsonRpcMethod("UpdateEnvironmentAsync")]
+    Task<Result> UpdateEnvironmentAsync(
+        string profileName,
+        EnvironmentProfile profile,
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>
+    /// Deletes a single environment profile by name.
+    /// </summary>
+    /// <param name="profileName">The name of the profile to delete.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A <see cref="Result" /> indicating success or failure.</returns>
+    [JsonRpcMethod("DeleteEnvironmentAsync")]
+    Task<Result> DeleteEnvironmentAsync(
+        string profileName,
+        CancellationToken cancellationToken = default
+    );
+
     // Cluster
     /// <summary>
     /// Connects to an Orleans cluster using the specified options.

@@ -48,6 +48,25 @@ public class EnvironmentService : IEnvironmentService
         await File.WriteAllTextAsync(path, json);
     }
 
+    public async Task UpdateAsync(string profileName, EnvironmentProfile profile)
+    {
+        var config = await LoadAsync();
+        var existing = config.Profiles.Find(p => p.Name == profileName);
+        if (existing is not null)
+        {
+            config.Profiles.Remove(existing);
+        }
+        config.Profiles.Add(profile);
+        await SaveAsync(config);
+    }
+
+    public async Task DeleteAsync(string profileName)
+    {
+        var config = await LoadAsync();
+        config.Profiles.RemoveAll(p => p.Name == profileName);
+        await SaveAsync(config);
+    }
+
     public string GetEnvironmentPath()
     {
         return Path.Combine(GetAppDirectory(), "environments.json");

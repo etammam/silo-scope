@@ -37,6 +37,8 @@ export const IPC_CHANNELS = {
   /** Environment profiles */
   environmentsList: "siloscope:environments-list",
   environmentsSave: "siloscope:environments-save",
+  environmentsUpdate: "siloscope:environments-update",
+  environmentsDelete: "siloscope:environments-delete",
 
   /** Cluster / workspace persistence */
   clustersList: "siloscope:clusters-list",

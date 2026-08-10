@@ -99,4 +99,82 @@ export function registerEnvironmentsIpc(
       }
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.environmentsUpdate,
+    async (
+      _event,
+      parameters: {
+        workspaceId: string;
+        profileName: string;
+        profile: { name: string; variables: Record<string, string> };
+      },
+    ) => {
+      try {
+        const storagePath = requireStoragePath();
+        const existing = readEnvironments(storagePath, parameters.workspaceId);
+        const updatedProfiles = existing.profiles.map((p) =>
+          p.name === parameters.profileName
+            ? {
+                name: parameters.profile.name,
+                variables: parameters.profile.variables,
+              }
+            : p,
+        );
+        const config = {
+          profiles: updatedProfiles,
+          activeEnvironment:
+            existing.activeEnvironment === parameters.profileName
+              ? parameters.profile.name
+              : existing.activeEnvironment,
+        };
+        writeEnvironments(storagePath, parameters.workspaceId, config);
+
+        if (sidecarAdapter) {
+          await sidecarAdapter.updateEnvironment(
+            parameters.profileName,
+            parameters.profile,
+          );
+        }
+
+        return true;
+      } catch (error) {
+        console.error("[environments:update]", error);
+        throw error;
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.environmentsDelete,
+    async (
+      _event,
+      parameters: { workspaceId: string; profileName: string },
+    ) => {
+      try {
+        const storagePath = requireStoragePath();
+        const existing = readEnvironments(storagePath, parameters.workspaceId);
+        const remainingProfiles = existing.profiles.filter(
+          (p) => p.name !== parameters.profileName,
+        );
+        const config = {
+          profiles: remainingProfiles,
+          activeEnvironment:
+            existing.activeEnvironment === parameters.profileName
+              ? (remainingProfiles[0]?.name ?? null)
+              : existing.activeEnvironment,
+        };
+        writeEnvironments(storagePath, parameters.workspaceId, config);
+
+        if (sidecarAdapter) {
+          await sidecarAdapter.deleteEnvironment(parameters.profileName);
+        }
+
+        return true;
+      } catch (error) {
+        console.error("[environments:delete]", error);
+        throw error;
+      }
+    },
+  );
 }

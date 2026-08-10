@@ -353,6 +353,13 @@ export interface ISidecarAdapter {
     profiles: Array<{ name: string; variables: Record<string, string> }>;
     activeEnvironment: string | null;
   }): Promise<void>;
+
+  updateEnvironment(
+    profileName: string,
+    profile: { name: string; variables: Record<string, string> },
+  ): Promise<void>;
+
+  deleteEnvironment(profileName: string): Promise<void>;
 }
 
 /**
@@ -570,6 +577,48 @@ export class SidecarAdapter implements ISidecarAdapter {
     if (!result.IsSuccess) {
       throw new Error(
         result.Errors?.[0]?.Message ?? "Failed to save environments.",
+      );
+    }
+  }
+
+  /**
+   * Updates a single environment profile in the sidecar.
+   *
+   * @param profileName - The name of the profile to update.
+   * @param profile - The replacement profile data.
+   * @throws {Error} When the sidecar call fails.
+   */
+  async updateEnvironment(
+    profileName: string,
+    profile: { name: string; variables: Record<string, string> },
+  ): Promise<void> {
+    const result = await this.requestSidecar<FluentResult<unknown>>(
+      "UpdateEnvironmentAsync",
+      [profileName, profile],
+    );
+
+    if (!result.IsSuccess) {
+      throw new Error(
+        result.Errors?.[0]?.Message ?? "Failed to update environment.",
+      );
+    }
+  }
+
+  /**
+   * Deletes a single environment profile from the sidecar.
+   *
+   * @param profileName - The name of the profile to delete.
+   * @throws {Error} When the sidecar call fails.
+   */
+  async deleteEnvironment(profileName: string): Promise<void> {
+    const result = await this.requestSidecar<FluentResult<unknown>>(
+      "DeleteEnvironmentAsync",
+      [profileName],
+    );
+
+    if (!result.IsSuccess) {
+      throw new Error(
+        result.Errors?.[0]?.Message ?? "Failed to delete environment.",
       );
     }
   }

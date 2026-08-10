@@ -251,6 +251,57 @@ public sealed class SiloScopeCommands : ISiloScopeCommands
         }
     }
 
+    public async Task<Result> UpdateEnvironmentAsync(
+        string profileName,
+        EnvironmentProfile profile,
+        CancellationToken cancellationToken = default
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var model = new Workspaces.EnvironmentProfile
+            {
+                Name = profile.Name,
+                Variables = profile.Variables,
+            };
+
+            await _environmentService.UpdateAsync(profileName, model);
+            return Result.Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to update environment profile '{ProfileName}'",
+                profileName
+            );
+            return Result.Fail(ex.Message);
+        }
+    }
+
+    public async Task<Result> DeleteEnvironmentAsync(
+        string profileName,
+        CancellationToken cancellationToken = default
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            await _environmentService.DeleteAsync(profileName);
+            return Result.Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to delete environment profile '{ProfileName}'",
+                profileName
+            );
+            return Result.Fail(ex.Message);
+        }
+    }
+
     public async Task<Result<string>> ConnectClusterAsync(
         ClusterOptions options,
         CancellationToken cancellationToken = default

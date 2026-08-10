@@ -11,8 +11,8 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
-import type { RendererApi } from "../shared/api";
 import type { ApplicationUpdateLocalInfo } from "../features/settings/schema";
+import type { RendererApi } from "../shared/api";
 import { IPC_CHANNELS } from "../shared/events";
 
 const api: RendererApi = {
@@ -42,12 +42,10 @@ const api: RendererApi = {
   /** NuGet feed management */
   feeds: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.feedsList),
-    create: (request) =>
-      ipcRenderer.invoke(IPC_CHANNELS.feedsCreate, request),
+    create: (request) => ipcRenderer.invoke(IPC_CHANNELS.feedsCreate, request),
     update: (name, request) =>
       ipcRenderer.invoke(IPC_CHANNELS.feedsUpdate, { name, feed: request }),
-    test: (request) =>
-      ipcRenderer.invoke(IPC_CHANNELS.feedsTest, request),
+    test: (request) => ipcRenderer.invoke(IPC_CHANNELS.feedsTest, request),
     search: (query, feedName, take) =>
       ipcRenderer.invoke(IPC_CHANNELS.feedsSearch, {
         query,
@@ -69,6 +67,17 @@ const api: RendererApi = {
       ipcRenderer.invoke(IPC_CHANNELS.environmentsSave, {
         workspaceId,
         config,
+      }),
+    update: (workspaceId: string, profileName: string, profile) =>
+      ipcRenderer.invoke(IPC_CHANNELS.environmentsUpdate, {
+        workspaceId,
+        profileName,
+        profile,
+      }),
+    delete: (workspaceId: string, profileName: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.environmentsDelete, {
+        workspaceId,
+        profileName,
       }),
   },
 
@@ -136,13 +145,9 @@ const api: RendererApi = {
   },
 
   /** Application menu actions (main → renderer push) */
-  onApplicationMenuAction: (
-    callback: (action: string) => void,
-  ) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      action: string,
-    ) => callback(action);
+  onApplicationMenuAction: (callback: (action: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, action: string) =>
+      callback(action);
     ipcRenderer.on(IPC_CHANNELS.applicationMenuAction, handler);
     return () => {
       ipcRenderer.removeListener(IPC_CHANNELS.applicationMenuAction, handler);
@@ -150,9 +155,7 @@ const api: RendererApi = {
   },
 
   /** Connection progress updates (main → renderer push) */
-  onConnectionProgress: (
-    callback: (entry: { message: string }) => void,
-  ) => {
+  onConnectionProgress: (callback: (entry: { message: string }) => void) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
       entry: { message: string },
@@ -170,24 +173,20 @@ const api: RendererApi = {
       ipcRenderer.invoke(IPC_CHANNELS.clustersSave, { cluster }),
     remove: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.clustersDelete, { id }),
-    pickSourceFile: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.selectSourceFile),
+    pickSourceFile: () => ipcRenderer.invoke(IPC_CHANNELS.selectSourceFile),
     connect: (cluster) =>
       ipcRenderer.invoke(IPC_CHANNELS.connectCluster, {
         workspace: cluster,
       }),
-    disconnect: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.disconnectCluster),
+    disconnect: () => ipcRenderer.invoke(IPC_CHANNELS.disconnectCluster),
     setActive: (cluster) =>
       ipcRenderer.invoke(IPC_CHANNELS.setActiveWorkspace, {
         workspace: cluster,
       }),
     discoverGrains: (workspaceId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.discoverGrains, { workspaceId }),
-    getGrains: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.getGrains),
-    getSourceCatalog: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.getSourceCatalog),
+    getGrains: () => ipcRenderer.invoke(IPC_CHANNELS.getGrains),
+    getSourceCatalog: () => ipcRenderer.invoke(IPC_CHANNELS.getSourceCatalog),
     invokeGrain: (params) =>
       ipcRenderer.invoke(IPC_CHANNELS.invokeGrain, params),
     requests: {
