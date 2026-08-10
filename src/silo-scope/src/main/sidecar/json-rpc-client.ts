@@ -65,7 +65,10 @@ export class SidecarJsonRpcClient {
   private readonly requestTimeoutMs: number;
   private readonly maxRestartAttempts: number;
   private readonly restartDelayMs: number;
-  private readonly pendingRequests = new Map<JsonRpcId, PendingRequest<unknown>>();
+  private readonly pendingRequests = new Map<
+    JsonRpcId,
+    PendingRequest<unknown>
+  >();
   private readonly notificationHandlers = new Set<JsonRpcNotificationHandler>();
   private readonly textEncoder = new TextEncoder();
   private readonly textDecoder = new TextDecoder();
@@ -152,10 +155,7 @@ export class SidecarJsonRpcClient {
     });
   }
 
-  async request<T>(
-    method: string,
-    params?: JsonRpcParams,
-  ): Promise<T> {
+  async request<T>(method: string, params?: JsonRpcParams): Promise<T> {
     if (this.isDisposed) {
       throw new Error("Cannot send JSON-RPC request after client disposal.");
     }
@@ -233,7 +233,14 @@ export class SidecarJsonRpcClient {
   private readStdout(stdout: NodeJS.ReadableStream): void {
     stdout.on("data", (chunk: Buffer) => {
       this.receiveBuffer = Buffer.concat([this.receiveBuffer, chunk]);
-      this.drainMessages();
+      try {
+        this.drainMessages();
+      } catch (error) {
+        console.warn(
+          "[siloscope-core] failed to drain JSON-RPC messages:",
+          error,
+        );
+      }
     });
 
     stdout.on("error", (error) => {
@@ -266,7 +273,36 @@ export class SidecarJsonRpcClient {
       const headerText = this.textDecoder.decode(
         this.receiveBuffer.subarray(0, headerEnd),
       );
-      const contentLength = parseContentLength(headerText);
+
+      let contentLength: number;
+      try {
+        contentLength = parseContentLength(headerText);
+      } catch {
+        // The sidecar wrote non-JSON-RPC data to stdout (e.g. a
+        // Console.ReadLine prompt, startup banner, or diagnostic text)
+        // that got interleaved with JSON-RPC framing. Rather than
+        // blindly skipping past \r\n\r\n (which can orphan the next
+        // message's JSON body and cause cascading failures), scan
+        // forward for the next valid Content-Length header.
+        console.warn(
+          "[siloscope-core] skipping non-JSON-RPC stdout data:",
+          headerText,
+        );
+
+        const recoverAt = findNextContentLengthHeader(
+          this.receiveBuffer,
+          headerEnd + 4,
+        );
+        if (recoverAt === -1) {
+          // No valid header found ahead — discard the entire buffer.
+          this.receiveBuffer = Buffer.alloc(0);
+          return;
+        }
+
+        this.receiveBuffer = this.receiveBuffer.subarray(recoverAt);
+        continue;
+      }
+
       const bodyStart = headerEnd + 4;
       const bodyEnd = bodyStart + contentLength;
 
@@ -331,10 +367,7 @@ export class SidecarJsonRpcClient {
           params: notification.params,
         });
       } catch (error) {
-        console.warn(
-          "[siloscope-core] notification handler failed",
-          error,
-        );
+        console.warn("[siloscope-core] notification handler failed", error);
       }
     }
   }
@@ -457,21 +490,29 @@ export function resolveDefaultCoreCommand(): SidecarCommand {
   );
   if (existsSync(projectPath)) {
     return {
-      command: ["dotnet", "run", "--project", projectPath, "--no-launch-profile"],
+      command: [
+        "dotnet",
+        "run",
+        "--project",
+        projectPath,
+        "--no-launch-profile",
+      ],
       cwd: repoRoot,
     };
   }
 
-  throw new Error(
-    `Could not locate SiloScope Core project under ${repoRoot}.`,
-  );
+  throw new Error(`Could not locate SiloScope Core project under ${repoRoot}.`);
 }
 
 function resolvePackagedCoreCommand(): SidecarCommand | null {
   const executableName =
     process.platform === "win32" ? "Siloscope.Core.exe" : "Siloscope.Core";
   // In production, the core is bundled in resources/core/
-  const packagedPath = join(process.resourcesPath ?? "", "core", executableName);
+  const packagedPath = join(
+    process.resourcesPath ?? "",
+    "core",
+    executableName,
+  );
   if (existsSync(packagedPath)) {
     return {
       command: [packagedPath],
@@ -559,4 +600,66 @@ function parseContentLength(headerText: string): number {
   }
 
   return value;
+}
+
+/**
+ * Scan the buffer starting at `startOffset` for the next valid
+ * `Content-Length: N\r\n\r\n` framing header. Returns the byte offset
+ * of the 'C' in "Content-Length", or -1 if no valid header is found.
+ *
+ * Used to recover when non-JSON-RPC text (e.g. Console.ReadLine prompts)
+ * leaks into stdout and corrupts the framing.
+ */
+function findNextContentLengthHeader(
+  buffer: Buffer,
+  startOffset: number,
+): number {
+  // Search for "\r\nContent-Length: " as a byte sequence.
+  // We require the leading \r\n so we don't match "Content-Length"
+  // appearing inside a JSON body or diagnostic message.
+  const needle = Buffer.from("\r\nContent-Length: ");
+  const needleLen = needle.byteLength;
+
+  for (let i = startOffset; i <= buffer.byteLength - needleLen; i++) {
+    let match = true;
+    for (let j = 0; j < needleLen; j++) {
+      if (buffer[i + j] !== needle[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (!match) continue;
+
+    // Found "\r\nContent-Length: " at offset i.
+    // The value starts at i + needleLen and ends at the next \r\n.
+    const valueStart = i + needleLen;
+    let valueEnd = -1;
+    for (let k = valueStart; k < buffer.byteLength - 3; k++) {
+      if (
+        buffer[k] === 13 &&
+        buffer[k + 1] === 10 &&
+        buffer[k + 2] === 13 &&
+        buffer[k + 3] === 10
+      ) {
+        valueEnd = k;
+        break;
+      }
+    }
+    if (valueEnd === -1) continue; // incomplete header
+
+    // Validate that the value consists only of digits.
+    let allDigits = true;
+    for (let k = valueStart; k < valueEnd; k++) {
+      if (buffer[k] < 0x30 || buffer[k] > 0x39) {
+        allDigits = false;
+        break;
+      }
+    }
+    if (!allDigits || valueEnd === valueStart) continue; // empty or non-numeric
+
+    // The header starts at i+1 (skip the leading \r\n).
+    return i + 1;
+  }
+
+  return -1;
 }
