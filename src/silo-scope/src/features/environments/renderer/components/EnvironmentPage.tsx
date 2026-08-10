@@ -1,13 +1,15 @@
 import {
-    AlertTriangle,
-    Braces,
-    Check,
-    Globe,
-    Pencil,
-    Plus,
-    Save,
-    Trash2,
-    X,
+  AlertTriangle,
+  Braces,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Layers,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { InlineAutocomplete } from "../../../../renderer/shared/components/InlineAutocomplete";
@@ -64,7 +66,7 @@ export function EnvironmentPage({
   const [envVarValue, setEnvVarValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [profileNameDraft, setProfileNameDraft] = useState("");
   const [profileNameError, setProfileNameError] = useState<string | null>(null);
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -75,6 +77,7 @@ export function EnvironmentPage({
 
   const envVarValueRef = useRef<HTMLInputElement>(null);
   const editValueRef = useRef<HTMLInputElement>(null);
+  const saveBarRef = useRef<HTMLDivElement>(null);
 
   const lastEnvironmentsRef = useRef<EnvironmentProfile[]>(environments);
   const lastActiveRef = useRef<string | null>(activeEnvironment);
@@ -103,11 +106,12 @@ export function EnvironmentPage({
     }
   }, [environments, activeEnvironment, selectedProfile]);
 
+  // Clear success indicator after a delay
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 2800);
+    if (!saveSuccess) return;
+    const timer = setTimeout(() => setSaveSuccess(false), 2000);
     return () => clearTimeout(timer);
-  }, [toast]);
+  }, [saveSuccess]);
 
   // Sync profile name draft when the selected profile changes
   useEffect(() => {
@@ -125,13 +129,17 @@ export function EnvironmentPage({
   const hasPendingInput = Boolean(pendingKey);
   const isPendingKeyValid = hasPendingInput && keyError === null;
 
+  const totalVarCount = Object.values(draftProfiles).reduce(
+    (sum, p) => sum + Object.keys(p.variables).length,
+    0,
+  );
+
   const validateEnvKey = (key: string): string | null => {
     if (key.length === 0) return null;
     if (/\s/.test(key)) return "Variable names cannot contain spaces.";
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key))
-      return "Only English letters, digits, and underscores.";
-    if (key.length > 64)
-      return "Variable names must be 64 characters or fewer.";
+      return "Only letters, digits, and underscores (must start with a letter or underscore).";
+    if (key.length > 64) return "Must be 64 characters or fewer.";
     return null;
   };
 
@@ -156,7 +164,6 @@ export function EnvironmentPage({
 
   const dismissSaveError = useCallback(() => setSaveError(null), []);
 
-  // Clear save error when the user starts making changes again
   useEffect(() => {
     if (hasChanges && saveError) {
       setSaveError(null);
@@ -234,7 +241,6 @@ export function EnvironmentPage({
     const error = validateProfileName(profileNameDraft);
     setProfileNameError(error);
     if (error) {
-      // Revert draft to current profile name on validation failure
       if (currentProfile) setProfileNameDraft(currentProfile.name);
       return false;
     }
@@ -254,6 +260,13 @@ export function EnvironmentPage({
     setEnvVarKey("");
     setEnvVarValue("");
     setKeyError(null);
+    // Focus back on key input for rapid entry
+    setTimeout(() => {
+      const keyInput = document.querySelector<HTMLInputElement>(
+        '[aria-label="Variable key"]',
+      );
+      keyInput?.focus();
+    }, 0);
   };
 
   const removeVariable = (key: string) => {
@@ -306,7 +319,6 @@ export function EnvironmentPage({
   };
 
   const handleSave = async () => {
-    // Commit any pending profile name rename before saving
     if (!commitProfileName()) return;
     const profilesToSave = hasPendingInput
       ? flushPendingVariable()
@@ -317,7 +329,7 @@ export function EnvironmentPage({
       await onEnvironmentsChange(profilesToSave, draftActive);
       setEnvVarKey("");
       setEnvVarValue("");
-      setToast("Environments saved");
+      setSaveSuccess(true);
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : "Failed to save environments",
@@ -327,410 +339,528 @@ export function EnvironmentPage({
     }
   };
 
+  // ── Empty state: no workspace ──
+  if (!hasWorkspace) {
+    return (
+      <section className="environment-page" aria-label="Environments">
+        <div className="environment-page__empty-full">
+          <div className="environment-page__empty-icon">
+            <Layers aria-hidden="true" width={28} height={28} />
+          </div>
+          <h3>No cluster connected</h3>
+          <p>
+            Environment profiles are tied to a cluster. Connect to or create a
+            cluster first, then return here to manage your variable sets.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Empty state: no profiles ──
+  if (draftProfiles.length === 0) {
+    return (
+      <section className="environment-page" aria-label="Environments">
+        <div className="environment-page__empty-full">
+          <div className="environment-page__empty-icon">
+            <Braces aria-hidden="true" width={28} height={28} />
+          </div>
+          <h3>No environment profiles yet</h3>
+          <p>
+            Create profiles to hold key-value variables that get substituted
+            into your grain invocations. Switch between them instantly from the
+            titlebar.
+          </p>
+          <button
+            className="environment-page__empty-action"
+            onClick={addProfile}
+            type="button"
+          >
+            <Plus aria-hidden="true" width={15} height={15} />
+            Create your first profile
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const profileVarCount = currentProfile
+    ? Object.keys(currentProfile.variables).length
+    : 0;
+
   return (
     <section className="environment-page" aria-label="Environments">
-      <header className="environment-page__header">
-        <h2>Environments</h2>
-        <p>
-          Manage variable sets for your grain invocations. Switch between
-          environments from the titlebar selector.
-        </p>
-      </header>
+      {/* ── Sidebar ── */}
+      <aside className="environment-page__sidebar" aria-label="Profiles">
+        <div className="environment-page__sidebar-header">
+          <span>
+            {draftProfiles.length}{" "}
+            {draftProfiles.length === 1 ? "profile" : "profiles"}
+            {totalVarCount > 0 && (
+              <>
+                {" "}
+                · {totalVarCount} {totalVarCount === 1 ? "var" : "vars"}
+              </>
+            )}
+          </span>
+          <button
+            className="environment-page__create-btn"
+            onClick={addProfile}
+            type="button"
+            aria-label="Create new environment profile"
+          >
+            <Plus aria-hidden="true" width={14} height={14} />
+          </button>
+        </div>
 
-      <div className="environment-page__body">
-        {!hasWorkspace ? (
-          <div className="environment-page__empty-full">
-            <div className="environment-page__empty-icon">
-              <Globe aria-hidden="true" width={32} height={32} />
-            </div>
-            <h3>No cluster selected</h3>
-            <p>
-              Environment profiles are scoped to a cluster. Select or create a
-              cluster to manage its environments.
-            </p>
-          </div>
-        ) : draftProfiles.length === 0 ? (
-          <div className="environment-page__empty-full">
-            <div className="environment-page__empty-icon">
-              <Globe aria-hidden="true" width={32} height={32} />
-            </div>
-            <h3>No environment profiles</h3>
-            <p>
-              Define sets of variables to switch between when invoking grains.
-              Each profile holds key-value pairs scoped to this cluster.
-            </p>
-            <button
-              className="environment-page__empty-action"
-              onClick={addProfile}
-              type="button"
-            >
-              <Plus aria-hidden="true" width={14} height={14} />
-              Create your first profile
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="environment-page__sidebar">
-              <div className="environment-page__sidebar-header">
-                <span>
-                  {draftProfiles.length}{" "}
-                  {draftProfiles.length === 1 ? "profile" : "profiles"}
-                </span>
+        <ul className="environment-page__list" role="list">
+          {draftProfiles.map((env) => {
+            const varCount = Object.keys(env.variables).length;
+            const isSelected = selectedProfile === env.name;
+            const isCurrent = draftActive === env.name;
+
+            return (
+              <li
+                key={env.name}
+                className={`environment-page__list-item${isSelected ? " environment-page__list-item--selected" : ""}${isCurrent ? " environment-page__list-item--current" : ""}`}
+              >
                 <button
-                  className="environment-page__create-btn"
-                  disabled={!hasWorkspace}
-                  onClick={addProfile}
+                  className="environment-page__list-button"
+                  onClick={() => setSelectedProfile(env.name)}
                   type="button"
                 >
-                  <Plus aria-hidden="true" width={14} height={14} />
+                  <span className="environment-page__list-icon">
+                    {isCurrent ? (
+                      <CheckCircle2 aria-hidden="true" width={15} height={15} />
+                    ) : (
+                      <ChevronRight aria-hidden="true" width={15} height={15} />
+                    )}
+                  </span>
+                  <span className="environment-page__list-name">
+                    {env.name}
+                  </span>
+                  <span className="environment-page__list-meta">
+                    {varCount > 0
+                      ? `${varCount} ${varCount === 1 ? "var" : "vars"}`
+                      : "Empty"}
+                  </span>
                 </button>
+              </li>
+            );
+          })}
+        </ul>
+      </aside>
+
+      {/* ── Main form area ── */}
+      <div className="environment-page__form-area">
+        {/* Page header */}
+        <div className="environment-page__form-header">
+          <h2 className="environment-page__form-title">Environments</h2>
+          <p className="environment-page__form-subtitle">
+            Manage variable sets for your grain invocations. Switch between
+            environments from the titlebar selector.
+          </p>
+        </div>
+
+        <div className="environment-form">
+          {/* Top row: Profile card + Usage card */}
+          <div className="environment-form__top-row">
+            {/* Profile card */}
+            <section
+              className="environment-form__card"
+              aria-label="Profile settings"
+            >
+              <div className="environment-form__card-header">
+                <h3 className="environment-form__card-title">Profile</h3>
+                {draftActive === currentProfile?.name && (
+                  <span className="environment-form__active-pill">
+                    <CheckCircle2 aria-hidden="true" width={12} height={12} />
+                    Active
+                  </span>
+                )}
               </div>
-              <ul className="environment-page__list" role="list">
-                {draftProfiles.map((env) => (
-                  <li
-                    key={env.name}
-                    className={`environment-page__list-item ${selectedProfile === env.name ? "environment-page__list-item--active" : ""} ${draftActive === env.name ? "environment-page__list-item--current" : ""}`}
-                  >
-                    <button
-                      className="environment-page__list-button"
-                      onClick={() => setSelectedProfile(env.name)}
-                      type="button"
+
+              <div className="environment-form__card-body">
+                <label className="environment-form__field">
+                  <span className="environment-form__label">Profile name</span>
+                  <input
+                    aria-label="Environment profile name"
+                    aria-invalid={profileNameError !== null}
+                    aria-describedby={
+                      profileNameError ? "profile-name-error" : undefined
+                    }
+                    value={profileNameDraft}
+                    onChange={(e) => {
+                      setProfileNameDraft(e.target.value);
+                      setProfileNameError(null);
+                    }}
+                    onBlur={() => commitProfileName()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitProfileName();
+                      }
+                    }}
+                    placeholder="e.g. Production, Staging, Local Dev"
+                  />
+                  {profileNameError && (
+                    <span
+                      id="profile-name-error"
+                      className="environment-form__field-error"
+                      role="alert"
                     >
-                      <span className="environment-page__list-name">
-                        {env.name}
-                      </span>
-                      {draftActive === env.name && (
-                        <span className="environment-page__list-badge">
-                          Active
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      {profileNameError}
+                    </span>
+                  )}
+                </label>
+
+                <div className="environment-form__actions">
+                  <button
+                    className={`environment-form__action${draftActive === currentProfile?.name ? " environment-form__action--active" : ""}`}
+                    onClick={() => setActive(currentProfile!.name)}
+                    aria-pressed={draftActive === currentProfile?.name}
+                    type="button"
+                  >
+                    <CheckCircle2 aria-hidden="true" width={13} height={13} />
+                    {draftActive === currentProfile?.name
+                      ? "Currently active"
+                      : "Set as active"}
+                  </button>
+                  <button
+                    className="environment-form__action environment-form__action--danger"
+                    onClick={removeProfile}
+                    disabled={draftProfiles.length <= 1}
+                    aria-label="Delete this profile"
+                    title={
+                      draftProfiles.length <= 1
+                        ? "Cannot delete the last profile"
+                        : "Delete profile"
+                    }
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" width={13} height={13} />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* Usage card */}
+            <section
+              className="environment-form__card environment-form__card--usage"
+              aria-label="Usage hints"
+            >
+              <div className="environment-form__card-header">
+                <h3 className="environment-form__card-title">How it works</h3>
+              </div>
+              <div className="environment-form__card-body">
+                <p className="environment-form__usage-text">
+                  Reference variables in your grain invocation payloads using
+                  either syntax:
+                </p>
+                <div className="environment-form__usage-codes">
+                  <code className="environment-form__usage-code">
+                    {"${env:SOME_KEY}"}
+                  </code>
+                  <span className="environment-form__usage-or">or</span>
+                  <code className="environment-form__usage-code">
+                    {"{{SOME_KEY}}"}
+                  </code>
+                </div>
+                <p className="environment-form__usage-text">
+                  The active profile&rsquo;s values are substituted at
+                  invocation time. Switch profiles from the titlebar selector
+                  without editing your payloads.
+                </p>
+              </div>
+            </section>
+          </div>
+
+          {/* Variables card — full width */}
+          <section
+            className="environment-form__card environment-form__card--variables"
+            aria-label="Environment variables"
+          >
+            <div className="environment-form__card-header">
+              <h3 className="environment-form__card-title">Variables</h3>
+              <span className="environment-form__card-badge">
+                {profileVarCount}{" "}
+                {profileVarCount === 1 ? "variable" : "variables"}
+              </span>
             </div>
 
-            <div className="environment-page__form-area">
-              {currentProfile ? (
-                <div className="environment-form">
-                  <div className="environment-form__toolbar">
-                    <label className="environment-form__field">
-                      <span>Profile name</span>
-                      <input
-                        aria-label="Environment profile name"
-                        aria-invalid={profileNameError !== null}
-                        value={profileNameDraft}
-                        onChange={(e) => {
-                          setProfileNameDraft(e.target.value);
-                          setProfileNameError(null);
-                        }}
-                        onBlur={() => commitProfileName()}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            commitProfileName();
-                          }
-                        }}
+            <div className="environment-form__card-body">
+              {/* Add variable row */}
+              <div className="environment-form__var-inputs">
+                <div className="environment-form__var-key-input">
+                  <input
+                    aria-label="Variable key"
+                    aria-invalid={keyError !== null}
+                    aria-describedby={keyError ? "var-key-error" : undefined}
+                    placeholder="Variable name"
+                    value={envVarKey}
+                    onChange={(e) => handleKeyChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addVariable();
+                      }
+                    }}
+                  />
+                  {keyError && (
+                    <span
+                      id="var-key-error"
+                      className="environment-form__var-error"
+                      role="alert"
+                    >
+                      <AlertTriangle
+                        aria-hidden="true"
+                        width={10}
+                        height={10}
                       />
-                      {profileNameError && (
-                        <span
-                          className="environment-form__field-error"
-                          role="alert"
-                        >
-                          {profileNameError}
-                        </span>
-                      )}
-                    </label>
-                    <div className="environment-form__actions">
-                      <button
-                        aria-label="Set as active environment"
-                        aria-pressed={draftActive === currentProfile.name}
-                        className={`environment-form__action ${draftActive === currentProfile.name ? "environment-form__action--active" : ""}`}
-                        onClick={() => setActive(currentProfile.name)}
-                        type="button"
-                      >
-                        {draftActive === currentProfile.name
-                          ? "Active"
-                          : "Set active"}
-                      </button>
-                      <button
-                        aria-label="Delete environment profile"
-                        className="environment-form__action environment-form__action--danger"
-                        disabled={draftProfiles.length === 0}
-                        onClick={removeProfile}
-                        title="Delete profile"
-                        type="button"
-                      >
-                        <Trash2 aria-hidden="true" width={12} height={12} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {saveError && (
-                    <div className="environment-form__error" role="alert">
-                      <div className="environment-form__error-header">
-                        <AlertTriangle
-                          aria-hidden="true"
-                          width={14}
-                          height={14}
-                        />
-                        <span>Save failed</span>
-                        <button
-                          aria-label="Dismiss error"
-                          className="environment-form__error-dismiss"
-                          onClick={dismissSaveError}
-                          type="button"
-                        >
-                          <X aria-hidden="true" width={12} height={12} />
-                        </button>
-                      </div>
-                      <p className="environment-form__error-message">
-                        {saveError}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="environment-form__section">
-                    <h4>Variables</h4>
-                    <div className="environment-form__var-inputs">
-                      <div className="environment-form__var-key-input">
-                        <input
-                          aria-label="Variable key"
-                          aria-invalid={keyError !== null}
-                          placeholder="Key"
-                          value={envVarKey}
-                          onChange={(e) => handleKeyChange(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addVariable();
-                            }
-                          }}
-                        />
-                        {keyError && (
-                          <span
-                            className="environment-form__var-error"
-                            role="alert"
-                          >
-                            <AlertTriangle
-                              aria-hidden="true"
-                              width={10}
-                              height={10}
-                            />
-                            {keyError}
-                          </span>
-                        )}
-                      </div>
-                      <InlineAutocomplete
-                        envVars={Object.keys(currentProfile.variables)}
-                      >
-                        <input
-                          ref={envVarValueRef}
-                          aria-label="Variable value"
-                          placeholder="Value"
-                          value={envVarValue}
-                          onChange={(e) => setEnvVarValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addVariable();
-                            }
-                          }}
-                        />
-                      </InlineAutocomplete>
-                      <button
-                        aria-label="Add variable"
-                        className="environment-form__mini-command"
-                        disabled={!isPendingKeyValid}
-                        onClick={addVariable}
-                        title={keyError ?? "Add variable"}
-                        type="button"
-                      >
-                        <Plus aria-hidden="true" width={12} height={12} />
-                      </button>
-                    </div>
-
-                    {Object.entries(currentProfile.variables).length > 0 ? (
-                      <ul
-                        className="environment-form__var-list"
-                        aria-label="Environment variables"
-                      >
-                        {Object.entries(currentProfile.variables).map(
-                          ([key, value]) => (
-                            <li key={key}>
-                              {editingKey === key ? (
-                                <>
-                                  <div className="environment-form__var-key-input environment-form__var-key-input--edit">
-                                    <input
-                                      aria-label="Edit variable key"
-                                      aria-invalid={editKeyError !== null}
-                                      className="environment-form__var-edit-input"
-                                      value={editKeyDraft}
-                                      onChange={(e) =>
-                                        handleEditKeyChange(e.target.value)
-                                      }
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                          e.preventDefault();
-                                          saveEditVariable();
-                                        }
-                                        if (e.key === "Escape") {
-                                          e.preventDefault();
-                                          cancelEditVariable();
-                                        }
-                                      }}
-                                      autoFocus
-                                    />
-                                    {editKeyError && (
-                                      <span
-                                        className="environment-form__var-error"
-                                        role="alert"
-                                      >
-                                        <AlertTriangle
-                                          aria-hidden="true"
-                                          width={10}
-                                          height={10}
-                                        />
-                                        {editKeyError}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <InlineAutocomplete
-                                    envVars={Object.keys(
-                                      currentProfile.variables,
-                                    )}
-                                  >
-                                    <input
-                                      ref={editValueRef}
-                                      aria-label="Edit variable value"
-                                      className="environment-form__var-edit-input environment-form__var-edit-input--value"
-                                      value={editValueDraft}
-                                      onChange={(e) =>
-                                        setEditValueDraft(e.target.value)
-                                      }
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                          e.preventDefault();
-                                          saveEditVariable();
-                                        }
-                                        if (e.key === "Escape") {
-                                          e.preventDefault();
-                                          cancelEditVariable();
-                                        }
-                                      }}
-                                    />
-                                  </InlineAutocomplete>
-                                  <button
-                                    aria-label="Save variable edit"
-                                    className="environment-form__mini-command"
-                                    onClick={saveEditVariable}
-                                    title="Save"
-                                    type="button"
-                                  >
-                                    <Check
-                                      aria-hidden="true"
-                                      width={12}
-                                      height={12}
-                                    />
-                                  </button>
-                                  <button
-                                    aria-label="Cancel variable edit"
-                                    className="environment-form__mini-command"
-                                    onClick={cancelEditVariable}
-                                    title="Cancel"
-                                    type="button"
-                                  >
-                                    <X
-                                      aria-hidden="true"
-                                      width={12}
-                                      height={12}
-                                    />
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="environment-form__var-key">
-                                    {key}
-                                  </span>
-                                  <span className="environment-form__var-value">
-                                    {value}
-                                  </span>
-                                  <button
-                                    aria-label={`Edit ${key}`}
-                                    className="environment-form__mini-command"
-                                    onClick={() =>
-                                      startEditVariable(key, value)
-                                    }
-                                    title="Edit"
-                                    type="button"
-                                  >
-                                    <Pencil
-                                      aria-hidden="true"
-                                      width={12}
-                                      height={12}
-                                    />
-                                  </button>
-                                  <button
-                                    aria-label={`Remove ${key}`}
-                                    className="environment-form__mini-command"
-                                    onClick={() => removeVariable(key)}
-                                    title="Remove"
-                                    type="button"
-                                  >
-                                    <X
-                                      aria-hidden="true"
-                                      width={12}
-                                      height={12}
-                                    />
-                                  </button>
-                                </>
-                              )}
-                            </li>
-                          ),
-                        )}
-                      </ul>
-                    ) : (
-                      <div className="environment-form__empty">
-                        <Braces aria-hidden="true" width={20} height={20} />
-                        <span>No variables defined</span>
-                      </div>
-                    )}
-                  </div>
-                  {draftProfiles.length > 0 && (
-                    <div className="environment-form__footer">
-                      <button
-                        aria-label="Save environment changes"
-                        className={`environment-page__save-btn ${hasChanges ? "environment-page__save-btn--dirty" : ""}`}
-                        disabled={!hasChanges || isSaving}
-                        onClick={handleSave}
-                        type="button"
-                      >
-                        <Save aria-hidden="true" width={14} height={14} />
-                        {isSaving
-                          ? "Saving…"
-                          : hasChanges
-                            ? "Save changes"
-                            : "Saved"}
-                      </button>
-                    </div>
+                      {keyError}
+                    </span>
                   )}
                 </div>
+                <InlineAutocomplete
+                  envVars={Object.keys(currentProfile?.variables ?? {})}
+                >
+                  <input
+                    ref={envVarValueRef}
+                    aria-label="Variable value"
+                    placeholder="Value"
+                    value={envVarValue}
+                    onChange={(e) => setEnvVarValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addVariable();
+                      }
+                    }}
+                  />
+                </InlineAutocomplete>
+                <button
+                  className="environment-form__mini-command environment-form__mini-command--add"
+                  disabled={!isPendingKeyValid}
+                  onClick={addVariable}
+                  aria-label={keyError ?? "Add variable"}
+                  title={keyError ?? "Add variable"}
+                  type="button"
+                >
+                  <Plus aria-hidden="true" width={13} height={13} />
+                </button>
+              </div>
+
+              {/* Variable list */}
+              {profileVarCount > 0 ? (
+                <ul
+                  className="environment-form__var-list"
+                  aria-label="Defined variables"
+                  role="list"
+                >
+                  {Object.entries(currentProfile!.variables).map(
+                    ([key, value]) => (
+                      <li
+                        key={key}
+                        className={`environment-form__var-row${editingKey === key ? " environment-form__var-row--editing" : ""}`}
+                      >
+                        {editingKey === key ? (
+                          <>
+                            <div className="environment-form__var-key-input environment-form__var-key-input--edit">
+                              <input
+                                aria-label="Edit variable key"
+                                aria-invalid={editKeyError !== null}
+                                className="environment-form__var-edit-input"
+                                value={editKeyDraft}
+                                onChange={(e) =>
+                                  handleEditKeyChange(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    saveEditVariable();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    cancelEditVariable();
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              {editKeyError && (
+                                <span
+                                  className="environment-form__var-error"
+                                  role="alert"
+                                >
+                                  <AlertTriangle
+                                    aria-hidden="true"
+                                    width={10}
+                                    height={10}
+                                  />
+                                  {editKeyError}
+                                </span>
+                              )}
+                            </div>
+                            <InlineAutocomplete
+                              envVars={Object.keys(currentProfile!.variables)}
+                            >
+                              <input
+                                ref={editValueRef}
+                                aria-label="Edit variable value"
+                                className="environment-form__var-edit-input environment-form__var-edit-input--value"
+                                value={editValueDraft}
+                                onChange={(e) =>
+                                  setEditValueDraft(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    saveEditVariable();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    cancelEditVariable();
+                                  }
+                                }}
+                              />
+                            </InlineAutocomplete>
+                            <div className="environment-form__var-row-actions">
+                              <button
+                                className="environment-form__mini-command environment-form__mini-command--confirm"
+                                onClick={saveEditVariable}
+                                aria-label="Confirm edit"
+                                title="Confirm"
+                                type="button"
+                              >
+                                <Check
+                                  aria-hidden="true"
+                                  width={12}
+                                  height={12}
+                                />
+                              </button>
+                              <button
+                                className="environment-form__mini-command"
+                                onClick={cancelEditVariable}
+                                aria-label="Cancel edit"
+                                title="Cancel"
+                                type="button"
+                              >
+                                <X aria-hidden="true" width={12} height={12} />
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <code className="environment-form__var-key">
+                              {key}
+                            </code>
+                            <span className="environment-form__var-value">
+                              {value || (
+                                <span className="environment-form__var-value--empty">
+                                  (empty)
+                                </span>
+                              )}
+                            </span>
+                            <div className="environment-form__var-row-actions">
+                              <button
+                                className="environment-form__mini-command"
+                                onClick={() => startEditVariable(key, value)}
+                                aria-label={`Edit variable ${key}`}
+                                title="Edit"
+                                type="button"
+                              >
+                                <Pencil
+                                  aria-hidden="true"
+                                  width={12}
+                                  height={12}
+                                />
+                              </button>
+                              <button
+                                className="environment-form__mini-command environment-form__mini-command--remove"
+                                onClick={() => removeVariable(key)}
+                                aria-label={`Remove variable ${key}`}
+                                title="Remove"
+                                type="button"
+                              >
+                                <X aria-hidden="true" width={12} height={12} />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    ),
+                  )}
+                </ul>
               ) : (
-                <div className="environment-page__empty-state">
-                  Select or create an environment profile to edit.
+                <div className="environment-form__empty">
+                  <Braces aria-hidden="true" width={24} height={24} />
+                  <span>No variables defined for this profile</span>
+                  <span className="environment-form__empty-hint">
+                    Add a key-value pair above to start building your variable
+                    set
+                  </span>
+                </div>
+              )}
+
+              {/* Save error */}
+              {saveError && (
+                <div className="environment-form__error" role="alert">
+                  <AlertTriangle aria-hidden="true" width={14} height={14} />
+                  <div className="environment-form__error-body">
+                    <strong>Save failed</strong>
+                    <span>{saveError}</span>
+                  </div>
+                  <button
+                    className="environment-form__error-dismiss"
+                    onClick={dismissSaveError}
+                    aria-label="Dismiss error"
+                    type="button"
+                  >
+                    <X aria-hidden="true" width={12} height={12} />
+                  </button>
                 </div>
               )}
             </div>
-          </>
-        )}
+          </section>
+        </div>
       </div>
 
-      {toast && (
-        <div className="environment-toast" role="status" aria-live="polite">
-          <Check aria-hidden="true" width={14} height={14} />
-          <span>{toast}</span>
+      {/* ── Sticky save bar ── */}
+      <div
+        ref={saveBarRef}
+        className={`environment-page__save-bar${hasChanges ? " environment-page__save-bar--dirty" : ""}${saveSuccess ? " environment-page__save-bar--success" : ""}`}
+      >
+        <div className="environment-page__save-bar-status">
+          {saveSuccess ? (
+            <>
+              <CheckCircle2 aria-hidden="true" width={14} height={14} />
+              <span>Saved successfully</span>
+            </>
+          ) : hasChanges ? (
+            <>
+              <span className="environment-page__save-bar-dot" />
+              <span>Unsaved changes</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 aria-hidden="true" width={14} height={14} />
+              <span>All changes saved</span>
+            </>
+          )}
         </div>
-      )}
+        <div className="environment-page__save-bar-actions">
+          <kbd className="environment-page__save-bar-kbd">⌘S</kbd>
+          <button
+            className="environment-page__save-bar-btn"
+            disabled={!hasChanges || isSaving}
+            onClick={handleSave}
+            type="button"
+          >
+            <Save aria-hidden="true" width={14} height={14} />
+            {isSaving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
