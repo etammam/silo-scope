@@ -7,6 +7,7 @@ import {
   FolderSearch,
   Import,
   Loader2,
+  Package,
   Plus,
   Search,
   Trash2,
@@ -184,9 +185,7 @@ export function WorkspacesPage({
         setDeleteFeedback({
           type: "error",
           message:
-            error instanceof Error
-              ? error.message
-              : "Failed to delete cluster",
+            error instanceof Error ? error.message : "Failed to delete cluster",
         });
       }
     },
@@ -859,7 +858,12 @@ function WorkspaceForm({
             </ul>
           ) : (
             <div className="workspace-form__empty">
-              No silos added yet. Add a DLL or NuGet package source above.
+              <Package aria-hidden="true" width={24} height={24} />
+              <span>No silos added yet</span>
+              <span className="workspace-form__empty-hint">
+                Add a DLL assembly or NuGet package as a grain interface source
+                to enable discovery and invocation.
+              </span>
             </div>
           )}
         </div>

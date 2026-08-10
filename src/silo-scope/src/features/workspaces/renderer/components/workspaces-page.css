@@ -859,10 +859,26 @@
 /* ── Empty / errors ── */
 
 .workspace-form__empty {
+  align-items: center;
   color: var(--ui-5);
+  display: flex;
+  flex-direction: column;
   font-size: 12.5px;
-  padding: 20px 0;
+  gap: 6px;
+  padding: 28px 0;
   text-align: center;
+}
+
+.workspace-form__empty svg {
+  color: var(--ui-4);
+}
+
+.workspace-form__empty-hint {
+  color: var(--ui-5);
+  font-size: 11px;
+  line-height: 1.45;
+  max-width: 320px;
+  opacity: 0.7;
 }
 
 .workspace-form__errors {
