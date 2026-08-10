@@ -1,3 +1,19 @@
+## [1.7.0](https://github.com/etammam/silo-scope/compare/v1.6.0...v1.7.0) (2026-08-10)
+* **connection:** add cancel connection functionality and update UI states ([ed76637](https://github.com/etammam/silo-scope/commit/ed7663779ccc86a1be43ac8e686e78c790608161)) by Islam Abouzeid
+* **environment:** add profile name validation and error handling in EnvironmentPage ([c6bb78f](https://github.com/etammam/silo-scope/commit/c6bb78f804af7ae5617377f4d9bbc82e55977ab5)) by Islam Abouzeid
+* **environment:** add update and delete functionality for environment profiles ([dfb1072](https://github.com/etammam/silo-scope/commit/dfb10729e4be7f3a1d596114f3420668af3d47b1)) by Islam Abouzeid
+* **workspaces:** enhance empty state UI in WorkspacesPage with improved layout and messaging ([124d438](https://github.com/etammam/silo-scope/commit/124d4383f2d381d5fadf6bfc304c306fe207ef63)) by Islam Abouzeid
+* **feeds:** implement semantic version comparison and find latest version utility ([212a5ef](https://github.com/etammam/silo-scope/commit/212a5ef6d5a51342286a5e590ab9faf731a7685a)) by Islam Abouzeid
+* **json-rpc-client:** improve error handling and buffer parsing for JSON-RPC messages ([f5d11fe](https://github.com/etammam/silo-scope/commit/f5d11fe3fe804897f158c38b266b0a9d17f0d067)) by Islam Abouzeid
+* **style:** improve package feeds page user experience ([33eca0d](https://github.com/etammam/silo-scope/commit/33eca0d815ebdeb0ca2d0845c1677bee701d35e0)) by Islam Abouzeid
+* **style:** improve the cluster page style ([4a8b1d0](https://github.com/etammam/silo-scope/commit/4a8b1d02443a1d7bd47c44a9ebd74dafe984e136)) by Islam Abouzeid
+* **statusbar:** restyle the statusbar and improve functionality ([b026dc6](https://github.com/etammam/silo-scope/commit/b026dc67ab686efe006ed9d0ef1f94f83b0c1dd5)) by Islam Abouzeid
+* **dependencies:** update Orleans packages to version 10.2.2 and remove Terminal.Gui ([e035356](https://github.com/etammam/silo-scope/commit/e035356a7909086a4c61cc038485f405ce890b03)) by Islam Abouzeid
+* **styles:** replace --invoke-accent with --accent for consistency ([3da92c5](https://github.com/etammam/silo-scope/commit/3da92c5922aca4e63c1e994cc912a5b851692ca1)) by Islam Abouzeid
+* **styles:** update success color for input elements ([881f3ed](https://github.com/etammam/silo-scope/commit/881f3edc26c722939d25fea237aa2b98630f4a3e)) by Islam Abouzeid
+* **cd:** remove push trigger from workflow dispatch ([d73282d](https://github.com/etammam/silo-scope/commit/d73282dd7915be0f89c63410a47764b1b7360668)) by Islam Abouzeid
+* remove environment page styles from index.css to streamline CSS and improve maintainability ([0e6face](https://github.com/etammam/silo-scope/commit/0e6face344f99529284c25e3d49874ed288bfa25)) by Islam Abouzeid
+
 ## [1.6.0](https://github.com/etammam/silo-scope/compare/v1.5.0...v1.6.0) (2026-08-10)
 * **updater:** implement update pending state management and cleanup logic ([60071a4](https://github.com/etammam/silo-scope/commit/60071a44928f9c579cf6e1233edd27d77829a042)) by Islam Abouzeid
 
