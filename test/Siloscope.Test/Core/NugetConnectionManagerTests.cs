@@ -11,6 +11,7 @@ using Xunit;
 
 namespace Siloscope.Test.Core;
 
+[Collection(NuGetPackagesEnvironmentCollection.Name)]
 public sealed class NugetConnectionManagerTests
 {
     private readonly Mock<ILogger<NugetConnectionManager>> _loggerMock;

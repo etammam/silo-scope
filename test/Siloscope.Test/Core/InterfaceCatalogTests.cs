@@ -18,6 +18,7 @@ public interface ITestGuidGrain : IGrainWithGuidKey
     Task<string> Echo();
 }
 
+[Collection(NuGetPackagesEnvironmentCollection.Name)]
 public sealed class InterfaceCatalogTests
 {
     [Fact]
