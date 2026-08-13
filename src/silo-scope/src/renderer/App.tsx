@@ -1,53 +1,52 @@
 import {
-    Briefcase,
-    ChevronDown,
-    Layers,
-    LayoutTemplate,
-    PanelLeftClose,
-    PanelRightClose,
-    Play,
-    Save,
-    Square,
-    X
+  Briefcase,
+  ChevronDown,
+  Layers,
+  LayoutTemplate,
+  PanelRightClose,
+  Play,
+  Save,
+  Square,
+  X,
 } from "lucide-react";
 import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type CSSProperties,
-    type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { EnvironmentPage } from "../features/environments/renderer/components/EnvironmentPage";
 import type { EnvironmentProfile } from "../features/environments/schema";
 import { PackageFeedsPage } from "../features/feeds/renderer/components/PackageFeedsPage";
 import {
-    createPayloadTemplate,
-    RequestWorkbench,
-    type RequestState,
+  createPayloadTemplate,
+  RequestWorkbench,
+  type RequestState,
 } from "../features/grain-invocation/renderer/components/RequestWorkbench";
 import {
-    ResponseTelemetryPane,
-    type ResponsePaneTab,
+  ResponseTelemetryPane,
+  type ResponsePaneTab,
 } from "../features/grain-invocation/renderer/components/ResponseTelemetryPane";
 import {
-    buildSourceCatalogFromGrains,
-    findCatalogFunction,
-    findCatalogSource,
+  buildSourceCatalogFromGrains,
+  findCatalogFunction,
+  findCatalogSource,
 } from "../features/grain-invocation/renderer/utils/catalog";
 import type { SourceCatalogFunction } from "../features/grain-invocation/schema";
 import {
-    QuickAccessPanel,
-    type QuickAccessActions,
+  QuickAccessPanel,
+  type QuickAccessActions,
 } from "../features/quick-access/renderer/components/QuickAccessPanel";
 import { SettingsPage } from "../features/settings/renderer/components/SettingsPage";
 import type { ApplicationUpdateState } from "../features/settings/schema";
 import { WorkspacesPage } from "../features/workspaces/renderer/components/WorkspacesPage";
 import type {
-    GrainKeyType,
-    SavedRequestContext,
-    Workspace,
+  GrainKeyType,
+  SavedRequestContext,
+  Workspace,
 } from "../features/workspaces/schema";
 import { useAppStore } from "./global-state";
 import { ActivityBar, type ActivityView } from "./layout/ActivityBar";
@@ -1309,29 +1308,6 @@ function App() {
           )}
           <button
             aria-label={
-              isNavigationVisible
-                ? "Collapse navigation panel"
-                : "Expand navigation panel"
-            }
-            aria-pressed={!isNavigationVisible}
-            className="titlebar-action titlebar-action--navigation app-region-no-drag"
-            onClick={() => setIsNavigationVisible((visible) => !visible)}
-            title={
-              isNavigationVisible
-                ? "Collapse navigation panel"
-                : "Expand navigation panel"
-            }
-            type="button"
-          >
-            <PanelLeftClose
-              aria-hidden="true"
-              className="titlebar-navigation__icon"
-              width={16}
-              height={16}
-            />
-          </button>
-          <button
-            aria-label={
               paneLayout === "horizontal"
                 ? "Stack request and response panels"
                 : "Place request and response panels side by side"
@@ -1666,6 +1642,8 @@ function App() {
         logs={logs}
         isLogPanelVisible={isLogPanelVisible}
         onToggleLogPanel={() => setIsLogPanelVisible((visible) => !visible)}
+        isNavigationVisible={isNavigationVisible}
+        onToggleNavigation={() => setIsNavigationVisible((visible) => !visible)}
       />
 
       <QuickAccessPanel
