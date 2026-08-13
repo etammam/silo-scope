@@ -1,46 +1,46 @@
 version: 2
 updates:
-- package-ecosystem: "nuget"
-  directory: "/src"
-  commit-message:
-    prefix: "chore"
-    include: "scope"
-  schedule:
-    interval: "weekly"
-    day: "sunday"
-    time: "04:00"
-  open-pull-requests-limit: 5
-  target-branch: "main"
-  labels:
-  - "dependencies"
-  - "dependabot"
+  - package-ecosystem: "nuget"
+    directory: "/"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "04:00"
+    open-pull-requests-limit: 5
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "dependabot"
 
-- package-ecosystem: "npm"
-  directory: "/test"
-  schedule:
-    interval: "weekly"
-    day: "sunday"
-    time: "04:00"
-  open-pull-requests-limit: 5
-  commit-message:
-    prefix: "chore"
-    include: "scope"
-  target-branch: "main"
-  labels:
-  - "dependencies"
-  - "dependabot"
+  - package-ecosystem: "npm"
+    directory: "/src/silo-scope"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "04:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "dependabot"
 
-- package-ecosystem: "github-actions"
-  directory: "/"
-  schedule:
-    interval: "weekly"
-    day: "sunday"
-    time: "04:00"
-  open-pull-requests-limit: 5
-  commit-message:
-    prefix: "ci"
-    include: "scope"
-  target-branch: "main"
-  labels:
-  - "dependencies"
-  - "dependabot"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "04:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "dependabot"
