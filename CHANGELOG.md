@@ -1,3 +1,12 @@
+## [1.8.0](https://github.com/etammam/silo-scope/compare/v1.7.0...v1.8.0) (2026-08-13)
+* **dependabot:** add auto-merge workflow for compatible Dependabot PRs ([6d2fcbd](https://github.com/etammam/silo-scope/commit/6d2fcbd65735769eb7582ce65e6d28abeaccb1ac)) by Islam Abouzeid
+* **status-bar:** add explorer toggle button and update props ([10b6faf](https://github.com/etammam/silo-scope/commit/10b6fafcb91faf2d4ff7653e06c8972addcfa263)) by Islam Abouzeid
+* **dev-tools:** restructure justfile to organize backend and frontend commands ([905e849](https://github.com/etammam/silo-scope/commit/905e84926cffea832ba8ee18b599f78bad19be61)) by Islam Abouzeid
+* **dependabot:** correct directory paths for nuget and npm ecosystems ([f9b4310](https://github.com/etammam/silo-scope/commit/f9b4310da6771bce42510c6b54296765c7d48c99)) by Islam Abouzeid
+* Bump csharpier from 1.2.6 to 1.3.0 ([#12](https://github.com/etammam/silo-scope/issues/12)) ([74cafe8](https://github.com/etammam/silo-scope/commit/74cafe8daf68b2222301d84219d0d0e0caf4af48)) by dependabot[bot]
+* **grain-explorer:** rename and extract design into owned css file ([9f803b0](https://github.com/etammam/silo-scope/commit/9f803b0689179665a5f10c063a72a653d8a75873)) by Islam Abouzeid
+* add NuGetPackagesEnvironmentCollection for test serialization ([bbd171e](https://github.com/etammam/silo-scope/commit/bbd171e09799120fc5aeccd965c977dac6b2f9a4)) by Islam Abouzeid
+
 ## [1.7.0](https://github.com/etammam/silo-scope/compare/v1.6.0...v1.7.0) (2026-08-10)
 * **connection:** add cancel connection functionality and update UI states ([ed76637](https://github.com/etammam/silo-scope/commit/ed7663779ccc86a1be43ac8e686e78c790608161)) by Islam Abouzeid
 * **environment:** add profile name validation and error handling in EnvironmentPage ([c6bb78f](https://github.com/etammam/silo-scope/commit/c6bb78f804af7ae5617377f4d9bbc82e55977ab5)) by Islam Abouzeid
