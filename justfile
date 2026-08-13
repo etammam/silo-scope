@@ -1,24 +1,67 @@
 # SiloScope development commands
 # https://github.com/casey/just
 
-_ELECTRON_DIR := "src" / "silo-scope"
+set dotenv-load := true
 
-# Run the Electron desktop app in dev/watch mode
-dev:
-    cd {{_ELECTRON_DIR}} && npm run dev
+### Backend commands
+server subcommand *args:
+    #!/usr/bin/env bash
+    case "{{subcommand}}" in
+        build)
+            cd src/Siloscope.Core && dotnet build
+            ;;
+        run)
+            cd src/Siloscope.Core && dotnet run
+            ;;
+        test)
+            dotnet test
+            ;;
+        format)
+            dotnet csharpier .
+            ;;
+        *)
+            echo "Unknown backend subcommand: {{subcommand}}"
+            echo "Available subcommands:"
+            echo "  build  - Build the .NET core project"
+            echo "  run    - Run the .NET core project"
+            echo "  test   - Run the .NET test suite"
+            echo "  format - Format code with CSharpier"
+            exit 1
+            ;;
+    esac
 
-# Typecheck the Electron app
-typecheck:
-    cd {{_ELECTRON_DIR}} && npx tsc --noEmit
+### Frontend commands
+client subcommand *args:
+    #!/usr/bin/env bash
+    case "{{subcommand}}" in
+        run)
+            cd src/silo-scope && npm run dev
+            ;;
+        build)
+            cd src/silo-scope && npm run build
+            ;;
+        typecheck)
+            cd src/silo-scope && npm run typecheck
+            ;;
+        start)
+            cd src/silo-scope && npm run start
+            ;;
+        dist)
+            cd src/silo-scope && npm run dist
+            ;;
+        install)
+            cd src/silo-scope && npm install
+            ;;
+        *)
+            echo "Unknown frontend subcommand: {{subcommand}}"
+            echo "Available subcommands:"
+            echo "  run       - Start the Electron app in dev/watch mode"
+            echo "  build     - Build the Electron app for production"
+            echo "  typecheck - Typecheck the Electron app"
+            echo "  start     - Preview the built Electron app"
+            echo "  dist      - Package the app for distribution"
+            echo "  install   - Install dependencies"
+            exit 1
+            ;;
+    esac
 
-# Build the Electron app for production
-build:
-    cd {{_ELECTRON_DIR}} && npm run build
-
-# Preview the built Electron app
-preview:
-    cd {{_ELECTRON_DIR}} && npm run start
-
-# Install dependencies for the Electron app
-install:
-    cd {{_ELECTRON_DIR}} && npm install
