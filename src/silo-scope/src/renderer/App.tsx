@@ -52,7 +52,7 @@ import type {
 import { useAppStore } from "./global-state";
 import { ActivityBar, type ActivityView } from "./layout/ActivityBar";
 import { BackendLogsPanel } from "./layout/BackendLogsPanel";
-import { NavigationSidebar } from "./layout/NavigationSidebar";
+import { GrainsExplorer } from "./layout/GrainsExplorer";
 import { SetupBanner } from "./layout/SetupBanner";
 import { StatusBar } from "./layout/StatusBar";
 import { RequestEmptyState } from "./shared/components/RequestEmptyState";
@@ -1384,7 +1384,7 @@ function App() {
       </header>
 
       {isNavigationVisible && (
-        <NavigationSidebar
+        <GrainsExplorer
           activeView={activeView}
           grains={grains}
           isConnected={isConnected}

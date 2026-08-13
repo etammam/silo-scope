@@ -15,7 +15,7 @@ import type { NugetFeed } from "../../features/feeds/schema";
 import type { SourceCatalogInterface, SourceCatalogSource, SourceOwnedCatalog } from "../../features/grain-invocation/schema";
 import { buildSourceCatalogFromGrains } from "../../features/grain-invocation/renderer/utils/catalog";
 import type { ActivityView } from "./ActivityBar";
-import "./navigation-sidebar.css";
+import "./grains-explorer.css";
 
 const DEFAULT_NUGET_FEED: NugetFeed = {
   name: "nuget.org",
@@ -31,7 +31,7 @@ const LARGE_CATALOG_INTERFACE_THRESHOLD = 18;
 const INTERFACE_PREVIEW_LIMIT = 50;
 const METHOD_PREVIEW_LIMIT = 30;
 
-type NavigationSidebarProps = {
+type GrainsExplorerProps = {
   activeView: ActivityView;
   onConnectCluster?: () => Promise<void>;
   onDisconnectCluster?: () => Promise<void>;
@@ -60,7 +60,7 @@ type WorkspaceNavigatorProps = {
   onSelectGrain: (grainId: string | null) => void;
 };
 
-export function NavigationSidebar({
+export function GrainsExplorer({
   activeView,
   grains,
   isConnected,
@@ -79,15 +79,15 @@ export function NavigationSidebar({
   workspace,
   workspaces,
   onSelectGrain,
-}: NavigationSidebarProps) {
+}: GrainsExplorerProps) {
   const title = formatViewTitle(activeView);
 
   return (
     <aside
-      className="navigation-sidebar"
+      className="grains-explorer"
       aria-label={`${activeView} navigation`}
     >
-      <div className="navigation-sidebar__header">
+      <div className="grains-explorer__header">
         <span>{title}</span>
       </div>
 
@@ -193,13 +193,13 @@ function WorkspaceNavigator({
   };
 
   return (
-    <div className="navigation-sidebar__workspace-content">
+    <div className="grains-explorer__workspace-content">
       <section
-        className="navigation-sidebar__section navigation-sidebar__section--sources"
+        className="grains-explorer__section grains-explorer__section--sources"
         aria-labelledby="source-catalog-title"
       >
         <div className="catalog-overview">
-          <div className="navigation-sidebar__section-title" id="source-catalog-title">
+          <div className="grains-explorer__section-title" id="source-catalog-title">
             API Index
           </div>
           <div className="catalog-overview__headline">
@@ -248,47 +248,47 @@ function WorkspaceNavigator({
               ? "Interfaces collapsed for fast browsing"
               : "All discovered functions visible"}
         </div>
-        <div className="navigation-sidebar__sources-container">
+        <div className="grains-explorer__sources-container">
           {hasAnyInterfaces ? (
-            <ul className="navigation-sidebar__tree navigation-sidebar__catalog">
+            <ul className="grains-explorer__tree grains-explorer__catalog">
             {filteredSources.map((source) => (
-              <li key={source.sourceId} className="navigation-sidebar__source-item">
-                <div className="navigation-sidebar__source-row">
+              <li key={source.sourceId} className="grains-explorer__source-item">
+                <div className="grains-explorer__source-row">
                   <button
                     aria-label={`${source.label} ${source.interfaces.length}`}
                     aria-expanded={!collapsedSources.has(source.sourceId)}
-                    className="navigation-sidebar__source"
+                    className="grains-explorer__source"
                     onClick={() => toggleSource(source.sourceId)}
                     type="button"
                   >
                     {collapsedSources.has(source.sourceId) ? (
                       <ChevronRight
                         aria-hidden="true"
-                        className="navigation-sidebar__disclosure"
+                        className="grains-explorer__disclosure"
                         width={14}
                         height={14}
                       />
                     ) : (
                       <ChevronDown
                         aria-hidden="true"
-                        className="navigation-sidebar__disclosure"
+                        className="grains-explorer__disclosure"
                         width={14}
                         height={14}
                       />
                     )}
-                    <span className="navigation-sidebar__source-main">
-                      <span className="navigation-sidebar__source-name">
+                    <span className="grains-explorer__source-main">
+                      <span className="grains-explorer__source-name">
                         {source.label}
                       </span>
-                      <span className="navigation-sidebar__source-meta">
-                        <span className="navigation-sidebar__source-type">
+                      <span className="grains-explorer__source-meta">
+                        <span className="grains-explorer__source-type">
                           {source.sourceType}
                         </span>
                         <span>{formatSourceDetail(source)}</span>
                       </span>
                     </span>
                     <span
-                      className="navigation-sidebar__source-status"
+                      className="grains-explorer__source-status"
                       data-status={source.discoveryStatus}
                     >
                       {source.discoveryStatus}
@@ -299,7 +299,7 @@ function WorkspaceNavigator({
                   </button>
                 </div>
                 {source.interfaces.length > 0 && !collapsedSources.has(source.sourceId) && (
-                  <div className="navigation-sidebar__source-children">
+                  <div className="grains-explorer__source-children">
                     <SourceInterfaceTree
                       fullyVisibleInterfaces={fullyVisibleInterfaces}
                       hasCatalogQuery={hasCatalogQuery}
@@ -321,20 +321,20 @@ function WorkspaceNavigator({
             ))}
           </ul>
         ) : hasCatalogQuery ? (
-          <div className="navigation-sidebar__empty">
+          <div className="grains-explorer__empty">
             No functions match &quot;{catalogQuery.trim()}&quot;
           </div>
         ) : !workspace ? (
-          <div className="navigation-sidebar__empty-state">
-            <div className="navigation-sidebar__empty-icon">
+          <div className="grains-explorer__empty-state">
+            <div className="grains-explorer__empty-icon">
               <Briefcase aria-hidden="true" width={32} height={32} />
             </div>
             <strong>No cluster loaded</strong>
             <span>Load or create a cluster to start discovering grain functions.</span>
-            <div className="navigation-sidebar__empty-actions">
+            <div className="grains-explorer__empty-actions">
               {onLoadWorkspace && (
                 <button
-                  className="navigation-sidebar__empty-action"
+                  className="grains-explorer__empty-action"
                   onClick={onLoadWorkspace}
                   type="button"
                 >
@@ -343,7 +343,7 @@ function WorkspaceNavigator({
               )}
               {onNewWorkspace && (
                 <button
-                  className="navigation-sidebar__empty-action navigation-sidebar__empty-action--secondary"
+                  className="grains-explorer__empty-action grains-explorer__empty-action--secondary"
                   onClick={onNewWorkspace}
                   type="button"
                 >
@@ -353,16 +353,16 @@ function WorkspaceNavigator({
             </div>
           </div>
         ) : !isConnected ? (
-          <div className="navigation-sidebar__empty-state">
-            <div className="navigation-sidebar__empty-icon">
+          <div className="grains-explorer__empty-state">
+            <div className="grains-explorer__empty-icon">
               <AlertCircle aria-hidden="true" width={32} height={32} />
             </div>
             <strong>Cluster not connected</strong>
             <span>Connect to your cluster to discover and browse available grain functions.</span>
             {onConnectCluster && (
-              <div className="navigation-sidebar__empty-actions">
+              <div className="grains-explorer__empty-actions">
                 <button
-                  className="navigation-sidebar__empty-action"
+                  className="grains-explorer__empty-action"
                   onClick={onConnectCluster}
                   type="button"
                 >
@@ -372,16 +372,16 @@ function WorkspaceNavigator({
             )}
           </div>
         ) : (
-          <div className="navigation-sidebar__empty-state">
-            <div className="navigation-sidebar__empty-icon">
+          <div className="grains-explorer__empty-state">
+            <div className="grains-explorer__empty-icon">
               <Search aria-hidden="true" width={32} height={32} />
             </div>
             <strong>No functions discovered</strong>
             <span>Your cluster is connected but no grain interfaces were found.</span>
             {onDiscoverGrains && (
-              <div className="navigation-sidebar__empty-actions">
+              <div className="grains-explorer__empty-actions">
                 <button
-                  className="navigation-sidebar__empty-action"
+                  className="grains-explorer__empty-action"
                   onClick={onDiscoverGrains}
                   type="button"
                 >
@@ -429,7 +429,7 @@ function SourceInterfaceTree({
 }) {
   if (source.interfaces.length === 0) {
     return (
-      <div className="navigation-sidebar__empty navigation-sidebar__empty--nested">
+      <div className="grains-explorer__empty grains-explorer__empty--nested">
         No functions discovered
       </div>
     );
@@ -451,7 +451,7 @@ function SourceInterfaceTree({
   const hiddenInterfaceCount = source.interfaces.length - visibleInterfaces.length;
 
   return (
-    <ul className="navigation-sidebar__tree navigation-sidebar__tree--nested">
+    <ul className="grains-explorer__tree grains-explorer__tree--nested">
       {visibleInterfaces.map((catalogInterface) => {
         const key = `${source.sourceId}:${catalogInterface.interfaceId}`;
         const containsSelection =
@@ -468,11 +468,11 @@ function SourceInterfaceTree({
         const hiddenMethodCount = catalogInterface.methods.length - visibleMethods.length;
 
         return (
-          <li className="navigation-sidebar__interface-item" key={catalogInterface.interfaceId}>
+          <li className="grains-explorer__interface-item" key={catalogInterface.interfaceId}>
             <button
               aria-label={`${catalogInterface.interfaceName} ${catalogInterface.methods.length}`}
               aria-expanded={isExpanded}
-              className="navigation-sidebar__interface"
+              className="grains-explorer__interface"
               onClick={() =>
                 onToggleInterface(source.sourceId, catalogInterface.interfaceId, isExpanded)
               }
@@ -481,14 +481,14 @@ function SourceInterfaceTree({
               {!isExpanded ? (
                 <ChevronRight
                   aria-hidden="true"
-                  className="navigation-sidebar__disclosure"
+                  className="grains-explorer__disclosure"
                   width={14}
                   height={14}
                 />
               ) : (
                 <ChevronDown
                   aria-hidden="true"
-                  className="navigation-sidebar__disclosure"
+                  className="grains-explorer__disclosure"
                   width={14}
                   height={14}
                 />
@@ -500,7 +500,7 @@ function SourceInterfaceTree({
               <small>{catalogInterface.methods.length}</small>
             </button>
             {isExpanded && (
-              <ul className="navigation-sidebar__tree navigation-sidebar__tree--nested navigation-sidebar__tree--methods">
+              <ul className="grains-explorer__tree grains-explorer__tree--nested grains-explorer__tree--methods">
                 {visibleMethods.map((method) => (
                   <li key={method.functionId}>
                     <button
@@ -518,7 +518,7 @@ function SourceInterfaceTree({
                       type="button"
                     >
                       <span
-                        className="navigation-sidebar__grain-icon"
+                        className="grains-explorer__grain-icon"
                         aria-hidden="true"
                       />
                       <span>{method.signature}</span>
@@ -526,9 +526,9 @@ function SourceInterfaceTree({
                   </li>
                 ))}
                 {hiddenMethodCount > 0 && (
-                  <li className="navigation-sidebar__show-more-item">
+                  <li className="grains-explorer__show-more-item">
                     <button
-                      className="navigation-sidebar__show-more"
+                      className="grains-explorer__show-more"
                       onClick={() => onShowAllMethods(source.sourceId, catalogInterface.interfaceId)}
                       type="button"
                     >
@@ -542,9 +542,9 @@ function SourceInterfaceTree({
         );
       })}
       {hiddenInterfaceCount > 0 && (
-        <li className="navigation-sidebar__load-more-item">
+        <li className="grains-explorer__load-more-item">
           <button
-            className="navigation-sidebar__load-more"
+            className="grains-explorer__load-more"
             onClick={() => onShowMoreInterfaces(source.sourceId)}
             type="button"
           >
