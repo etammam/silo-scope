@@ -20,6 +20,9 @@ jobs:
         uses: dependabot/fetch-metadata@v3
         with:
           compat-lookup: true
+          # PR author is already verified by the job condition; maintainer
+          # branch updates ("Update branch") break commit-signature checks.
+          skip-commit-verification: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Approve PR
