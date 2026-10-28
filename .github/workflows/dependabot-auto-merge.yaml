@@ -11,7 +11,9 @@ jobs:
   auto-merge:
     name: Auto-merge compatible Dependabot PRs
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    # Use the PR author rather than the push actor so user-initiated events
+    # (e.g. "Update branch") on Dependabot PRs don't skip the job.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       - name: Fetch Dependabot metadata
         id: dependabot-metadata
