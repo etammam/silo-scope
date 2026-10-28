@@ -82,7 +82,7 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
 
       - name: Upload Core artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: siloscope-core-${{ matrix.runtime }}
           path: artifacts/core/${{ matrix.runtime }}
@@ -152,7 +152,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload distributable packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: silo-scope-dist-${{ matrix.name }}
           path: |
