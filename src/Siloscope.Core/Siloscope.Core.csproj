@@ -20,6 +20,8 @@
     <PackageReference Include="Microsoft.Orleans.Clustering.ZooKeeper" />
     <PackageReference Include="Microsoft.Orleans.Serialization.MessagePack" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
+    <!-- Lifts the vulnerable transitive Pkcs 9.0.13 (via Microsoft.Data.SqlClient) to a patched release -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="NuGet.Protocol" />
     <PackageReference Include="Serilog" />
